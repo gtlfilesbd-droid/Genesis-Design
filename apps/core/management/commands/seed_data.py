@@ -226,3 +226,5 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Seeded {len(SAMPLE_PROJECTS)} projects, {total_designs} designs, settings, and demo users'
         ))
+        from django.core.management import call_command
+        call_command('seed_permissions')

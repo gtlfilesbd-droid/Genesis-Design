@@ -3,7 +3,8 @@ from django.utils import timezone
 
 from apps.core.models import ActivityLog
 from apps.designs.models import DesignRequest, DesignStatus
-from apps.projects.models import Project, ProjectStatus
+from apps.permissions.services import PermissionService
+from apps.projects.models import ProjectStatus
 
 
 def get_recent_activity(limit=8):
@@ -35,12 +36,8 @@ def get_pending_actions(user, limit=5):
 def get_dashboard_stats(user):
     now = timezone.now()
     terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
-    designs = DesignRequest.objects.all()
-    projects = Project.objects.all()
-
-    if user.is_design_requester and not user.is_genesis_admin:
-        projects = projects.filter(created_by=user)
-        designs = designs.filter(requested_by=user)
+    designs = PermissionService.filter_design_requests(user, DesignRequest.objects.all())
+    projects = PermissionService.get_user_projects(user)
 
     active_projects = projects.filter(status=ProjectStatus.ACTIVE).count()
     running = designs.exclude(status__in=terminal).count()

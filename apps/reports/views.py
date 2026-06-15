@@ -8,7 +8,7 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 
-from apps.accounts.decorators import role_required
+from apps.permissions.decorators import require_global_permission
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
@@ -65,7 +65,7 @@ def _sla_compliance_data():
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def reports_index(request):
     tab = request.GET.get('tab', 'performance')
     designer_filter = request.GET.get('designer')
@@ -104,7 +104,7 @@ def reports_index(request):
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def export_csv(request, report_type):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{report_type}.csv"'
@@ -156,7 +156,7 @@ def export_csv(request, report_type):
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def export_excel(request, report_type):
     try:
         import openpyxl
@@ -184,7 +184,7 @@ def export_excel(request, report_type):
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def export_pdf(request, report_type):
     try:
         from reportlab.lib.pagesizes import A4

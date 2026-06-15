@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.analytics',
     'apps.api',
+    'apps.permissions',
 ]
 
 MIDDLEWARE = [
@@ -44,6 +45,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.core.middleware.AuditMiddleware',
+    'apps.permissions.middleware.ProjectContextMiddleware',
 ]
 
 ROOT_URLCONF = 'genesis_design.urls'
@@ -60,7 +62,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.notifications.context_processors.unread_notifications',
-                'apps.core.context_processors.genesis_navigation',
+                'apps.permissions.context_processors.user_permissions',
             ],
         },
     },

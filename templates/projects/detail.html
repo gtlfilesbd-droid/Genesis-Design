@@ -12,12 +12,12 @@
             <p class="text-sm text-slate-500 mt-1">{{ project.code }} · Started {{ project.start_date|date:"d M Y" }}</p>
         </div>
         <div class="flex gap-2 self-start">
-        {% if user.is_design_requester or user.is_head_of_design or user.is_genesis_admin %}
+        {% if can_edit_project %}
         <a href="{% url 'projects:edit' project.pk %}" class="g-btn-secondary inline-flex items-center gap-2">
             <i data-lucide="pencil" class="w-4 h-4"></i> Edit
         </a>
         {% endif %}
-        {% if user.is_design_requester or user.is_genesis_admin %}
+        {% if can_request %}
         <a href="{% url 'projects:request_new' project.pk %}" class="g-btn-primary inline-flex items-center gap-2">
             <i data-lucide="plus" class="w-4 h-4"></i> New Design Request
         </a>

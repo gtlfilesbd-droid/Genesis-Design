@@ -3,7 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 
-from apps.accounts.decorators import role_required
+from apps.permissions.decorators import require_global_permission
+from apps.permissions.services import PermissionService
+from apps.accounts.models import User, UserRole
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 
@@ -34,9 +36,41 @@ class CommentForm(forms.Form):
     comments = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
 
 
+ACTION_PERMISSIONS = {
+    'acknowledge': 'PROJECT_PERM_ASSIGN',
+    'assign': 'PROJECT_PERM_ASSIGN',
+    'accept_assignment': 'DESIGN_PERM_WORK',
+    'submit_work': 'DESIGN_PERM_WORK',
+    'request_correction': 'PROJECT_PERM_REVIEW',
+    'accept_design': 'PROJECT_PERM_REVIEW',
+    'verification_correction': 'PROJECT_PERM_VERIFY',
+    'verify_approved': 'PROJECT_PERM_VERIFY',
+    'forward_to_designer': 'PROJECT_PERM_ASSIGN',
+    'complete': 'PROJECT_PERM_COMPLETE',
+}
+
+
+def _check_workflow_permission(request, design, action):
+    required = ACTION_PERMISSIONS.get(action)
+    if not required:
+        return True
+    project = design.project
+    if action in ('accept_assignment', 'submit_work'):
+        if PermissionService.has_project_permission(request.user, project, 'PROJECT_PERM_ASSIGN'):
+            return True
+        return (
+            PermissionService.has_project_permission(request.user, project, 'DESIGN_PERM_WORK')
+            and design.assigned_designer_id == request.user.pk
+        )
+    return PermissionService.has_project_permission(request.user, project, required)
+
+
 @login_required
 def workflow_action(request, pk, action):
     design = get_object_or_404(DesignRequest, pk=pk)
+    if not _check_workflow_permission(request, design, action):
+        messages.error(request, "You don't have permission to perform this action.")
+        return redirect('requests:detail', pk=pk)
 
     form_actions = {
         'assign': AssignDesignerForm,
@@ -89,9 +123,13 @@ def workflow_action(request, pk, action):
 @login_required
 def assign_designer_view(request, pk):
     design = get_object_or_404(DesignRequest, pk=pk)
+    if not PermissionService.has_project_permission(request.user, design.project, 'PROJECT_PERM_ASSIGN'):
+        messages.error(request, "You don't have permission to assign designers.")
+        return redirect('requests:detail', pk=pk)
     suggested = suggest_designer(design)
     if request.method == 'POST':
         form = AssignDesignerForm(request.POST)
+        form.fields['designer'].queryset = PermissionService.get_assignable_designers(design.project)
         if form.is_valid():
             try:
                 transition(design, 'assign', request.user, request=request, **form.cleaned_data)
@@ -104,21 +142,26 @@ def assign_designer_view(request, pk):
         if suggested:
             initial['designer'] = suggested
         form = AssignDesignerForm(initial=initial)
+        form.fields['designer'].queryset = PermissionService.get_assignable_designers(design.project)
     return render(request, 'workflow/assign.html', {
         'design': design, 'form': form, 'suggested_designer': suggested,
     })
 
 
 @login_required
+@require_global_permission('VIS_PERM_WORKFLOW_BOARD')
 def kanban_board(request):
     statuses = [
         (s.value, s.label) for s in DesignStatus
         if s not in [DesignStatus.DRAFT]
     ]
     columns = {}
-    queryset = DesignRequest.objects.select_related(
-        'project', 'drawing_type', 'assigned_designer', 'current_holder'
-    ).exclude(status=DesignStatus.DRAFT)
+    queryset = PermissionService.filter_design_requests(
+        request.user,
+        DesignRequest.objects.select_related(
+            'project', 'drawing_type', 'assigned_designer', 'current_holder'
+        ).exclude(status=DesignStatus.DRAFT),
+    )
 
     project_id = request.GET.get('project')
     priority = request.GET.get('priority')
@@ -140,6 +183,8 @@ def kanban_board(request):
     from apps.projects.models import Project
     return render(request, 'workflow/kanban.html', {
         'columns': columns,
-        'projects': Project.objects.filter(status='active')[:50],
-        'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
+        'projects': PermissionService.get_user_projects(request.user).filter(status='active')[:50],
+        'designers': PermissionService.get_assignable_designers(
+            Project.objects.filter(status='active').first()
+        ) if Project.objects.filter(status='active').exists() else User.objects.none(),
     })

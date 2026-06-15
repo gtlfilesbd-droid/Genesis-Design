@@ -12,13 +12,14 @@ from apps.core.utils import log_activity
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
 
-from .decorators import role_required
+from apps.permissions.decorators import require_global_permission
+from apps.permissions.services import PermissionService
 from .models import User, UserRole, UserStatus
 from .user_forms import UserCreateForm, UserEditForm
 
 
 @login_required
-@role_required(UserRole.ADMIN)
+@require_global_permission('PERM_MANAGE_USERS')
 def user_list(request):
     users = User.objects.select_related('team', 'manager').annotate(
         running_tasks=Count(
@@ -62,7 +63,7 @@ def user_list(request):
 
 
 @login_required
-@role_required(UserRole.ADMIN)
+@require_global_permission('PERM_MANAGE_USERS')
 def user_create(request):
     if request.method == 'POST':
         form = UserCreateForm(request.POST)
@@ -77,7 +78,7 @@ def user_create(request):
 
 
 @login_required
-@role_required(UserRole.ADMIN)
+@require_global_permission('PERM_MANAGE_USERS')
 def user_edit(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method == 'POST':
@@ -97,7 +98,10 @@ def user_edit(request, pk):
 @login_required
 def user_detail(request, pk):
     user_obj = get_object_or_404(User.objects.select_related('team', 'manager'), pk=pk)
-    if request.user.role == UserRole.DESIGN_REQUESTER and request.user.pk != user_obj.pk and not request.user.is_genesis_admin:
+    if (
+        request.user.pk != user_obj.pk
+        and not PermissionService.has_global_permission(request.user, 'VIS_PERM_USER_PROFILES')
+    ):
         messages.error(request, 'Access denied.')
         return redirect('accounts:profile')
 
@@ -150,7 +154,7 @@ def user_detail(request, pk):
 
 
 @login_required
-@role_required(UserRole.ADMIN)
+@require_global_permission('PERM_MANAGE_USERS')
 def user_disable(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method == 'POST':

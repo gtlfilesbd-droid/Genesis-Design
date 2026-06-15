@@ -7,8 +7,8 @@ from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from apps.accounts.decorators import role_required
-from apps.accounts.models import UserRole
+from apps.permissions.decorators import require_global_permission, require_project_permission
+from apps.permissions.services import PermissionService
 from apps.core.models import ActivityLog
 from apps.core.utils import log_activity
 
@@ -53,9 +53,7 @@ class ProjectAttachmentForm(forms.Form):
 
 @login_required
 def project_list(request):
-    qs = Project.objects.select_related('created_by')
-    if request.user.role == UserRole.DESIGN_REQUESTER and not request.user.is_genesis_admin:
-        qs = qs.filter(created_by=request.user)
+    qs = PermissionService.get_user_projects(request.user).select_related('created_by')
 
     status = request.GET.get('status')
     search = request.GET.get('q')
@@ -75,7 +73,7 @@ def project_list(request):
 
 
 @login_required
-@role_required(UserRole.DESIGN_REQUESTER, UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PROJECT_PERM_CREATE')
 def project_create(request):
     if request.method == 'POST':
         form = ProjectForm(request.POST)
@@ -113,11 +111,7 @@ def project_detail(request, pk):
         Project.objects.select_related('created_by'),
         pk=pk,
     )
-    if (
-        request.user.role == UserRole.DESIGN_REQUESTER
-        and not request.user.is_genesis_admin
-        and project.created_by != request.user
-    ):
+    if not PermissionService.has_project_permission(request.user, project, 'PROJECT_PERM_VIEW'):
         messages.error(request, 'You do not have access to this project.')
         return redirect('projects:list')
 
@@ -151,7 +145,7 @@ def project_detail(request, pk):
 
 
 @login_required
-@role_required(UserRole.DESIGN_REQUESTER, UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_project_permission('PROJECT_PERM_EDIT')
 def project_edit(request, pk):
     project = get_object_or_404(Project, pk=pk)
     if request.method == 'POST':

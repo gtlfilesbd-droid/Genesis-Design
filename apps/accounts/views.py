@@ -12,7 +12,9 @@ from apps.core.dashboard_helpers import (
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project, ProjectStatus
 
-from .decorators import role_required
+from apps.permissions.decorators import require_global_permission
+from apps.permissions.services import PermissionService
+
 from .models import User, UserRole
 
 
@@ -41,6 +43,8 @@ class GenesisPasswordResetDoneView(PasswordResetDoneView):
 
 @login_required
 def dashboard_redirect(request):
+    if not PermissionService.has_global_permission(request.user, 'VIS_PERM_DASHBOARD'):
+        return redirect('projects:list')
     return redirect(request.user.get_dashboard_url_name())
 
 
@@ -77,7 +81,7 @@ def profile(request):
 
 
 @login_required
-@role_required(UserRole.ADMIN)
+@require_global_permission('VIS_PERM_DASHBOARD')
 def admin_dashboard(request):
     context = _base_dashboard_context(request)
     context.update({
@@ -86,19 +90,19 @@ def admin_dashboard(request):
         'total_designs': DesignRequest.objects.count(),
         'charts': get_chart_data(),
         'show_charts': True,
-        'show_admin_panel_link': True,
     })
     context['charts_json'] = json.dumps(context['charts'])
     return render(request, 'accounts/dashboards/admin.html', context)
 
 
 @login_required
-@role_required(UserRole.DESIGN_REQUESTER)
+@require_global_permission('VIS_PERM_DASHBOARD')
 def requester_dashboard(request):
-    projects = Project.objects.filter(created_by=request.user)
-    designs = DesignRequest.objects.filter(requested_by=request.user).select_related(
-        'project', 'drawing_type', 'current_holder'
-    )[:20]
+    projects = PermissionService.get_user_projects(request.user)
+    designs = PermissionService.filter_design_requests(
+        request.user,
+        DesignRequest.objects.filter(requested_by=request.user),
+    ).select_related('project', 'drawing_type', 'current_holder')[:20]
     context = _base_dashboard_context(request)
     context.update({
         'projects': projects,
@@ -110,10 +114,13 @@ def requester_dashboard(request):
 
 
 @login_required
-@role_required(UserRole.HEAD_OF_DESIGN)
+@require_global_permission('VIS_PERM_DASHBOARD')
 def hod_dashboard(request):
-    designs = DesignRequest.objects.exclude(
-        status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+    designs = PermissionService.filter_design_requests(
+        request.user,
+        DesignRequest.objects.exclude(
+            status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+        ),
     ).select_related('project', 'drawing_type', 'assigned_designer', 'current_holder')
     context = _base_dashboard_context(request)
     context.update({
@@ -130,7 +137,7 @@ def hod_dashboard(request):
 
 
 @login_required
-@role_required(UserRole.DESIGNER)
+@require_global_permission('VIS_PERM_DASHBOARD')
 def designer_dashboard(request):
     designs = DesignRequest.objects.filter(
         assigned_designer=request.user
@@ -150,7 +157,7 @@ def designer_dashboard(request):
 
 
 @login_required
-@role_required(UserRole.VERIFICATION_TEAM)
+@require_global_permission('VIS_PERM_DASHBOARD')
 def verification_dashboard(request):
     designs = DesignRequest.objects.filter(
         status__in=[

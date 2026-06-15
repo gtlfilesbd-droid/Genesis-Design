@@ -5,7 +5,7 @@ from django.db.models import Avg, Count, F, Q
 from django.shortcuts import render
 from django.utils import timezone
 
-from apps.accounts.decorators import role_required
+from apps.permissions.decorators import require_global_permission
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus, SLAStatus
 from apps.projects.models import Project, ProjectStatus
@@ -194,14 +194,14 @@ def kpi_dashboard(request):
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def leaderboard(request):
     rankings = get_leaderboard()
     return render(request, 'analytics/leaderboard.html', {'rankings': rankings})
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def workload_view(request):
     active_statuses = [
         DesignStatus.ASSIGNED, DesignStatus.IN_PROGRESS,
@@ -216,7 +216,7 @@ def workload_view(request):
 
 
 @login_required
-@role_required(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+@require_global_permission('PERM_VIEW_REPORTS')
 def executive_dashboard(request):
     now = timezone.now()
     projects = Project.objects.all()

@@ -6,7 +6,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 import json
 
-from apps.accounts.decorators import role_required
+from apps.permissions.decorators import require_global_permission, require_project_permission
+from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.core.utils import log_activity
 from apps.projects.models import Project
@@ -25,8 +26,14 @@ def design_detail(request, pk):
         ),
         pk=pk,
     )
+    if not PermissionService.has_project_permission(request.user, design.project, 'PROJECT_PERM_VIEW'):
+        messages.error(request, 'You do not have access to this design request.')
+        return redirect('requests:list')
 
     if request.method == 'POST' and request.POST.get('action') == 'add_comment':
+        if not PermissionService.has_project_permission(request.user, design.project, 'PROJECT_PERM_COMMENT'):
+            messages.error(request, 'You do not have permission to comment.')
+            return redirect('requests:detail', pk=pk)
         message = request.POST.get('message', '').strip()
         if message:
             create_design_comment(design, request.user, message)
@@ -88,7 +95,7 @@ def design_detail(request, pk):
 
 
 @login_required
-@role_required(UserRole.DESIGN_REQUESTER, UserRole.ADMIN)
+@require_project_permission('PROJECT_PERM_REQUEST')
 def design_create(request, pk):
     project = get_object_or_404(Project, pk=pk)
     if request.method == 'POST':
@@ -123,8 +130,10 @@ def design_create(request, pk):
 
 @login_required
 def design_library(request):
+    visible_projects = PermissionService.get_user_projects(request.user)
     designs = DesignRequest.objects.filter(
-        status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED]
+        status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
+        project__in=visible_projects,
     ).select_related('project', 'drawing_type', 'assigned_designer', 'requested_by')
 
     drawing_type = request.GET.get('drawing_type')
@@ -141,8 +150,6 @@ def design_library(request):
     if designer:
         designs = designs.filter(assigned_designer_id=designer)
 
-    from .models import DrawingType
-    from apps.accounts.models import User, UserRole
     return render(request, 'designs/library.html', {
         'designs': designs[:100],
         'drawing_types': DrawingType.objects.filter(is_active=True),
@@ -152,11 +159,12 @@ def design_library(request):
 
 @login_required
 def design_request_list(request):
-    designs = DesignRequest.objects.select_related(
-        'project', 'drawing_type', 'requested_by', 'assigned_designer', 'current_holder'
+    designs = PermissionService.filter_design_requests(
+        request.user,
+        DesignRequest.objects.select_related(
+            'project', 'drawing_type', 'requested_by', 'assigned_designer', 'current_holder'
+        ),
     )
-    if request.user.role == UserRole.DESIGN_REQUESTER and not request.user.is_genesis_admin:
-        designs = designs.filter(requested_by=request.user)
 
     terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
     status = request.GET.get('status')
@@ -190,7 +198,7 @@ def design_request_list(request):
     return render(request, 'requests/list.html', {
         'designs': designs.order_by('-created_at')[:100],
         'statuses': DesignStatus.choices,
-        'projects': Project.objects.all()[:50],
+        'projects': PermissionService.get_user_projects(request.user)[:50],
     })
 
 

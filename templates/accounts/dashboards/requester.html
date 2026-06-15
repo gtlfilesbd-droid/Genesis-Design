@@ -6,9 +6,11 @@
 
 <div class="flex items-center justify-between mt-8 mb-4">
     <h2 class="text-lg font-semibold text-slate-900">My Projects</h2>
+    {% if can_create_project %}
     <a href="{% url 'projects:new' %}" class="g-btn-primary inline-flex items-center gap-2">
         <i data-lucide="plus" class="w-4 h-4"></i> New Project
     </a>
+    {% endif %}
 </div>
 <div class="g-card overflow-hidden">
     <table class="g-table w-full">

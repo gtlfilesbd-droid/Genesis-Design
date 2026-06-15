@@ -18,6 +18,13 @@
             <div class="min-w-0">
                 <div class="text-white text-sm font-semibold truncate">{{ user.get_full_name|default:user.username }}</div>
                 <div class="text-white/50 text-xs truncate">{{ user.get_role_display }}</div>
+                {% if user_permission_labels %}
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                    {% for label in user_permission_labels|slice:":3" %}
+                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/70">{{ label }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

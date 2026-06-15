@@ -3,8 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
-from apps.accounts.decorators import role_required
-from apps.accounts.models import UserRole
+from apps.permissions.decorators import require_global_permission
 from apps.designs.models import DrawingType
 
 from .models import CompanySettings, RolePermission, SLAConfiguration
@@ -30,7 +29,7 @@ SETTINGS_TABS = [
 
 
 @login_required
-@role_required(UserRole.ADMIN)
+@require_global_permission('PERM_ADMIN_PANEL')
 def settings_index(request):
     tab = request.GET.get('tab', 'general')
     ensure_role_permissions()
