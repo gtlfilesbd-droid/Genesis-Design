@@ -1,0 +1,211 @@
+from datetime import timedelta
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+import json
+
+from apps.accounts.decorators import role_required
+from apps.accounts.models import User, UserRole
+from apps.core.utils import log_activity
+from apps.projects.models import Project
+
+from .forms import DesignRequestForm, create_design_request
+from .models import DesignComment, DesignRequest, DesignStatus, DrawingType, RequestAttachment
+from .utils import create_design_comment
+
+
+@login_required
+def design_detail(request, pk):
+    design = get_object_or_404(
+        DesignRequest.objects.select_related(
+            'project', 'drawing_type', 'requested_by',
+            'assigned_designer', 'current_holder',
+        ),
+        pk=pk,
+    )
+
+    if request.method == 'POST' and request.POST.get('action') == 'add_comment':
+        message = request.POST.get('message', '').strip()
+        if message:
+            create_design_comment(design, request.user, message)
+            log_activity('design_request', design.pk, request.user, 'comment_added', message[:100])
+            if request.headers.get('HX-Request'):
+                comments = design.comments.select_related('author').prefetch_related('mentions')
+                return render(request, 'designs/partials/comments.html', {'comments': comments})
+            messages.success(request, 'Comment posted.')
+        return redirect('requests:detail', pk=pk)
+
+    if request.method == 'POST' and request.POST.get('action') == 'cancel_request':
+        if design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
+            design.status = DesignStatus.CANCELLED
+            design.save(update_fields=['status', 'primary_status', 'sla_breached'])
+            log_activity('design_request', design.pk, request.user, 'cancelled', 'Request cancelled')
+            messages.success(request, 'Design request cancelled.')
+        return redirect('requests:detail', pk=pk)
+
+    from apps.core.models import ActivityLog
+    logs = ActivityLog.objects.filter(
+        entity_type='design_request', entity_id=design.pk
+    ).select_related('user')[:50]
+    submissions = design.submissions.select_related('submitted_by', 'reviewed_by')
+    reviews = design.reviews.select_related('reviewer')
+    verifications = design.verifications.select_related('verifier')
+    attachments = design.attachments.select_related('uploaded_by')
+    comments = design.comments.select_related('author').prefetch_related('mentions')
+    from apps.workflow.services import compute_delay_attribution
+    compute_delay_attribution(design)
+    design.refresh_from_db()
+
+    stage_durations = design.stage_durations.select_related('responsible_user')
+    sla_pct = 0
+    if design.sla_start and design.sla_due:
+        total = (design.sla_due - design.sla_start).total_seconds()
+        elapsed = (timezone.now() - design.sla_start).total_seconds() if total else 0
+        sla_pct = min(100, round((elapsed / total) * 100)) if total else 0
+
+    workflow_steps = [
+        'new_request', 'acknowledged', 'assigned', 'in_progress',
+        'under_review', 'verification_pending', 'approved', 'completed',
+    ]
+    current_idx = workflow_steps.index(design.status) if design.status in workflow_steps else -1
+
+    return render(request, 'designs/detail.html', {
+        'design': design,
+        'logs': logs,
+        'submissions': submissions,
+        'reviews': reviews,
+        'verifications': verifications,
+        'attachments': attachments,
+        'comments': comments,
+        'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
+        'stage_durations': stage_durations,
+        'sla_pct': sla_pct,
+        'workflow_steps': workflow_steps,
+        'current_idx': current_idx,
+    })
+
+
+@login_required
+@role_required(UserRole.DESIGN_REQUESTER, UserRole.ADMIN)
+def design_create(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    if request.method == 'POST':
+        form = DesignRequestForm(request.POST, project=project)
+        if form.is_valid():
+            design = create_design_request(project, request.user, form.cleaned_data)
+            from apps.workflow.services import get_head_of_design
+            hod = get_head_of_design()
+            design.current_holder = hod
+            design.save(update_fields=['current_holder'])
+            for uploaded in request.FILES.getlist('attachments'):
+                RequestAttachment.objects.create(
+                    design=design, file=uploaded, filename=uploaded.name, uploaded_by=request.user,
+                )
+            log_activity(
+                'design_request', design.pk, request.user,
+                'design_requested',
+                f'Design request {design.design_number} created',
+                {'drawing_type': design.drawing_type.name},
+            )
+            log_activity(
+                'project', project.pk, request.user,
+                'design_requested',
+                f'Design {design.design_number} requested for project',
+            )
+            messages.success(request, f'Design request {design.design_number} submitted.')
+            return redirect('projects:detail', pk=project.pk)
+    else:
+        form = DesignRequestForm(project=project)
+    return render(request, 'designs/create.html', {'form': form, 'project': project})
+
+
+@login_required
+def design_library(request):
+    designs = DesignRequest.objects.filter(
+        status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED]
+    ).select_related('project', 'drawing_type', 'assigned_designer', 'requested_by')
+
+    drawing_type = request.GET.get('drawing_type')
+    project_code = request.GET.get('project')
+    client = request.GET.get('client')
+    designer = request.GET.get('designer')
+
+    if drawing_type:
+        designs = designs.filter(drawing_type_id=drawing_type)
+    if project_code:
+        designs = designs.filter(project__code__icontains=project_code)
+    if client:
+        designs = designs.filter(project__client_name__icontains=client)
+    if designer:
+        designs = designs.filter(assigned_designer_id=designer)
+
+    from .models import DrawingType
+    from apps.accounts.models import User, UserRole
+    return render(request, 'designs/library.html', {
+        'designs': designs[:100],
+        'drawing_types': DrawingType.objects.filter(is_active=True),
+        'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
+    })
+
+
+@login_required
+def design_request_list(request):
+    designs = DesignRequest.objects.select_related(
+        'project', 'drawing_type', 'requested_by', 'assigned_designer', 'current_holder'
+    )
+    if request.user.role == UserRole.DESIGN_REQUESTER and not request.user.is_genesis_admin:
+        designs = designs.filter(requested_by=request.user)
+
+    status = request.GET.get('status')
+    priority = request.GET.get('priority')
+    project = request.GET.get('project')
+    search = request.GET.get('q')
+    if status:
+        designs = designs.filter(status=status)
+    if priority:
+        designs = designs.filter(priority=priority)
+    if project:
+        designs = designs.filter(project_id=project)
+    if search:
+        designs = designs.filter(
+            Q(design_number__icontains=search) | Q(project__code__icontains=search)
+        )
+
+    return render(request, 'requests/list.html', {
+        'designs': designs.order_by('-created_at')[:100],
+        'statuses': DesignStatus.choices,
+        'projects': Project.objects.all()[:50],
+    })
+
+
+@login_required
+def my_tasks(request):
+    user = request.user
+    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+    assigned = DesignRequest.objects.filter(
+        assigned_designer=user
+    ).exclude(status__in=terminal).select_related('project', 'drawing_type')
+    held = DesignRequest.objects.filter(
+        current_holder=user
+    ).exclude(status__in=terminal).select_related('project', 'drawing_type')
+    requested = DesignRequest.objects.filter(
+        requested_by=user
+    ).exclude(status__in=terminal).select_related('project', 'drawing_type')
+
+    today = timezone.now().date()
+    overdue = assigned.filter(due_date__lt=timezone.now())
+    due_today = assigned.filter(due_date__date=today)
+    due_3d = assigned.filter(due_date__date__lte=today + timedelta(days=3), due_date__date__gt=today)
+    due_7d = assigned.filter(due_date__date__lte=today + timedelta(days=7), due_date__date__gt=today + timedelta(days=3))
+
+    return render(request, 'tasks/list.html', {
+        'assigned_tasks': assigned.order_by('due_date'),
+        'held_tasks': held.order_by('-priority', 'due_date'),
+        'requested_tasks': requested.order_by('-created_at')[:20],
+        'overdue_count': overdue.count(),
+        'due_today_count': due_today.count(),
+        'due_3d_count': due_3d.count(),
+        'due_7d_count': due_7d.count(),
+    })

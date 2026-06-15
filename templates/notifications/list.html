@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <div>
+        <h1 class="text-[28px] font-bold text-slate-900">Notifications</h1>
+        <p class="text-sm text-slate-500 mt-1">Stay updated on workflow changes</p>
+    </div>
+    <a href="{% url 'notifications:mark_all_read' %}" class="g-btn-secondary text-sm">Mark All Read</a>
+</div>
+
+<div class="g-card divide-y divide-slate-100">
+    {% for n in notifications %}
+    <div class="flex items-start justify-between p-5 {% if not n.is_read %}bg-white border-l-[3px] border-l-blue-500{% else %}bg-slate-50/50{% endif %}">
+        <div class="flex gap-4 min-w-0">
+            <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <i data-lucide="bell" class="w-4 h-4"></i>
+            </div>
+            <div>
+                <p class="text-sm {% if not n.is_read %}font-semibold text-slate-900{% else %}text-slate-700{% endif %}">{{ n.title }}</p>
+                <p class="text-sm text-slate-500 mt-0.5">{{ n.message }}</p>
+                <p class="text-xs text-slate-400 mt-1">{{ n.created_at|timesince_short }}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0 ml-4">
+            {% if n.link and not n.is_read %}
+            <a href="{% url 'notifications:mark_read' n.pk %}" class="g-btn-primary text-xs px-3 py-1.5">View →</a>
+            {% elif n.link %}
+            <a href="{{ n.link }}" class="g-btn-secondary text-xs px-3 py-1.5">View</a>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="p-12 text-center text-slate-500">
+        <i data-lucide="bell-off" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i>
+        <p>No notifications.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

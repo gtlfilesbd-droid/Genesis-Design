@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Leaderboard{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">Employee Leaderboard</h1>
+    <p class="text-sm text-slate-500 mt-1">Top performers ranked by completion, speed, and quality</p>
+</div>
+<div class="g-card overflow-hidden">
+    <table class="g-table w-full">
+        <thead><tr><th>Rank</th><th>Designer</th><th>Score</th><th>Completion</th><th>On-Time</th><th>First-Time Approval</th></tr></thead>
+        <tbody>
+        {% for r in rankings %}
+        <tr class="{% if forloop.counter <= 3 %}bg-amber-50/50{% endif %}">
+            <td>
+                {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}#{{ forloop.counter }}{% endif %}
+            </td>
+            <td class="font-medium">{{ r.user.get_full_name }}</td>
+            <td class="font-bold text-primary">{{ r.score }}</td>
+            <td>{{ r.kpis.completion_rate }}%</td>
+            <td>{{ r.kpis.on_time_rate }}%</td>
+            <td>{{ r.kpis.first_time_approval_rate }}%</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-slate-500 py-12">No ranking data.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

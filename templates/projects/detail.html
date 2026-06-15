@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}{{ project.code }} — Project{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'projects:list' %}" class="text-sm text-slate-500 hover:text-primary-light inline-flex items-center gap-1 mb-3">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> Projects
+    </a>
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <h1 class="text-[28px] font-bold text-slate-900">{{ project.client_name }}</h1>
+            <p class="text-sm text-slate-500 mt-1">{{ project.code }} · Started {{ project.start_date|date:"d M Y" }}</p>
+        </div>
+        <div class="flex gap-2 self-start">
+        {% if user.is_design_requester or user.is_head_of_design or user.is_genesis_admin %}
+        <a href="{% url 'projects:edit' project.pk %}" class="g-btn-secondary inline-flex items-center gap-2">
+            <i data-lucide="pencil" class="w-4 h-4"></i> Edit
+        </a>
+        {% endif %}
+        {% if user.is_design_requester or user.is_genesis_admin %}
+        <a href="{% url 'projects:request_new' project.pk %}" class="g-btn-primary inline-flex items-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i> New Design Request
+        </a>
+        {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="flex gap-1 border-b border-slate-200 mb-6">
+    <a href="?tab=overview" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'overview' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Overview</a>
+    <a href="?tab=designs" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'designs' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Design Requests</a>
+    <a href="?tab=activity" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'activity' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Activity Log</a>
+    <a href="?tab=documents" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'documents' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Documents</a>
+</div>
+
+{% if tab == 'overview' or tab == 'designs' %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    {% include 'components/stat_card.html' with label='Total Requests' value=project.total_design_requests icon='file-text' %}
+    {% include 'components/stat_card.html' with label='Running' value=project.running_designs icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Completed' value=project.completed_designs icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
+    {% include 'components/stat_card.html' with label='Health Score' value=project.health_score icon='heart-pulse' icon_bg='bg-blue-50' icon_color='text-blue-600' %}
+</div>
+{% endif %}
+
+{% if tab == 'overview' %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="g-card p-6">
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Project Details</h2>
+        <dl class="space-y-3 text-sm">
+            <div class="flex justify-between"><dt class="text-slate-500">Address</dt><dd>{{ project.address|default:"—" }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Start Date</dt><dd>{{ project.start_date|date:"d M Y" }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Target Completion</dt><dd>{{ project.expected_completion_date|date:"d M Y"|default:"—" }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Status</dt><dd>{% render_status_badge project.status %}</dd></div>
+            <div><dt class="text-slate-500 mb-1">Description</dt><dd class="text-slate-700">{{ project.description|default:"—" }}</dd></div>
+        </dl>
+    </div>
+    <div class="g-card p-6">
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Progress</h2>
+        <div class="text-center py-2 mb-4">
+            <div class="text-4xl font-bold text-primary mb-1">{{ completion_pct }}%</div>
+            <p class="text-sm text-slate-500">Overall completion</p>
+            <div class="g-progress mt-4"><div class="g-progress-fill" style="width: {{ completion_pct }}%"></div></div>
+        </div>
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Status Breakdown</h2>
+        <div class="flex items-center justify-center">
+            <div class="w-48 h-48"><canvas id="statusDonut"></canvas></div>
+        </div>
+        <div class="mt-4 space-y-2">
+            {% for label, count in status_breakdown.items %}
+            <div class="flex justify-between text-sm"><span class="text-slate-600">{{ label }}</span><span class="font-semibold">{{ count }}</span></div>
+            {% empty %}
+            <p class="text-sm text-slate-500 text-center">No designs yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if tab == 'overview' or tab == 'designs' %}
+<div class="g-card overflow-x-auto">
+    <table class="g-table w-full">
+        <thead><tr><th>Design #</th><th>Type</th><th>Requested</th><th>Requester</th><th>Designer</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for d in designs %}
+        <tr>
+            <td class="font-medium text-primary-light">{{ d.design_number }}</td>
+            <td>{{ d.drawing_type.name }}</td>
+            <td class="text-slate-500">{{ d.created_at|date:"d M Y" }}</td>
+            <td>{{ d.requested_by }}</td>
+            <td>{{ d.assigned_designer|default:"—" }}</td>
+            <td>{% render_status_badge d.status %}</td>
+            <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-slate-500 py-8">No designs yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if tab == 'activity' %}
+<div class="g-card p-6">
+    <div class="relative g-timeline space-y-6 pl-8">
+        {% for log in logs %}
+        <div class="relative">
+            <div class="absolute -left-8 top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-white"></div>
+            <div class="flex gap-4">
+                <span class="text-xs text-slate-400 w-28 shrink-0">{{ log.created_at|date:"d M Y H:i" }}</span>
+                <div>
+                    <p class="text-sm text-slate-900">{{ log.description|default:log.action }}</p>
+                    <p class="text-xs text-slate-500">{{ log.user|default:"System" }}</p>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-slate-500">No activity yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if tab == 'documents' %}
+<div class="g-card p-6">
+    {% if attachments %}
+    <ul class="divide-y divide-slate-100">
+        {% for a in attachments %}
+        <li class="flex items-center justify-between py-3">
+            <div class="flex items-center gap-3">
+                <i data-lucide="file" class="w-5 h-5 text-slate-400"></i>
+                <div>
+                    <p class="text-sm font-medium">{{ a.name|default:a.file.name }}</p>
+                    <p class="text-xs text-slate-500">{{ a.uploaded_at|date:"d M Y" }} · {{ a.uploaded_by }}</p>
+                </div>
+            </div>
+            <a href="{{ a.file.url }}" class="g-btn-secondary text-xs" target="_blank">Download</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-slate-500 text-center py-8">No documents uploaded.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if tab == 'overview' %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('statusDonut');
+    if (el && window.Chart) {
+        const labels = {{ chart_labels|safe }};
+        const data = {{ chart_data|safe }};
+        if (labels.length) {
+            new Chart(el, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{ data, backgroundColor: ['#1A3C6E','#2E75B6','#f59e0b','#22c55e','#ef4444','#8b5cf6','#64748b'] }],
+                },
+                options: { plugins: { legend: { display: false } }, cutout: '65%' },
+            });
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

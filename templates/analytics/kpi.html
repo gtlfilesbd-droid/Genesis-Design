@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}My KPIs{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">My KPIs</h1>
+    <p class="text-sm text-slate-500 mt-1">Performance metrics for your role</p>
+</div>
+{% if kpis %}
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    {% for key, value in kpis.items %}
+    <div class="g-stat-card">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ key|cut:"_"|title }}</span>
+        <div class="text-3xl font-bold text-slate-900 mt-3">{{ value }}{% if "rate" in key %}%{% endif %}</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="g-card p-12 text-center text-slate-500">
+    <i data-lucide="bar-chart-2" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i>
+    <p>KPI data is available for Designer, Head of Design, and Verification roles.</p>
+</div>
+{% endif %}
+{% endblock %}

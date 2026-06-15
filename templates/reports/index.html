@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+
+<div class="mb-8">
+
+    <h1 class="text-[28px] font-bold text-slate-900">Reports</h1>
+
+    <p class="text-sm text-slate-500 mt-1">Export and analyze design operations data</p>
+
+</div>
+
+
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
+
+    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' %}
+
+    {% include 'components/stat_card.html' with label='Total Designs' value=total_designs icon='file-text' %}
+
+    {% include 'components/stat_card.html' with label='Pending' value=pending_designs icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+
+</div>
+
+
+
+<div class="flex gap-1 border-b border-slate-200 mb-6">
+
+    <a href="?tab=performance" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'performance' or not tab %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Performance</a>
+    <a href="?tab=projects" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'projects' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Project Report</a>
+
+    <a href="?tab=sla" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'sla' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">SLA Compliance</a>
+
+    <a href="?tab=delay" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'delay' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Delay Analysis</a>
+
+    <a href="?tab=export" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'export' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Export</a>
+
+</div>
+
+
+
+{% if tab == 'performance' or not tab %}
+<form method="get" class="g-card p-4 mb-4 flex flex-wrap gap-3 items-end">
+    <input type="hidden" name="tab" value="performance">
+    <div><label class="text-xs text-slate-500 block mb-1">Designer</label>
+    <select name="designer" class="g-input w-auto min-w-[160px]"><option value="">All</option>{% for d in designers %}<option value="{{ d.pk }}" {% if designer_filter == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.get_full_name }}</option>{% endfor %}</select></div>
+    <div><label class="text-xs text-slate-500 block mb-1">Project</label>
+    <select name="project" class="g-input w-auto min-w-[160px]"><option value="">All</option>{% for p in projects %}<option value="{{ p.pk }}" {% if project_filter == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.code }}</option>{% endfor %}</select></div>
+    <button type="submit" class="g-btn-secondary">Apply Filters</button>
+</form>
+<div class="g-card overflow-x-auto">
+
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+
+        <h2 class="font-semibold text-slate-900">Designer Performance</h2>
+
+        <div class="flex gap-2 text-xs">
+
+            <a href="{% url 'reports:export_csv' 'designer_performance' %}" class="text-primary-light font-semibold">CSV</a>
+
+            <a href="{% url 'reports:export_excel' 'designer_performance' %}" class="text-primary-light font-semibold">Excel</a>
+
+            <a href="{% url 'reports:export_pdf' 'designer_performance' %}" class="text-primary-light font-semibold">PDF</a>
+
+        </div>
+
+    </div>
+
+    <table class="g-table w-full">
+
+        <thead><tr><th>Designer</th><th>Assigned</th><th>Completed</th><th>On-Time</th><th>Rate</th><th>Avg Days</th><th>Corrections</th><th>Score</th></tr></thead>
+
+        <tbody>
+
+        {% for row in designer_data %}
+
+        <tr>
+
+            <td class="font-medium">{{ row.designer }}</td>
+
+            <td>{{ row.assigned }}</td>
+
+            <td>{{ row.completed }}</td>
+            <td>{{ row.on_time }}</td>
+            <td class="font-semibold text-green-600">{{ row.completion_rate }}%</td>
+            <td>{{ row.avg_days }}</td>
+            <td>{{ row.corrections }}</td>
+            <td class="font-bold {% if row.score >= 85 %}text-green-600{% elif row.score >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ row.score }}</td>
+
+        </tr>
+
+        {% empty %}
+
+        <tr><td colspan="8" class="text-center text-slate-500 py-8">No data</td></tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endif %}
+
+{% if tab == 'projects' %}
+<div class="g-card overflow-x-auto">
+    <table class="g-table w-full">
+        <thead><tr><th>Project</th><th>Status</th><th>Total</th><th>Completed</th><th>Running</th><th>Progress</th><th>Health</th></tr></thead>
+        <tbody>
+        {% for row in project_data %}
+        <tr>
+            <td><span class="font-medium">{{ row.code }}</span><br><span class="text-xs text-slate-500">{{ row.name }}</span></td>
+            <td>{{ row.status }}</td>
+            <td>{{ row.total }}</td>
+            <td>{{ row.completed }}</td>
+            <td>{{ row.running }}</td>
+            <td><div class="g-progress w-24 inline-block align-middle mr-2"><div class="g-progress-fill" style="width: {{ row.pct }}%"></div></div>{{ row.pct }}%</td>
+            <td>{{ row.health }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center py-8 text-slate-500">No projects.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if tab == 'sla' %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <div class="g-card p-6">
+
+        <h2 class="font-semibold text-slate-900 mb-4">SLA Overview</h2>
+
+        <div class="text-4xl font-bold text-primary mb-2">{{ sla_data.compliance_rate }}%</div>
+
+        <p class="text-sm text-slate-500 mb-6">Overall compliance rate</p>
+
+        <div class="space-y-3 text-sm">
+
+            <div class="flex justify-between"><span class="text-green-600">On Track</span><span class="font-semibold">{{ sla_data.green }}</span></div>
+
+            <div class="flex justify-between"><span class="text-amber-600">Warning</span><span class="font-semibold">{{ sla_data.yellow }}</span></div>
+
+            <div class="flex justify-between"><span class="text-red-600">Breached</span><span class="font-semibold">{{ sla_data.red }}</span></div>
+
+            <div class="flex justify-between border-t pt-2"><span>Total tracked</span><span class="font-semibold">{{ sla_data.total }}</span></div>
+
+        </div>
+
+        <a href="{% url 'reports:export_csv' 'sla_compliance' %}" class="g-btn-secondary text-sm mt-6 inline-block">Export CSV</a>
+
+    </div>
+
+    <div class="g-card p-6">
+
+        <h2 class="font-semibold text-slate-900 mb-4">Compliance Chart</h2>
+
+        <canvas id="slaChart" height="200"></canvas>
+
+    </div>
+
+</div>
+
+{% endif %}
+
+
+
+{% if tab == 'delay' %}
+
+<div class="g-card overflow-x-auto">
+
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+
+        <h2 class="font-semibold text-slate-900">Delay Attribution</h2>
+
+        <a href="{% url 'reports:export_csv' 'delay_analysis' %}" class="text-primary-light text-xs font-semibold">Export CSV</a>
+
+    </div>
+
+    <table class="g-table w-full">
+
+        <thead><tr><th>Design #</th><th>Delay Source</th><th>Days</th><th>Status</th></tr></thead>
+
+        <tbody>
+
+        {% for row in delay_data %}
+
+        <tr>
+
+            <td class="font-medium">{{ row.design_number }}</td>
+
+            <td class="text-red-600">{{ row.delay_source }}</td>
+
+            <td>{{ row.delay_duration_days }}</td>
+
+            <td>{{ row.status }}</td>
+
+        </tr>
+
+        {% empty %}
+
+        <tr><td colspan="4" class="text-center text-slate-500 py-8">No delays recorded.</td></tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endif %}
+
+
+
+{% if tab == 'export' %}
+
+<div class="g-card p-6 max-w-xl">
+
+    <h2 class="font-semibold text-slate-900 mb-4">Export Reports</h2>
+
+    <div class="space-y-3">
+
+        <div class="flex items-center justify-between py-3 border-b border-slate-100">
+
+            <span class="text-sm font-medium">Designer Performance</span>
+
+            <div class="flex gap-2 text-xs">
+
+                <a href="{% url 'reports:export_csv' 'designer_performance' %}" class="text-primary-light font-semibold">CSV</a>
+
+                <a href="{% url 'reports:export_excel' 'designer_performance' %}" class="text-primary-light font-semibold">Excel</a>
+
+                <a href="{% url 'reports:export_pdf' 'designer_performance' %}" class="text-primary-light font-semibold">PDF</a>
+
+            </div>
+
+        </div>
+
+        <div class="flex items-center justify-between py-3 border-b border-slate-100">
+
+            <span class="text-sm font-medium">Project Progress</span>
+
+            <a href="{% url 'reports:export_csv' 'project_progress' %}" class="text-primary-light text-xs font-semibold">CSV</a>
+
+        </div>
+
+        <div class="flex items-center justify-between py-3 border-b border-slate-100">
+
+            <span class="text-sm font-medium">SLA Compliance</span>
+
+            <a href="{% url 'reports:export_csv' 'sla_compliance' %}" class="text-primary-light text-xs font-semibold">CSV</a>
+
+        </div>
+
+        <div class="flex items-center justify-between py-3 border-b border-slate-100">
+
+            <span class="text-sm font-medium">Delay Analysis</span>
+
+            <a href="{% url 'reports:export_csv' 'delay_analysis' %}" class="text-primary-light text-xs font-semibold">CSV</a>
+
+        </div>
+
+        <div class="flex items-center justify-between py-3">
+
+            <span class="text-sm font-medium">Management Summary</span>
+
+            <a href="{% url 'reports:export_pdf' 'management_summary' %}" class="text-primary-light text-xs font-semibold">PDF</a>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+
+
+{% block extra_js %}
+
+{% if tab == 'sla' %}
+
+<script>
+
+document.addEventListener('DOMContentLoaded', () => {
+
+    const ctx = document.getElementById('slaChart');
+
+    if (ctx && window.Chart) {
+
+        new Chart(ctx, {
+
+            type: 'doughnut',
+
+            data: {
+
+                labels: ['On Track', 'Warning', 'Breached'],
+
+                datasets: [{ data: [{{ sla_data.green }}, {{ sla_data.yellow }}, {{ sla_data.red }}], backgroundColor: ['#22c55e','#f59e0b','#ef4444'] }],
+
+            },
+
+            options: { plugins: { legend: { position: 'bottom' } } },
+
+        });
+
+    }
+
+});
+
+</script>
+
+{% endif %}
+
+{% endblock %}
+

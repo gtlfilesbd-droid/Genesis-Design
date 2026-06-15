@@ -1,0 +1,65 @@
+{% load genesis_ui %}
+<aside class="g-sidebar flex flex-col shrink-0">
+    <div class="px-5 py-6 border-b border-white/10">
+        <a href="{% url 'accounts:dashboard' %}" class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-white font-bold text-lg">G</div>
+            <div>
+                <div class="text-white font-bold text-base leading-tight">Genesis</div>
+                <div class="text-white/60 text-xs">Design</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="px-4 py-4 border-b border-white/10">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-semibold">
+                {{ user|initials }}
+            </div>
+            <div class="min-w-0">
+                <div class="text-white text-sm font-semibold truncate">{{ user.get_full_name|default:user.username }}</div>
+                <div class="text-white/50 text-xs truncate">{{ user.get_role_display }}</div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="flex-1 py-4 overflow-y-auto">
+        <div class="px-5 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">Navigation</div>
+        {% for item in nav_main %}
+        <a href="{{ item.url }}" class="g-sidebar-link {% if item.active %}active{% endif %}">
+            <i data-lucide="{{ item.icon }}" class="w-[18px] h-[18px]"></i>
+            <span>{{ item.label }}</span>
+        </a>
+        {% endfor %}
+
+        {% if nav_management %}
+        <div class="px-5 mt-6 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">Management</div>
+        {% for item in nav_management %}
+        <a href="{{ item.url }}" class="g-sidebar-link {% if item.active %}active{% endif %}">
+            <i data-lucide="{{ item.icon }}" class="w-[18px] h-[18px]"></i>
+            <span>{{ item.label }}</span>
+        </a>
+        {% endfor %}
+        {% endif %}
+
+        <div class="px-5 mt-6 mb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">Account</div>
+        {% for item in nav_account %}
+        <a href="{{ item.url }}" class="g-sidebar-link {% if item.active %}active{% endif %}">
+            <i data-lucide="{{ item.icon }}" class="w-[18px] h-[18px]"></i>
+            <span>{{ item.label }}</span>
+            {% if item.icon == 'bell' and unread_notification_count %}
+            <span class="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{{ unread_notification_count }}</span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </nav>
+
+    <div class="p-4 border-t border-white/10">
+        <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="g-sidebar-link w-full text-left bg-transparent border-0 cursor-pointer">
+                <i data-lucide="log-out" class="w-[18px] h-[18px]"></i>
+                <span>Logout</span>
+            </button>
+        </form>
+    </div>
+</aside>

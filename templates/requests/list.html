@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Design Requests{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">Design Requests</h1>
+    <p class="text-sm text-slate-500 mt-1">All design requests across projects</p>
+</div>
+
+<form method="get" class="g-card p-4 mb-6 flex flex-wrap gap-3 items-center">
+    <div class="relative flex-1 min-w-[200px]">
+        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search by design # or project..." class="g-input pl-10">
+    </div>
+    <select name="status" class="g-input w-auto min-w-[150px]">
+        <option value="">All Statuses</option>
+        {% for val, label in statuses %}
+        <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="project" class="g-input w-auto min-w-[150px]">
+        <option value="">All Projects</option>
+        {% for p in projects %}
+        <option value="{{ p.pk }}" {% if request.GET.project == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.code }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="g-btn-secondary">Filter</button>
+</form>
+
+<div class="g-card overflow-x-auto">
+    <table class="g-table w-full">
+        <thead>
+            <tr>
+                <th>Design #</th>
+                <th>Project</th>
+                <th>Type</th>
+                <th>Priority</th>
+                <th>Requester</th>
+                <th>Designer</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for d in designs %}
+        <tr>
+            <td class="font-medium text-primary-light">{{ d.design_number }}</td>
+            <td>{{ d.project.code }}</td>
+            <td>{{ d.drawing_type.name }}</td>
+            <td>{% render_priority_badge d.priority %}</td>
+            <td>{{ d.requested_by }}</td>
+            <td>{{ d.assigned_designer|default:"—" }}</td>
+            <td>{% render_status_badge d.status %}</td>
+            <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-slate-500 py-10">No design requests found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

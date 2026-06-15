@@ -1,0 +1,188 @@
+:root {
+  --primary: #1A3C6E;
+  --primary-light: #2E75B6;
+  --accent: #E8F0F8;
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --border: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+.g-sidebar {
+  width: 260px;
+  background: var(--primary);
+  min-height: 100vh;
+}
+
+.g-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin: 2px 12px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+}
+
+.g-sidebar-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.g-sidebar-link.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-left-color: #60A5FA;
+}
+
+.g-navbar {
+  height: 64px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.g-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.g-stat-card.danger {
+  border-left: 4px solid #DC2626;
+  background: linear-gradient(90deg, #FEF2F2 0%, #FFFFFF 30%);
+}
+
+.g-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.g-btn-primary {
+  background: var(--primary);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.g-btn-primary:hover {
+  background: #153260;
+}
+
+.g-btn-secondary {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: #334155;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.g-btn-secondary:hover {
+  background: #F8FAFC;
+}
+
+.g-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.g-input:focus {
+  outline: none;
+  ring: 2px;
+  border-color: transparent;
+  box-shadow: 0 0 0 2px #3B82F6;
+}
+
+.g-table th {
+  background: #F8FAFC;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.g-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 14px;
+}
+
+.g-table tr:hover td {
+  background: #F8FAFC;
+}
+
+.g-progress {
+  height: 6px;
+  background: #F1F5F9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.g-progress-fill {
+  height: 100%;
+  background: var(--primary-light);
+  border-radius: 999px;
+}
+
+[x-cloak] { display: none !important; }
+
+.g-kanban-col {
+  min-width: 280px;
+  max-width: 280px;
+}
+
+.g-kanban-card {
+  border-left-width: 3px;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.g-kanban-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+.g-timeline::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #E2E8F0;
+}
+
+.g-step-done { background: var(--primary-light); }
+.g-step-current { background: var(--primary); box-shadow: 0 0 0 4px rgba(46,117,182,0.25); }
+.g-step-pending { background: #CBD5E1; }
+
+@media (max-width: 1024px) {
+  .g-sidebar { position: fixed; z-index: 40; transform: translateX(-100%); transition: transform 0.2s; }
+  .g-sidebar.open { transform: translateX(0); }
+}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Projects{% endblock %}
+{% block content %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-[28px] font-bold text-slate-900">Projects</h1>
+        <p class="text-sm text-slate-500 mt-1">{{ active_count }} active · {{ total_count }} total</p>
+    </div>
+    {% if user.is_design_requester or user.is_head_of_design or user.is_genesis_admin %}
+    <a href="{% url 'projects:new' %}" class="g-btn-primary inline-flex items-center gap-2 self-start">
+        <i data-lucide="plus" class="w-4 h-4"></i> New Project
+    </a>
+    {% endif %}
+</div>
+
+<form method="get" class="g-card p-4 mb-6 flex flex-wrap gap-3 items-center">
+    <div class="relative flex-1 min-w-[200px]">
+        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search projects..." class="g-input pl-10">
+    </div>
+    <select name="status" class="g-input w-auto min-w-[140px]">
+        <option value="">All Statuses</option>
+        {% for val, label in statuses %}
+        <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="g-btn-secondary">Filter</button>
+</form>
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+    {% for p in projects %}
+    <div class="g-card p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+        <div class="flex items-start justify-between mb-3">
+            <div class="min-w-0">
+                <h3 class="font-semibold text-slate-900 truncate">{{ p.client_name }}</h3>
+                <p class="text-xs text-slate-500 font-mono">{{ p.code }}</p>
+            </div>
+            {% render_status_badge p.status %}
+        </div>
+        <div class="text-sm text-slate-600 space-y-1 mb-4">
+            <p>Started: {{ p.start_date|date:"d M Y" }}</p>
+            {% if p.expected_completion_date %}<p>Target: {{ p.expected_completion_date|date:"d M Y" }}</p>{% endif %}
+        </div>
+        <div class="flex items-center gap-4 text-xs text-slate-500 mb-3">
+            <span><strong class="text-slate-700">{{ p.total_design_requests }}</strong> Drawings</span>
+            <span><strong class="text-green-600">{{ p.completed_designs }}</strong> Done</span>
+            {% if p.running_designs %}<span class="text-red-600"><strong>{{ p.running_designs }}</strong> Running</span>{% endif %}
+        </div>
+        {% with pct=p.completed_designs|progress_pct:p.total_design_requests %}
+        <div class="g-progress mb-4"><div class="g-progress-fill" style="width: {{ pct }}%"></div></div>
+        <p class="text-xs text-slate-500 mb-4">{{ pct }}% complete</p>
+        {% endwith %}
+        <a href="{% url 'projects:detail' p.pk %}" class="g-btn-secondary w-full text-center block">View Project</a>
+    </div>
+    {% empty %}
+    <div class="col-span-full g-card p-12 text-center text-slate-500">
+        <i data-lucide="folder-open" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i>
+        <p>No projects found.</p>
+        {% if user.is_design_requester or user.is_head_of_design or user.is_genesis_admin %}
+        <a href="{% url 'projects:new' %}" class="g-btn-primary inline-block mt-4">Create your first project</a>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

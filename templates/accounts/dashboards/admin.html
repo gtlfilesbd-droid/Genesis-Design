@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Admin{% endblock %}
+{% block content %}
+{% include 'accounts/dashboards/_shared.html' %}
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-8">
+    <div class="g-card p-5 text-center">
+        <div class="text-3xl font-bold text-slate-900">{{ total_users }}</div>
+        <div class="text-sm text-slate-500 mt-1">Active Users</div>
+    </div>
+    <div class="g-card p-5 text-center">
+        <div class="text-3xl font-bold text-slate-900">{{ total_projects }}</div>
+        <div class="text-sm text-slate-500 mt-1">Total Projects</div>
+    </div>
+    <div class="g-card p-5 text-center">
+        <div class="text-3xl font-bold text-slate-900">{{ total_designs }}</div>
+        <div class="text-sm text-slate-500 mt-1">Design Requests</div>
+    </div>
+</div>
+<div class="mt-6">
+    <a href="/django-admin/" class="g-btn-secondary inline-flex items-center gap-2">
+        <i data-lucide="settings" class="w-4 h-4"></i> Django Admin Settings
+    </a>
+</div>
+{% endblock %}

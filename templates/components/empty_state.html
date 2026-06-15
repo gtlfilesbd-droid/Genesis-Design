@@ -1,0 +1,10 @@
+<div class="text-center py-12 px-6">
+    <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+        <i data-lucide="{{ icon|default:'inbox' }}" class="w-7 h-7 text-slate-400"></i>
+    </div>
+    <p class="text-slate-600 font-medium mb-1">{{ message|default:"Nothing here yet." }}</p>
+    {% if hint %}<p class="text-sm text-slate-500 mb-4">{{ hint }}</p>{% endif %}
+    {% if cta_url and cta_label %}
+    <a href="{{ cta_url }}" class="g-btn-primary inline-flex items-center gap-2">{{ cta_label }}</a>
+    {% endif %}
+</div>

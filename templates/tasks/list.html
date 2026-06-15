@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}My Tasks{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">My Tasks</h1>
+    <p class="text-sm text-slate-500 mt-1">Your assigned work, pending actions, and requests</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue_count icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_count %}
+    {% include 'components/stat_card.html' with label='Due Today' value=due_today_count icon='calendar' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Due in 3 Days' value=due_3d_count icon='clock' %}
+    {% include 'components/stat_card.html' with label='Due in 7 Days' value=due_7d_count icon='calendar-days' %}
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+    <div class="g-card p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Assigned to Me</h2>
+        <div class="space-y-3">
+            {% for d in assigned_tasks %}
+            <a href="{% url 'requests:detail' d.pk %}" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50 transition">
+                <div>
+                    <p class="text-sm font-medium text-primary-light">{{ d.design_number }}</p>
+                    <p class="text-xs text-slate-500">{{ d.project.code }} · {{ d.drawing_type.name }}</p>
+                    {% if d.due_date %}<p class="text-xs {% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-400{% endif %} mt-1">Due {{ d.due_date|date:"d M Y" }}</p>{% endif %}
+                </div>
+                {% render_status_badge d.status %}
+            </a>
+            {% empty %}
+            <p class="text-sm text-slate-500">No assigned tasks.</p>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="g-card p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Awaiting My Action</h2>
+        <div class="space-y-3">
+            {% for d in held_tasks %}
+            <a href="{% url 'requests:detail' d.pk %}" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50 transition">
+                <div>
+                    <p class="text-sm font-medium text-primary-light">{{ d.design_number }}</p>
+                    <p class="text-xs text-slate-500">{{ d.project.code }} · {{ d.drawing_type.name }}</p>
+                </div>
+                {% render_status_badge d.status %}
+            </a>
+            {% empty %}
+            <p class="text-sm text-slate-500">Nothing awaiting your action.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="g-card p-6">
+    <h2 class="font-semibold text-slate-900 mb-4">My Open Requests</h2>
+    <div class="overflow-x-auto">
+        <table class="g-table w-full">
+            <thead><tr><th>Design #</th><th>Project</th><th>Type</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for d in requested_tasks %}
+            <tr>
+                <td class="font-medium text-primary-light">{{ d.design_number }}</td>
+                <td>{{ d.project.code }}</td>
+                <td>{{ d.drawing_type.name }}</td>
+                <td>{% render_status_badge d.status %}</td>
+                <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-slate-500 py-6">No open requests.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

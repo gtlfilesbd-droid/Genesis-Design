@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}My Profile{% endblock %}
+{% block content %}
+<div class="g-card p-8 mb-8">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-6">
+        <div class="w-20 h-20 rounded-2xl bg-primary text-white text-2xl font-bold flex items-center justify-center shrink-0">
+            {{ profile_user|initials }}
+        </div>
+        <div class="flex-1">
+            <h1 class="text-2xl font-bold text-slate-900">{{ profile_user.get_full_name }}</h1>
+            <p class="text-slate-500">{{ profile_user.designation|default:profile_user.get_role_display }} · {{ profile_user.department|default:"Design" }}</p>
+            <p class="text-sm text-slate-500 mt-1">{{ profile_user.employee_id|default:"—" }} · {{ profile_user.email }}</p>
+        </div>
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700 self-start">{{ profile_user.get_status_display }}</span>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    {% include 'components/stat_card.html' with label='Projects Created' value=total_projects_created icon='folder-plus' %}
+    {% include 'components/stat_card.html' with label='Design Requests' value=total_design_requests icon='file-plus' %}
+    {% include 'components/stat_card.html' with label='Assigned Designs' value=total_assigned_designs icon='pen-tool' %}
+    {% include 'components/stat_card.html' with label='Completed Tasks' value=completed_tasks icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+    {% include 'components/stat_card.html' with label='Running' value=running_tasks icon='loader' %}
+    {% include 'components/stat_card.html' with label='Pending' value=pending_tasks icon='clock' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue_tasks icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_tasks %}
+</div>
+
+<a href="{% url 'analytics:kpi' %}" class="g-btn-primary inline-flex items-center gap-2">
+    <i data-lucide="trending-up" class="w-4 h-4"></i> View KPI Dashboard
+</a>
+{% endblock %}

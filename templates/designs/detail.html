@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}{{ design.design_number }}{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'projects:detail' design.project.pk %}" class="text-sm text-slate-500 hover:text-primary-light inline-flex items-center gap-1 mb-3">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i> {{ design.project.client_name }}
+    </a>
+    <div class="flex flex-wrap items-center gap-3">
+        <h1 class="text-[28px] font-bold text-slate-900">{{ design.design_number }}</h1>
+        {% render_priority_badge design.priority %}
+        {% render_status_badge design.status %}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
+            {% if design.sla_status == 'green' %}bg-green-100 text-green-700{% elif design.sla_status == 'yellow' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+            SLA: {{ design.get_sla_status_display }}
+        </span>
+    </div>
+    <p class="text-sm text-slate-500 mt-1">{{ design.drawing_type.name }} · {{ design.project.code }}</p>
+</div>
+
+<div class="g-card p-6 mb-6 overflow-x-auto">
+    <div class="flex items-center min-w-max gap-0">
+        {% for step in workflow_steps %}
+        {% with idx=forloop.counter0 %}
+        <div class="flex items-center">
+            <div class="flex flex-col items-center">
+                <div class="w-3 h-3 rounded-full {% if idx < current_idx %}g-step-done{% elif idx == current_idx %}g-step-current{% else %}g-step-pending{% endif %}"></div>
+                <span class="text-[10px] text-slate-500 mt-2 whitespace-nowrap">{{ step|title }}</span>
+            </div>
+            {% if not forloop.last %}<div class="w-12 h-0.5 {% if idx < current_idx %}bg-primary-light{% else %}bg-slate-200{% endif %} mx-1 mb-5"></div>{% endif %}
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="xl:col-span-2 space-y-6">
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Request Information</h2>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div><dt class="text-slate-500">Requested By</dt><dd class="font-medium">{{ design.requested_by }}</dd></div>
+                <div><dt class="text-slate-500">Request Date</dt><dd class="font-medium">{{ design.created_at|date:"d M Y" }}</dd></div>
+                <div><dt class="text-slate-500">Drawing Type</dt><dd class="font-medium">{{ design.drawing_type.name }}</dd></div>
+                <div><dt class="text-slate-500">Priority</dt><dd>{% render_priority_badge design.priority %}</dd></div>
+                <div><dt class="text-slate-500">Target Date</dt><dd class="font-medium">{{ design.target_completion_date|date:"d M Y"|default:"—" }}</dd></div>
+                <div><dt class="text-slate-500">Revisions</dt><dd class="font-medium">{{ design.revision_count }}</dd></div>
+                <div class="col-span-2"><dt class="text-slate-500">Message</dt><dd>{{ design.request_message|default:"—" }}</dd></div>
+            </dl>
+        </div>
+
+        {% if design.assigned_designer %}
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Assignment</h2>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div><dt class="text-slate-500">Assigned To</dt><dd class="font-medium">{{ design.assigned_designer }}</dd></div>
+                <div><dt class="text-slate-500">Assigned By</dt><dd class="font-medium">{{ design.assigned_by|default:"—" }}</dd></div>
+                <div><dt class="text-slate-500">Due Date</dt><dd class="font-medium {% if design.is_overdue %}text-red-600{% endif %}">{{ design.due_date|date:"d M Y H:i"|default:"—" }}</dd></div>
+                <div class="col-span-2"><dt class="text-slate-500">Instructions</dt><dd>{{ design.assignment_instructions|default:"—" }}</dd></div>
+            </dl>
+        </div>
+        {% endif %}
+
+        {% if submissions %}
+        <div class="g-card overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100"><h2 class="font-semibold text-slate-900">Revision History</h2></div>
+            <table class="g-table w-full">
+                <thead><tr><th>Ver</th><th>Submitted By</th><th>Date</th><th>File Ref</th><th>Notes</th></tr></thead>
+                <tbody>
+                {% for s in submissions %}
+                <tr>
+                    <td class="font-medium">V{{ s.version_number }}</td>
+                    <td>{{ s.submitted_by }}</td>
+                    <td class="text-slate-500">{{ s.submitted_at|date:"d M Y" }}</td>
+                    <td class="text-xs">{{ s.internal_file_reference|default:s.file.name|default:"—" }}</td>
+                    <td>{{ s.notes|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if reviews or verifications %}
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Comments & Reviews</h2>
+            <div class="space-y-4">
+                {% for r in reviews %}
+                <div class="flex gap-3 p-3 rounded-lg bg-slate-50">
+                    <div class="w-8 h-8 rounded-full bg-primary text-white text-xs flex items-center justify-center shrink-0">{{ r.reviewer|initials }}</div>
+                    <div>
+                        <p class="text-sm"><span class="font-semibold">{{ r.reviewer }}</span> — {{ r.get_action_display }}</p>
+                        <p class="text-xs text-slate-500">{{ r.created_at|date:"d M Y H:i" }}</p>
+                        {% if r.comments %}<p class="text-sm text-slate-700 mt-1">{{ r.comments }}</p>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% for v in verifications %}
+                <div class="flex gap-3 p-3 rounded-lg bg-slate-50">
+                    <div class="w-8 h-8 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center shrink-0">{{ v.verifier|initials }}</div>
+                    <div>
+                        <p class="text-sm"><span class="font-semibold">{{ v.verifier }}</span> — {{ v.get_action_display }}</p>
+                        <p class="text-xs text-slate-500">{{ v.created_at|date:"d M Y H:i" }}</p>
+                        {% if v.comments %}<p class="text-sm text-slate-700 mt-1">{{ v.comments }}</p>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if attachments %}
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Attachments</h2>
+            <ul class="divide-y divide-slate-100">
+                {% for a in attachments %}
+                <li class="flex items-center justify-between py-2 text-sm">
+                    <span>{{ a.filename }}</span>
+                    <a href="{{ a.file.url }}" class="text-primary-light font-semibold" target="_blank">Download</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="g-card p-6" id="comments-panel">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Internal Discussion</h2>
+            <div class="space-y-4 mb-4 max-h-80 overflow-y-auto" id="comments-list">
+                {% for c in comments %}
+                <div class="flex gap-3 p-3 rounded-lg bg-slate-50">
+                    <div class="w-8 h-8 rounded-full bg-slate-600 text-white text-xs flex items-center justify-center shrink-0">{{ c.author|initials }}</div>
+                    <div>
+                        <p class="text-sm"><span class="font-semibold">{{ c.author }}</span></p>
+                        <p class="text-xs text-slate-500">{{ c.created_at|timesince_short }}</p>
+                        <p class="text-sm text-slate-700 mt-1">{{ c.message|highlight_mentions }}</p>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-sm text-slate-500">No comments yet. Start the discussion below.</p>
+                {% endfor %}
+            </div>
+            <form method="post" class="flex gap-2"
+                  hx-post="{% url 'requests:detail' design.pk %}"
+                  hx-target="#comments-list" hx-swap="innerHTML">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_comment">
+                <input type="text" name="message" placeholder="Type a comment... @username to mention" class="g-input flex-1" required list="mention-users">
+                <datalist id="mention-users">
+                    {% for u in mentionable_users %}<option value="@{{ u.username }}">{{ u.get_full_name }}</option>{% endfor %}
+                </datalist>
+                <button type="submit" class="g-btn-primary shrink-0">Post</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="g-card p-6 border-2 border-primary/20">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-primary mb-4">Your Actions</h2>
+            <div class="space-y-2">
+                {% if design.status == 'new_request' and user.is_head_of_design or user.is_genesis_admin and design.status == 'new_request' %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'acknowledge' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge</button></form>
+                {% endif %}
+                {% if design.status == 'acknowledged' and user.is_head_of_design or user.is_genesis_admin and design.status == 'acknowledged' %}
+                <a href="{% url 'workflow:assign' design.pk %}" class="g-btn-primary w-full block text-center">Assign Designer</a>
+                {% endif %}
+                {% if design.status == 'assigned' and user == design.assigned_designer or user.is_genesis_admin and design.status == 'assigned' %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'accept_assignment' %}">{% csrf_token %}<button class="g-btn-primary w-full">Accept Assignment</button></form>
+                {% endif %}
+                {% if design.status == 'in_progress' or design.status == 'resubmitted' %}
+                {% if user == design.assigned_designer or user.is_genesis_admin %}
+                <a href="{% url 'workflow:action' design.pk 'submit_work' %}" class="g-btn-primary w-full block text-center">Submit Work</a>
+                {% endif %}
+                {% endif %}
+                {% if design.status == 'under_review' and user.is_head_of_design or user.is_genesis_admin and design.status == 'under_review' %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'accept_design' %}">{% csrf_token %}<button class="g-btn-primary w-full">Accept Design</button></form>
+                <a href="{% url 'workflow:action' design.pk 'request_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
+                {% endif %}
+                {% if design.status == 'correction_required' and user == design.assigned_designer or user.is_genesis_admin and design.status == 'correction_required' %}
+                <a href="{% url 'workflow:action' design.pk 'submit_work' %}" class="g-btn-primary w-full block text-center">Resubmit</a>
+                {% endif %}
+                {% if design.status == 'verification_pending' and user.is_verification_team or user.is_genesis_admin and design.status == 'verification_pending' %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'verify_approved' %}">{% csrf_token %}<button class="g-btn-primary w-full">Verify Approved</button></form>
+                <a href="{% url 'workflow:action' design.pk 'verification_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
+                {% endif %}
+                {% if design.status == 'verification_correction' and user.is_head_of_design or user.is_genesis_admin and design.status == 'verification_correction' %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'forward_to_designer' %}">{% csrf_token %}<button class="g-btn-secondary w-full">Forward to Designer</button></form>
+                {% endif %}
+                {% if design.status == 'approved' and user.is_head_of_design or user.is_genesis_admin and design.status == 'approved' %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'complete' %}">{% csrf_token %}<button class="g-btn-primary w-full">Mark Completed</button></form>
+                {% endif %}
+                {% if design.status != 'completed' and design.status != 'cancelled' %}
+                {% if user.is_design_requester and design.requested_by == user or user.is_genesis_admin %}
+                <div class="pt-2 border-t border-slate-100 mt-2">
+                    {% include 'components/confirm_modal.html' with title='Cancel this request?' message='This design request will be marked as cancelled.' action_url=request.path hidden_action='cancel_request' trigger_label='Cancel Request' confirm_label='Yes, Cancel' icon='x-circle' %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">SLA Tracker</h2>
+            <div class="g-progress mb-2"><div class="g-progress-fill {% if design.sla_status == 'red' %}!bg-red-500{% elif design.sla_status == 'yellow' %}!bg-amber-500{% endif %}" style="width: {{ sla_pct }}%"></div></div>
+            <p class="text-sm text-slate-600">{{ sla_pct }}% elapsed</p>
+            {% if design.sla_due %}<p class="text-xs text-slate-500 mt-1">Due: {{ design.sla_due|date:"d M Y H:i" }}</p>{% endif %}
+        </div>
+
+        {% if design.delay_source %}
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Time Breakdown</h2>
+            <p class="text-sm text-red-600 font-medium">Delay: {{ design.delay_source }} ({{ design.delay_duration_days }} days)</p>
+        </div>
+        {% endif %}
+
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Activity</h2>
+            <div class="space-y-3 max-h-64 overflow-y-auto">
+                {% for log in logs %}
+                <div class="text-sm border-l-2 border-blue-200 pl-3">
+                    <p class="font-medium">{{ log.action }}</p>
+                    <p class="text-xs text-slate-500">{{ log.user }} · {{ log.created_at|timesince_short }}</p>
+                </div>
+                {% empty %}<p class="text-sm text-slate-500">No activity.</p>{% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

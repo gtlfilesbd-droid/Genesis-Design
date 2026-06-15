@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Design Library{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">Design Library</h1>
+    <p class="text-sm text-slate-500 mt-1">Approved and completed drawings knowledge base</p>
+</div>
+
+<form method="get" class="g-card p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <select name="drawing_type" class="g-input">
+        <option value="">All Types</option>
+        {% for dt in drawing_types %}<option value="{{ dt.pk }}" {% if request.GET.drawing_type == dt.pk|stringformat:"s" %}selected{% endif %}>{{ dt.name }}</option>{% endfor %}
+    </select>
+    <input type="text" name="project" value="{{ request.GET.project }}" placeholder="Project code" class="g-input">
+    <input type="text" name="client" value="{{ request.GET.client }}" placeholder="Client" class="g-input">
+    <select name="designer" class="g-input">
+        <option value="">All Designers</option>
+        {% for d in designers %}<option value="{{ d.pk }}" {% if request.GET.designer == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.get_full_name }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="g-btn-primary">Search</button>
+</form>
+
+<div class="g-card overflow-hidden">
+    <table class="g-table w-full">
+        <thead><tr><th>Design #</th><th>Type</th><th>Project</th><th>Client</th><th>Designer</th><th>Completed</th><th></th></tr></thead>
+        <tbody>
+        {% for d in designs %}
+        <tr>
+            <td class="font-medium text-primary-light">{{ d.design_number }}</td>
+            <td>{{ d.drawing_type.name }}</td>
+            <td>{{ d.project.code }}</td>
+            <td>{{ d.project.client_name }}</td>
+            <td>{{ d.assigned_designer|default:"—" }}</td>
+            <td class="text-slate-500">{{ d.completion_date|date:"d M Y"|default:"—" }}</td>
+            <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-slate-500 py-12">No approved drawings found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

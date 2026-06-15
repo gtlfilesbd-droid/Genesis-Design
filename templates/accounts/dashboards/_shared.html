@@ -1,0 +1,107 @@
+{% load genesis_ui %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">Dashboard</h1>
+    <p class="text-slate-500 text-sm mt-1">{{ today|date:"l, d F Y" }}</p>
+</div>
+
+{% if stats.sla_breached %}
+<div class="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
+    <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
+    <span><strong>{{ stats.sla_breached }}</strong> design{{ stats.sla_breached|pluralize }} have breached SLA deadline —</span>
+    <a href="{% url 'workflow:board' %}?priority=critical" class="font-semibold underline">View Overdue Designs →</a>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+    {% include 'components/stat_card.html' with label='Active Projects' value=stats.active_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' subtext=stats.trend_active %}
+    {% include 'components/stat_card.html' with label='Running Designs' value=stats.running_designs icon='pen-tool' icon_bg='bg-amber-50' icon_color='text-amber-600' subtext=stats.trend_running %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='clock' icon_bg='bg-red-50' icon_color='text-red-600' subtext=stats.trend_overdue subtext_class='text-red-600' danger=stats.overdue_designs %}
+    {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext=stats.trend_completed subtext_class='text-green-600' %}
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-8">
+    <div class="xl:col-span-3 g-card p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-base font-semibold text-slate-900">Recent Activity</h2>
+        </div>
+        <div class="relative g-timeline space-y-5 pl-8">
+            {% for log in recent_activity %}
+            <div class="relative">
+                <div class="absolute -left-8 top-1 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-white"></div>
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
+                        {{ log.user|initials }}
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-900"><span class="font-semibold">{{ log.user|default:"System" }}</span> — {{ log.description|default:log.action }}</p>
+                        <p class="text-xs text-slate-400 mt-0.5">{{ log.created_at|timesince_short }}</p>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-500">No recent activity.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="xl:col-span-2 g-card p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h2 class="text-base font-semibold text-slate-900">My Pending Actions</h2>
+            <span class="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{{ pending_actions|length }}</span>
+        </div>
+        <div class="space-y-3">
+            {% for item in pending_actions %}
+            <div class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-slate-900 truncate">{{ item.design.design_number }}</p>
+                    <p class="text-xs text-slate-500">{{ item.design.project.code }} · {{ item.design.get_status_display }}</p>
+                </div>
+                <a href="{% url 'requests:detail' item.design.pk %}" class="g-btn-primary text-xs px-3 py-1.5 shrink-0 ml-2">{{ item.action_label }}</a>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-500 py-4 text-center">No pending actions.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if show_charts and charts %}
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    <div class="g-card p-6">
+        <h2 class="text-base font-semibold text-slate-900 mb-4">Designs by Status</h2>
+        <canvas id="statusChart" height="200"></canvas>
+    </div>
+    <div class="g-card p-6">
+        <h2 class="text-base font-semibold text-slate-900 mb-4">Workload by Designer</h2>
+        <canvas id="workloadChart" height="200"></canvas>
+    </div>
+</div>
+{{ charts|json_script:"charts-data" }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const charts = JSON.parse(document.getElementById('charts-data').textContent);
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx) {
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: charts.status_labels,
+                datasets: [{ label: 'Designs', data: charts.status_data, backgroundColor: '#2E75B6', borderRadius: 6 }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
+    }
+    const workloadCtx = document.getElementById('workloadChart');
+    if (workloadCtx && charts.workload_labels.length) {
+        new Chart(workloadCtx, {
+            type: 'doughnut',
+            data: {
+                labels: charts.workload_labels,
+                datasets: [{ data: charts.workload_data, backgroundColor: ['#1A3C6E','#2E75B6','#60A5FA','#93C5FD','#BFDBFE','#DBEAFE','#E8F0F8','#F1F5F9'] }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'right' } } }
+        });
+    }
+});
+</script>
+{% endif %}

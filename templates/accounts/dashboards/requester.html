@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Dashboard — Requester{% endblock %}
+{% block content %}
+{% include 'accounts/dashboards/_shared.html' %}
+
+<div class="flex items-center justify-between mt-8 mb-4">
+    <h2 class="text-lg font-semibold text-slate-900">My Projects</h2>
+    <a href="{% url 'projects:new' %}" class="g-btn-primary inline-flex items-center gap-2">
+        <i data-lucide="plus" class="w-4 h-4"></i> New Project
+    </a>
+</div>
+<div class="g-card overflow-hidden">
+    <table class="g-table w-full">
+        <thead><tr><th>Code</th><th>Client</th><th>Status</th><th>Drawings</th><th></th></tr></thead>
+        <tbody>
+        {% for p in projects %}
+        <tr>
+            <td class="font-medium text-primary">{{ p.code }}</td>
+            <td>{{ p.client_name }}</td>
+            <td>{% render_status_badge p.status %}</td>
+            <td>{{ p.total_design_requests }}</td>
+            <td><a href="{% url 'projects:detail' p.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-slate-500 py-8">No projects yet. <a href="{% url 'projects:new' %}" class="text-primary-light font-semibold">Create one</a></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<h2 class="text-lg font-semibold text-slate-900 mt-8 mb-4">Design Request History</h2>
+<div class="g-card overflow-hidden">
+    <table class="g-table w-full">
+        <thead><tr><th>Design #</th><th>Type</th><th>Priority</th><th>Stage</th><th>Holder</th></tr></thead>
+        <tbody>
+        {% for d in designs %}
+        <tr>
+            <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
+            <td>{{ d.drawing_type.name }}</td>
+            <td>{% render_priority_badge d.priority %}</td>
+            <td>{% render_status_badge d.status %}</td>
+            <td class="text-slate-500">{{ d.current_holder|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-slate-500 py-8">No design requests.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

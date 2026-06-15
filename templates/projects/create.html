@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Create Project{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-[28px] font-bold text-slate-900 mb-2">Create Project</h1>
+    <p class="text-slate-500 text-sm mb-8">Add a new project to start design requests.</p>
+    <div class="g-card p-8">
+        <form method="post" enctype="multipart/form-data" class="space-y-5">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+                {{ field.as_widget|safe }}
+                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="border-t border-slate-100 pt-5">
+                <p class="text-sm font-medium text-slate-700 mb-3">Document Upload <span class="text-slate-400 font-normal">(optional)</span></p>
+                <div class="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center hover:border-primary-light transition-colors">
+                    <i data-lucide="upload" class="w-8 h-8 mx-auto text-slate-400 mb-2"></i>
+                    <p class="text-sm text-slate-500 mb-3">Drag & drop files or click to browse</p>
+                    {{ attachment_form.file }}
+                    <div class="mt-3">{{ attachment_form.name }}</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 pt-2">
+                <button type="submit" class="g-btn-primary">Create Project</button>
+                <a href="{% url 'projects:list' %}" class="g-btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+<style>
+    #id_client_name, #id_code, #id_address, #id_start_date, #id_expected_completion_date, #id_description { @apply g-input; }
+    textarea { width: 100%; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+</style>
+{% endblock %}

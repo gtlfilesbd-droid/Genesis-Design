@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">Settings</h1>
+    <p class="text-sm text-slate-500 mt-1">Configure system preferences, SLA rules, and permissions</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <nav class="g-card p-4 h-fit">
+        <ul class="space-y-1">
+            {% for key, label, icon in settings_tabs %}
+            <li>
+                <a href="?tab={{ key }}" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition {% if tab == key %}bg-primary text-white{% else %}text-slate-600 hover:bg-slate-50{% endif %}">
+                    <i data-lucide="{{ icon }}" class="w-4 h-4"></i> {{ label }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </nav>
+
+    <div class="lg:col-span-3">
+        {% if tab == 'general' %}
+        <div class="g-card p-8">
+            <h2 class="font-semibold text-slate-900 mb-6">General Settings</h2>
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_general">
+                {% for field in company_form %}
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+                    {{ field }}
+                </div>
+                {% endfor %}
+                <button type="submit" class="g-btn-primary">Save General Settings</button>
+            </form>
+        </div>
+
+        {% elif tab == 'drawing_types' %}
+        <div class="g-card overflow-x-auto mb-6">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h2 class="font-semibold text-slate-900">Drawing Types</h2>
+            </div>
+            <table class="g-table w-full">
+                <thead><tr><th>Code</th><th>Name</th><th>SLA</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                {% for dt in drawing_types %}
+                <tr>
+                    <td class="font-mono text-sm">{{ dt.code_prefix }}</td>
+                    <td class="font-medium">{{ dt.name }}</td>
+                    <td>{{ dt.default_sla_days }} days</td>
+                    <td>{% if dt.is_active %}<span class="text-green-600 text-sm font-medium">Active</span>{% else %}<span class="text-slate-400 text-sm">Inactive</span>{% endif %}</td>
+                    <td><button type="button" onclick="document.getElementById('edit-dt-{{ dt.pk }}').classList.toggle('hidden')" class="text-primary-light text-sm font-semibold">Edit</button></td>
+                </tr>
+                <tr id="edit-dt-{{ dt.pk }}" class="hidden bg-slate-50">
+                    <td colspan="5" class="p-4">
+                        <form method="post" class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="edit_drawing_type">
+                            <input type="hidden" name="drawing_type_id" value="{{ dt.pk }}">
+                            <div><label class="text-xs text-slate-500">Name</label><input name="name" value="{{ dt.name }}" class="g-input"></div>
+                            <div><label class="text-xs text-slate-500">Prefix</label><input name="code_prefix" value="{{ dt.code_prefix }}" class="g-input"></div>
+                            <div><label class="text-xs text-slate-500">SLA Days</label><input name="default_sla_days" type="number" value="{{ dt.default_sla_days }}" class="g-input"></div>
+                            <div class="flex items-center gap-2"><input type="checkbox" name="is_active" {% if dt.is_active %}checked{% endif %} class="rounded"><button type="submit" class="g-btn-primary text-sm">Save</button></div>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="g-card p-6">
+            <h3 class="font-semibold text-slate-900 mb-4">Add Drawing Type</h3>
+            <form method="post" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_drawing_type">
+                {% for field in drawing_type_form %}
+                <div><label class="text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>{{ field }}</div>
+                {% endfor %}
+                <div class="sm:col-span-2"><button type="submit" class="g-btn-primary">Add Type</button></div>
+            </form>
+        </div>
+
+        {% elif tab == 'sla' %}
+        <div class="g-card p-8">
+            <h2 class="font-semibold text-slate-900 mb-6">SLA Configuration</h2>
+            <form method="post" class="space-y-5 max-w-lg">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_sla">
+                {% for field in sla_form %}
+                <div class="flex items-center justify-between gap-4 {% if field.field.widget.input_type != 'checkbox' %}flex-col items-start{% endif %}">
+                    <label class="text-sm font-medium text-slate-700">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p class="text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="g-btn-primary">Save SLA Settings</button>
+            </form>
+        </div>
+
+        {% elif tab == 'notifications' %}
+        <div class="g-card p-8 max-w-xl">
+            <h2 class="font-semibold text-slate-900 mb-6">Notification Settings</h2>
+            <form method="post" class="space-y-5">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_notifications">
+                {% for field in notification_form %}
+                <div class="flex items-center justify-between py-2">
+                    <label class="text-sm font-medium text-slate-700">{{ field.label }}</label>
+                    {{ field }}
+                </div>
+                {% endfor %}
+                <button type="submit" class="g-btn-primary">Save Notifications</button>
+            </form>
+        </div>
+
+        {% elif tab == 'company' %}
+        <div class="g-card p-8">
+            <h2 class="font-semibold text-slate-900 mb-6">Company Information</h2>
+            <form method="post" class="space-y-4 max-w-xl">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_company">
+                {% for field in company_form %}
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+                    {{ field }}
+                </div>
+                {% endfor %}
+                <button type="submit" class="g-btn-primary">Save Company Info</button>
+            </form>
+        </div>
+
+        {% elif tab == 'permissions' %}
+        <div class="g-card overflow-x-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h2 class="font-semibold text-slate-900">Role Permissions</h2>
+                <form method="post">{% csrf_token %}<input type="hidden" name="action" value="reset_permissions"><button type="submit" class="g-btn-secondary text-sm">Reset Defaults</button></form>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_permissions">
+                <table class="g-table w-full text-sm">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Projects</th>
+                            <th>Requests</th>
+                            <th>Assign</th>
+                            <th>Review</th>
+                            <th>Verify</th>
+                            <th>Users</th>
+                            <th>Reports</th>
+                            <th>Settings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in role_permissions %}
+                    {% with perm=item.perm %}
+                    <tr>
+                        <td class="font-medium">{{ item.label }}</td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_create_project" {% if perm.can_create_project %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_create_request" {% if perm.can_create_request %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_assign_designer" {% if perm.can_assign_designer %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_review" {% if perm.can_review %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_verify" {% if perm.can_verify %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_manage_users" {% if perm.can_manage_users %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_view_reports" {% if perm.can_view_reports %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_manage_settings" {% if perm.can_manage_settings %}checked{% endif %} class="rounded"></td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="p-6"><button type="submit" class="g-btn-primary">Save Permissions</button></div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

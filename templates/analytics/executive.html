@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Executive Dashboard{% endblock %}
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-[28px] font-bold text-slate-900">Executive Dashboard</h1>
+    <p class="text-sm text-slate-500 mt-1">Real-time overview for management</p>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' %}
+    {% include 'components/stat_card.html' with label='Total Drawings' value=total_drawings icon='file-text' %}
+    {% include 'components/stat_card.html' with label='Pending' value=pending_drawings icon='clock' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue_drawings icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_drawings %}
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="g-card p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Risk Indicators</h2>
+        <p class="text-sm mb-4">Projects at risk (health &lt; 70): <strong class="text-amber-600">{{ at_risk_projects }}</strong></p>
+        <p class="text-sm text-slate-500 mb-4">Design team: {{ design_team_count }} · Verification: {{ verification_team_count }}</p>
+        <h3 class="text-xs font-semibold uppercase text-slate-500 mb-2">High Risk Projects</h3>
+        <ul class="space-y-2">
+            {% for p in critical_projects %}
+            <li class="flex justify-between text-sm p-2 rounded bg-red-50 text-red-800"><span>{{ p.code }} — {{ p.client_name }}</span><span>Health: {{ p.health_score }}</span></li>
+            {% empty %}<li class="text-sm text-slate-500">None</li>{% endfor %}
+        </ul>
+    </div>
+    <div class="g-card p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Top Performers</h2>
+        <ul class="space-y-3">
+            {% for r in top_performers %}
+            <li class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
+                <span class="font-medium text-sm">{{ r.user.get_full_name }}</span>
+                <span class="text-primary font-bold">{{ r.score }}</span>
+            </li>
+            {% empty %}<li class="text-sm text-slate-500">No data</li>{% endfor %}
+        </ul>
+    </div>
+</div>
+
+<div class="g-card p-6">
+    <h2 class="font-semibold text-slate-900 mb-4">Bottleneck Detection</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+        <div>
+            <h3 class="text-xs font-semibold uppercase text-red-600 mb-3">Slow Designers</h3>
+            {% for b in bottlenecks.slow_designers %}<p class="mb-2">{{ b.user.get_full_name }} — {{ b.overdue_count }} overdue</p>{% empty %}<p class="text-slate-500">None</p>{% endfor %}
+        </div>
+        <div>
+            <h3 class="text-xs font-semibold uppercase text-amber-600 mb-3">Slow Verifiers</h3>
+            {% for b in bottlenecks.slow_verifiers %}<p class="mb-2">{{ b.user.get_full_name }} — {{ b.pending_count }} pending</p>{% empty %}<p class="text-slate-500">None</p>{% endfor %}
+        </div>
+        <div>
+            <h3 class="text-xs font-semibold uppercase text-red-600 mb-3">Stalled Projects</h3>
+            {% for b in bottlenecks.stalled_projects %}<p class="mb-2">{{ b.project.code }} — Health: {{ b.health }}</p>{% empty %}<p class="text-slate-500">None</p>{% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

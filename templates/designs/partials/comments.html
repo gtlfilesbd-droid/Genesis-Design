@@ -1,0 +1,13 @@
+{% load genesis_ui %}
+{% for c in comments %}
+<div class="flex gap-3 p-3 rounded-lg bg-slate-50">
+    <div class="w-8 h-8 rounded-full bg-slate-600 text-white text-xs flex items-center justify-center shrink-0">{{ c.author|initials }}</div>
+    <div>
+        <p class="text-sm"><span class="font-semibold">{{ c.author }}</span></p>
+        <p class="text-xs text-slate-500">{{ c.created_at|timesince_short }}</p>
+        <p class="text-sm text-slate-700 mt-1">{{ c.message|highlight_mentions }}</p>
+    </div>
+</div>
+{% empty %}
+<p class="text-sm text-slate-500">No comments yet. Use @username to mention someone.</p>
+{% endfor %}
