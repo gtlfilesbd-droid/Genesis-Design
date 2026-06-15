@@ -7,14 +7,14 @@ from apps.permissions.decorators import require_global_permission
 from apps.accounts.models import UserRole
 from apps.designs.models import DrawingType
 
-from .models import CompanySettings, RolePermission, SLAConfiguration
+from .models import CompanySettings, RolePermission, DeadlineConfiguration
 from .settings_forms import (
     CompanySettingsForm,
     DEFAULT_ROLE_PERMISSIONS,
     DrawingTypeForm,
     NotificationSettingForm,
     RolePermissionForm,
-    SLAConfigurationForm,
+    DeadlineConfigurationForm,
     ensure_role_permissions,
 )
 from apps.notifications.models import NotificationSetting
@@ -22,7 +22,7 @@ from apps.notifications.models import NotificationSetting
 SETTINGS_TABS = [
     ('general', 'General', 'settings'),
     ('drawing_types', 'Drawing Types', 'clipboard-list'),
-    ('sla', 'SLA Configuration', 'timer'),
+    ('deadline', 'Deadline Configuration', 'timer'),
     ('notifications', 'Notifications', 'bell'),
     ('company', 'Company Info', 'building-2'),
     ('permissions', 'Role Permissions', 'shield'),
@@ -36,7 +36,7 @@ def settings_index(request):
     ensure_role_permissions()
 
     company = CompanySettings.get_solo()
-    sla_config = SLAConfiguration.get_solo()
+    deadline_config = DeadlineConfiguration.get_solo()
     notif_settings = NotificationSetting.get_solo()
     drawing_types = DrawingType.objects.all()
     role_permissions = [
@@ -60,12 +60,12 @@ def settings_index(request):
                 form.save()
                 messages.success(request, 'Company info saved.')
                 redirect_tab = 'company'
-        elif action == 'update_sla':
-            form = SLAConfigurationForm(request.POST, instance=sla_config)
+        elif action == 'update_deadline':
+            form = DeadlineConfigurationForm(request.POST, instance=deadline_config)
             if form.is_valid():
                 form.save()
-                messages.success(request, 'SLA configuration saved.')
-                redirect_tab = 'sla'
+                messages.success(request, 'Deadline configuration saved.')
+                redirect_tab = 'deadline'
         elif action == 'update_notifications':
             form = NotificationSettingForm(request.POST, instance=notif_settings)
             if form.is_valid():
@@ -106,7 +106,7 @@ def settings_index(request):
         'tab': tab,
         'settings_tabs': SETTINGS_TABS,
         'company_form': CompanySettingsForm(instance=company),
-        'sla_form': SLAConfigurationForm(instance=sla_config),
+        'deadline_form': DeadlineConfigurationForm(instance=deadline_config),
         'notification_form': NotificationSettingForm(instance=notif_settings),
         'drawing_types': drawing_types,
         'drawing_type_form': DrawingTypeForm(),

@@ -28,7 +28,7 @@ class WorkflowTests(TestCase):
             employee_id='V001',
         )
         self.drawing_type = DrawingType.objects.create(
-            name='Initial Drawing', code_prefix='ID', default_sla_days=3,
+            name='Initial Drawing', code_prefix='ID', allowed_days=3,
         )
         self.project = Project.objects.create(
             name='Test Project', code='PRJ-001', client_name='Client',
@@ -47,7 +47,7 @@ class WorkflowTests(TestCase):
         transition(self.design, 'acknowledge', self.hod)
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.ACKNOWLEDGED)
-        self.assertIsNotNone(self.design.sla_start)
+        self.assertIsNotNone(self.design.deadline_start)
 
         transition(self.design, 'assign', self.hod, designer=self.designer,
                    due_date=timezone.now() + timedelta(days=3))

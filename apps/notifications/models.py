@@ -4,7 +4,7 @@ from django.db import models
 
 class NotificationType(models.TextChoices):
     WORKFLOW = 'workflow', 'Workflow'
-    SLA = 'sla', 'SLA'
+    DEADLINE = 'deadline', 'Deadline'
     ESCALATION = 'escalation', 'Escalation'
     SYSTEM = 'system', 'System'
 
@@ -42,7 +42,7 @@ class NotificationSetting(models.Model):
     enable_in_app = models.BooleanField(default=True)
     enable_whatsapp = models.BooleanField(default=False)
     enable_sms = models.BooleanField(default=False)
-    sla_warning_hours = models.PositiveSmallIntegerField(default=24)
+    deadline_warning_hours = models.PositiveSmallIntegerField(default=24)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

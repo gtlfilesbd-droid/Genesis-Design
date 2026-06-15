@@ -52,8 +52,8 @@ def send_escalation(design, level):
     from apps.accounts.models import User, UserRole
 
     link = f'/requests/{design.pk}/'
-    title = f'SLA Escalation Level {level}: {design.design_number}'
-    message = f'Design {design.design_number} has breached SLA. Escalation level {level}.'
+    title = f'Deadline Escalation Level {level}: {design.design_number}'
+    message = f'Design {design.design_number} has missed deadline. Escalation level {level}.'
 
     if level == 1 and design.assigned_designer:
         create_notification(

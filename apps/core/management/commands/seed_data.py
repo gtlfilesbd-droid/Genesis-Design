@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 from apps.accounts.models import Team, User, UserRole
-from apps.core.models import CompanySettings, SLAConfiguration
+from apps.core.models import CompanySettings, DeadlineConfiguration
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import (
     DesignComment, DesignPriority, DesignRequest, DesignStatus,
@@ -78,14 +78,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         team, _ = Team.objects.get_or_create(name='Design Department', defaults={'department': 'Design'})
 
-        for name, prefix, sla_days in DRAWING_TYPES:
+        for name, prefix, allowed_days in DRAWING_TYPES:
             DrawingType.objects.update_or_create(
                 name=name,
-                defaults={'code_prefix': prefix, 'default_sla_days': sla_days, 'is_active': True},
+                defaults={'code_prefix': prefix, 'allowed_days': allowed_days, 'is_active': True},
             )
 
         CompanySettings.get_solo()
-        SLAConfiguration.get_solo()
+        DeadlineConfiguration.get_solo()
         NotificationSetting.get_solo()
         ensure_role_permissions()
 
@@ -157,7 +157,7 @@ class Command(BaseCommand):
                 priority = PRIORITY_POOL[seq % len(PRIORITY_POOL)]
                 overdue = status == DesignStatus.IN_PROGRESS and seq <= 2
                 due = now - timedelta(days=2) if overdue else now + timedelta(days=seq + 3)
-                sla_status = 'red' if overdue else ('yellow' if seq % 5 == 0 else 'green')
+                deadline_status = 'red' if overdue else ('yellow' if seq % 5 == 0 else 'green')
 
                 design = DesignRequest(
                     project=project,
@@ -172,9 +172,9 @@ class Command(BaseCommand):
                         verifier if status == DesignStatus.VERIFICATION_PENDING else designer
                     ),
                     due_date=due,
-                    sla_start=now - timedelta(days=10),
-                    sla_due=now - timedelta(days=1) if overdue else now + timedelta(days=5),
-                    sla_status=sla_status,
+                    deadline_start=now - timedelta(days=10),
+                    deadline_due=now - timedelta(days=1) if overdue else now + timedelta(days=5),
+                    deadline_status=deadline_status,
                     target_completion_date=today + timedelta(days=20 + seq),
                     request_message=f'Sample {dt.name} for {project.code}',
                     revision_count=0,

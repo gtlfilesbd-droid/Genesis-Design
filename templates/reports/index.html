@@ -31,7 +31,7 @@
     <a href="?tab=performance" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'performance' or not tab %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Performance</a>
     <a href="?tab=projects" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'projects' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Project Report</a>
 
-    <a href="?tab=sla" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'sla' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">SLA Compliance</a>
+    <a href="?tab=deadline" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'deadline' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Deadline Compliance</a>
 
     <a href="?tab=delay" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'delay' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Delay Analysis</a>
 
@@ -128,31 +128,31 @@
 </div>
 {% endif %}
 
-{% if tab == 'sla' %}
+{% if tab == 'deadline' %}
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
     <div class="g-card p-6">
 
-        <h2 class="font-semibold text-slate-900 mb-4">SLA Overview</h2>
+        <h2 class="font-semibold text-slate-900 mb-4">Deadline Overview</h2>
 
-        <div class="text-4xl font-bold text-primary mb-2">{{ sla_data.compliance_rate }}%</div>
+        <div class="text-4xl font-bold text-primary mb-2">{{ deadline_data.compliance_rate }}%</div>
 
         <p class="text-sm text-slate-500 mb-6">Overall compliance rate</p>
 
         <div class="space-y-3 text-sm">
 
-            <div class="flex justify-between"><span class="text-green-600">On Track</span><span class="font-semibold">{{ sla_data.green }}</span></div>
+            <div class="flex justify-between"><span class="text-green-600">On Track</span><span class="font-semibold">{{ deadline_data.green }}</span></div>
 
-            <div class="flex justify-between"><span class="text-amber-600">Warning</span><span class="font-semibold">{{ sla_data.yellow }}</span></div>
+            <div class="flex justify-between"><span class="text-amber-600">Warning</span><span class="font-semibold">{{ deadline_data.yellow }}</span></div>
 
-            <div class="flex justify-between"><span class="text-red-600">Breached</span><span class="font-semibold">{{ sla_data.red }}</span></div>
+            <div class="flex justify-between"><span class="text-red-600">Missed</span><span class="font-semibold">{{ deadline_data.red }}</span></div>
 
-            <div class="flex justify-between border-t pt-2"><span>Total tracked</span><span class="font-semibold">{{ sla_data.total }}</span></div>
+            <div class="flex justify-between border-t pt-2"><span>Total tracked</span><span class="font-semibold">{{ deadline_data.total }}</span></div>
 
         </div>
 
-        <a href="{% url 'reports:export_csv' 'sla_compliance' %}" class="g-btn-secondary text-sm mt-6 inline-block">Export CSV</a>
+        <a href="{% url 'reports:export_csv' 'deadline_compliance' %}" class="g-btn-secondary text-sm mt-6 inline-block">Export CSV</a>
 
     </div>
 
@@ -160,7 +160,7 @@
 
         <h2 class="font-semibold text-slate-900 mb-4">Compliance Chart</h2>
 
-        <canvas id="slaChart" height="200"></canvas>
+        <canvas id="deadlineChart" height="200"></canvas>
 
     </div>
 
@@ -252,9 +252,9 @@
 
         <div class="flex items-center justify-between py-3 border-b border-slate-100">
 
-            <span class="text-sm font-medium">SLA Compliance</span>
+            <span class="text-sm font-medium">Deadline Compliance</span>
 
-            <a href="{% url 'reports:export_csv' 'sla_compliance' %}" class="text-primary-light text-xs font-semibold">CSV</a>
+            <a href="{% url 'reports:export_csv' 'deadline_compliance' %}" class="text-primary-light text-xs font-semibold">CSV</a>
 
         </div>
 
@@ -286,13 +286,13 @@
 
 {% block extra_js %}
 
-{% if tab == 'sla' %}
+{% if tab == 'deadline' %}
 
 <script>
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    const ctx = document.getElementById('slaChart');
+    const ctx = document.getElementById('deadlineChart');
 
     if (ctx && window.Chart) {
 
@@ -304,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 labels: ['On Track', 'Warning', 'Breached'],
 
-                datasets: [{ data: [{{ sla_data.green }}, {{ sla_data.yellow }}, {{ sla_data.red }}], backgroundColor: ['#22c55e','#f59e0b','#ef4444'] }],
+                datasets: [{ data: [{{ deadline_data.green }}, {{ deadline_data.yellow }}, {{ deadline_data.red }}], backgroundColor: ['#22c55e','#f59e0b','#ef4444'] }],
 
             },
 

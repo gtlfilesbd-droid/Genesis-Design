@@ -63,7 +63,7 @@ Django Admin: http://127.0.0.1:8000/django-admin/
 ## Features
 
 - **Phase 1**: Projects, design requests, 11-step workflow, role dashboards, activity logs
-- **Phase 2**: SLA tracking, notifications, Kanban board, version history, audit trail, reports (CSV/Excel/PDF)
+- **Phase 2**: Deadline tracking, notifications, Kanban board, version history, audit trail, reports (CSV/Excel/PDF)
 - **Phase 3**: KPIs, leaderboard, workload balancing, executive dashboard, drawing library
 
 ## Workflow
@@ -82,4 +82,4 @@ celery -A genesis_design worker -l info
 celery -A genesis_design beat -l info
 ```
 
-Runs SLA status checks and escalation tasks.
+Runs Deadline status checks and escalation tasks.

@@ -97,7 +97,7 @@ class CompanySettings(models.Model):
         return obj
 
 
-class SLAConfiguration(models.Model):
+class DeadlineConfiguration(models.Model):
     default_warning_percent = models.PositiveSmallIntegerField(default=20)
     escalation_level_1_days = models.PositiveSmallIntegerField(default=1)
     escalation_level_2_days = models.PositiveSmallIntegerField(default=3)
@@ -105,7 +105,7 @@ class SLAConfiguration(models.Model):
     count_weekends = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name_plural = 'SLA configuration'
+        verbose_name_plural = 'Deadline configuration'
 
     @classmethod
     def get_solo(cls):

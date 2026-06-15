@@ -47,7 +47,7 @@ def design_detail(request, pk):
     if request.method == 'POST' and request.POST.get('action') == 'cancel_request':
         if design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
             design.status = DesignStatus.CANCELLED
-            design.save(update_fields=['status', 'primary_status', 'sla_breached'])
+            design.save(update_fields=['status', 'primary_status', 'deadline_missed'])
             log_activity('design_request', design.pk, request.user, 'cancelled', 'Request cancelled')
             messages.success(request, 'Design request cancelled.')
         return redirect('requests:detail', pk=pk)
@@ -66,11 +66,11 @@ def design_detail(request, pk):
     design.refresh_from_db()
 
     stage_durations = design.stage_durations.select_related('responsible_user')
-    sla_pct = 0
-    if design.sla_start and design.sla_due:
-        total = (design.sla_due - design.sla_start).total_seconds()
-        elapsed = (timezone.now() - design.sla_start).total_seconds() if total else 0
-        sla_pct = min(100, round((elapsed / total) * 100)) if total else 0
+    deadline_pct = 0
+    if design.deadline_start and design.deadline_due:
+        total = (design.deadline_due - design.deadline_start).total_seconds()
+        elapsed = (timezone.now() - design.deadline_start).total_seconds() if total else 0
+        deadline_pct = min(100, round((elapsed / total) * 100)) if total else 0
 
     workflow_steps = [
         'new_request', 'acknowledged', 'assigned', 'in_progress',
@@ -88,7 +88,7 @@ def design_detail(request, pk):
         'comments': comments,
         'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
         'stage_durations': stage_durations,
-        'sla_pct': sla_pct,
+        'deadline_pct': deadline_pct,
         'workflow_steps': workflow_steps,
         'current_idx': current_idx,
     })

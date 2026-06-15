@@ -30,10 +30,10 @@ PRIORITY_BADGE = {
     'low': ('Low', 'bg-green-100 text-green-700', 'border-l-green-500'),
 }
 
-SLA_BADGE = {
+DEADLINE_BADGE = {
     'green': ('On Track', 'bg-green-100 text-green-700'),
-    'yellow': ('Warning', 'bg-amber-100 text-amber-700'),
-    'red': ('Breached', 'bg-red-100 text-red-700'),
+    'yellow': ('Deadline Warning', 'bg-amber-100 text-amber-700'),
+    'red': ('Deadline Missed', 'bg-red-100 text-red-700'),
 }
 
 
@@ -52,8 +52,8 @@ def priority_badge(priority):
 
 
 @register.simple_tag
-def sla_badge(status):
-    label, css = SLA_BADGE.get(status, ('Unknown', 'bg-slate-100 text-slate-600'))
+def deadline_badge(status):
+    label, css = DEADLINE_BADGE.get(status, ('Unknown', 'bg-slate-100 text-slate-600'))
     return {'label': label, 'css': css}
 
 

@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from apps.permissions.decorators import require_global_permission
 from apps.accounts.models import User, UserRole
-from apps.designs.models import DesignRequest, DesignStatus, SLAStatus
+from apps.designs.models import DesignRequest, DesignStatus, DeadlineStatus
 from apps.projects.models import Project, ProjectStatus
 
 
@@ -76,14 +76,14 @@ def compute_project_health(project):
         due_date__lt=timezone.now()
     ).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count()
     corrections = designs.aggregate(s=Count('id', filter=Q(revision_count__gt=0)))['s']
-    sla_breached = designs.filter(sla_status=SLAStatus.RED).count()
+    deadline_missed = designs.filter(deadline_status=DeadlineStatus.RED).count()
 
     completion_score = (completed / total) * 40
     overdue_penalty = min((overdue / total) * 30, 30)
     correction_penalty = min((corrections / total) * 20, 20)
-    sla_penalty = min((sla_breached / total) * 10, 10)
+    deadline_penalty = min((deadline_missed / total) * 10, 10)
 
-    score = max(0, round(completion_score + 40 - overdue_penalty - correction_penalty - sla_penalty))
+    score = max(0, round(completion_score + 40 - overdue_penalty - correction_penalty - deadline_penalty))
     return score
 
 

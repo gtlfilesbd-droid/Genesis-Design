@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mb-8">
     <h1 class="text-[28px] font-bold text-slate-900">Settings</h1>
-    <p class="text-sm text-slate-500 mt-1">Configure system preferences, SLA rules, and permissions</p>
+    <p class="text-sm text-slate-500 mt-1">Configure system preferences, deadline rules, and permissions</p>
 </div>
 
 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -42,13 +42,13 @@
                 <h2 class="font-semibold text-slate-900">Drawing Types</h2>
             </div>
             <table class="g-table w-full">
-                <thead><tr><th>Code</th><th>Name</th><th>SLA</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Code</th><th>Name</th><th>Allowed Days</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                 {% for dt in drawing_types %}
                 <tr>
                     <td class="font-mono text-sm">{{ dt.code_prefix }}</td>
                     <td class="font-medium">{{ dt.name }}</td>
-                    <td>{{ dt.default_sla_days }} days</td>
+                    <td>{{ dt.allowed_days }} days</td>
                     <td>{% if dt.is_active %}<span class="text-green-600 text-sm font-medium">Active</span>{% else %}<span class="text-slate-400 text-sm">Inactive</span>{% endif %}</td>
                     <td><button type="button" onclick="document.getElementById('edit-dt-{{ dt.pk }}').classList.toggle('hidden')" class="text-primary-light text-sm font-semibold">Edit</button></td>
                 </tr>
@@ -60,7 +60,7 @@
                             <input type="hidden" name="drawing_type_id" value="{{ dt.pk }}">
                             <div><label class="text-xs text-slate-500">Name</label><input name="name" value="{{ dt.name }}" class="g-input"></div>
                             <div><label class="text-xs text-slate-500">Prefix</label><input name="code_prefix" value="{{ dt.code_prefix }}" class="g-input"></div>
-                            <div><label class="text-xs text-slate-500">SLA Days</label><input name="default_sla_days" type="number" value="{{ dt.default_sla_days }}" class="g-input"></div>
+                            <div><label class="text-xs text-slate-500">Allowed Days</label><input name="allowed_days" type="number" value="{{ dt.allowed_days }}" class="g-input"></div>
                             <div class="flex items-center gap-2"><input type="checkbox" name="is_active" {% if dt.is_active %}checked{% endif %} class="rounded"><button type="submit" class="g-btn-primary text-sm">Save</button></div>
                         </form>
                     </td>
@@ -81,20 +81,20 @@
             </form>
         </div>
 
-        {% elif tab == 'sla' %}
+        {% elif tab == 'deadline' %}
         <div class="g-card p-8">
-            <h2 class="font-semibold text-slate-900 mb-6">SLA Configuration</h2>
+            <h2 class="font-semibold text-slate-900 mb-6">Deadline Configuration</h2>
             <form method="post" class="space-y-5 max-w-lg">
                 {% csrf_token %}
-                <input type="hidden" name="action" value="update_sla">
-                {% for field in sla_form %}
+                <input type="hidden" name="action" value="update_deadline">
+                {% for field in deadline_form %}
                 <div class="flex items-center justify-between gap-4 {% if field.field.widget.input_type != 'checkbox' %}flex-col items-start{% endif %}">
                     <label class="text-sm font-medium text-slate-700">{{ field.label }}</label>
                     {{ field }}
                     {% if field.help_text %}<p class="text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
                 </div>
                 {% endfor %}
-                <button type="submit" class="g-btn-primary">Save SLA Settings</button>
+                <button type="submit" class="g-btn-primary">Save Deadline Settings</button>
             </form>
         </div>
 

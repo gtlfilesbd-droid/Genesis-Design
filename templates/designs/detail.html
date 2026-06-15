@@ -11,8 +11,8 @@
         {% render_priority_badge design.priority %}
         {% render_status_badge design.status %}
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
-            {% if design.sla_status == 'green' %}bg-green-100 text-green-700{% elif design.sla_status == 'yellow' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
-            SLA: {{ design.get_sla_status_display }}
+            {% if design.deadline_status == 'green' %}bg-green-100 text-green-700{% elif design.deadline_status == 'yellow' %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+            Deadline: {{ design.get_deadline_status_display }}
         </span>
     </div>
     <p class="text-sm text-slate-500 mt-1">{{ design.drawing_type.name }} · {{ design.project.code }}</p>
@@ -201,10 +201,10 @@
         </div>
 
         <div class="g-card p-6">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">SLA Tracker</h2>
-            <div class="g-progress mb-2"><div class="g-progress-fill {% if design.sla_status == 'red' %}!bg-red-500{% elif design.sla_status == 'yellow' %}!bg-amber-500{% endif %}" style="width: {{ sla_pct }}%"></div></div>
-            <p class="text-sm text-slate-600">{{ sla_pct }}% elapsed</p>
-            {% if design.sla_due %}<p class="text-xs text-slate-500 mt-1">Due: {{ design.sla_due|date:"d M Y H:i" }}</p>{% endif %}
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Deadline Timer</h2>
+            <div class="g-progress mb-2"><div class="g-progress-fill {% if design.deadline_status == 'red' %}!bg-red-500{% elif design.deadline_status == 'yellow' %}!bg-amber-500{% endif %}" style="width: {{ deadline_pct }}%"></div></div>
+            <p class="text-sm text-slate-600">{{ deadline_pct }}% elapsed</p>
+            {% if design.deadline_due %}<p class="text-xs text-slate-500 mt-1">Due: {{ design.deadline_due|date:"d M Y H:i" }}</p>{% endif %}
         </div>
 
         {% if design.delay_source %}

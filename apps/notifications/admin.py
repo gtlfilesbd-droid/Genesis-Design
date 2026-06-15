@@ -13,7 +13,7 @@ class NotificationAdmin(admin.ModelAdmin):
 class NotificationSettingAdmin(admin.ModelAdmin):
     list_display = (
         'enable_email', 'enable_in_app', 'enable_whatsapp',
-        'enable_sms', 'sla_warning_hours',
+        'enable_sms', 'deadline_warning_hours',
     )
 
     def has_add_permission(self, request):

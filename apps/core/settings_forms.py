@@ -1,7 +1,7 @@
 from django import forms
 
 from apps.accounts.models import UserRole
-from apps.core.models import CompanySettings, RolePermission, SLAConfiguration
+from apps.core.models import CompanySettings, RolePermission, DeadlineConfiguration
 from apps.designs.models import DrawingType
 from apps.notifications.models import NotificationSetting
 
@@ -22,18 +22,18 @@ class CompanySettingsForm(forms.ModelForm):
 class DrawingTypeForm(forms.ModelForm):
     class Meta:
         model = DrawingType
-        fields = ['name', 'code_prefix', 'default_sla_days', 'is_active']
+        fields = ['name', 'code_prefix', 'allowed_days', 'is_active']
         widgets = {
             'name': forms.TextInput(attrs={'class': INPUT}),
             'code_prefix': forms.TextInput(attrs={'class': INPUT}),
-            'default_sla_days': forms.NumberInput(attrs={'class': INPUT, 'min': 1}),
+            'allowed_days': forms.NumberInput(attrs={'class': INPUT, 'min': 1}),
             'is_active': forms.CheckboxInput(attrs={'class': 'rounded'}),
         }
 
 
-class SLAConfigurationForm(forms.ModelForm):
+class DeadlineConfigurationForm(forms.ModelForm):
     class Meta:
-        model = SLAConfiguration
+        model = DeadlineConfiguration
         fields = [
             'default_warning_percent', 'escalation_level_1_days',
             'escalation_level_2_days', 'auto_breach_notify', 'count_weekends',
@@ -52,14 +52,14 @@ class NotificationSettingForm(forms.ModelForm):
         model = NotificationSetting
         fields = [
             'enable_email', 'enable_in_app', 'enable_whatsapp',
-            'enable_sms', 'sla_warning_hours',
+            'enable_sms', 'deadline_warning_hours',
         ]
         widgets = {
             'enable_email': forms.CheckboxInput(attrs={'class': 'rounded'}),
             'enable_in_app': forms.CheckboxInput(attrs={'class': 'rounded'}),
             'enable_whatsapp': forms.CheckboxInput(attrs={'class': 'rounded'}),
             'enable_sms': forms.CheckboxInput(attrs={'class': 'rounded'}),
-            'sla_warning_hours': forms.NumberInput(attrs={'class': INPUT, 'min': 1}),
+            'deadline_warning_hours': forms.NumberInput(attrs={'class': INPUT, 'min': 1}),
         }
 
 

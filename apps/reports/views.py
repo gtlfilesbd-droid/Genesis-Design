@@ -51,14 +51,14 @@ def _designer_performance_data(designer_id=None, project_id=None):
     return rows
 
 
-def _sla_compliance_data():
-    designs = DesignRequest.objects.exclude(sla_due__isnull=True)
+def _deadline_compliance_data():
+    designs = DesignRequest.objects.exclude(deadline_due__isnull=True)
     total = designs.count()
-    breached = designs.filter(sla_status='red').count()
+    breached = designs.filter(deadline_status='red').count()
     return {
         'total': total,
-        'green': designs.filter(sla_status='green').count(),
-        'yellow': designs.filter(sla_status='yellow').count(),
+        'green': designs.filter(deadline_status='green').count(),
+        'yellow': designs.filter(deadline_status='yellow').count(),
         'red': breached,
         'compliance_rate': round(((total - breached) / total * 100) if total else 100, 1),
     }
@@ -88,7 +88,7 @@ def reports_index(request):
     return render(request, 'reports/index.html', {
         'tab': tab,
         'designer_data': _designer_performance_data(designer_filter, project_filter),
-        'sla_data': _sla_compliance_data(),
+        'deadline_data': _deadline_compliance_data(),
         'delay_data': delay_data,
         'project_data': project_rows,
         'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
@@ -124,12 +124,12 @@ def export_csv(request, report_type):
                 p.code, p.name, p.status, p.total_design_requests,
                 p.completed_designs, p.health_score,
             ])
-    elif report_type == 'sla_compliance':
-        writer.writerow(['Design Number', 'Project', 'SLA Status', 'Due Date', 'Status'])
-        for d in DesignRequest.objects.exclude(sla_due__isnull=True):
+    elif report_type == 'deadline_compliance':
+        writer.writerow(['Design Number', 'Project', 'Deadline Status', 'Due Date', 'Status'])
+        for d in DesignRequest.objects.exclude(deadline_due__isnull=True):
             writer.writerow([
-                d.design_number, d.project.code, d.sla_status,
-                d.sla_due, d.status,
+                d.design_number, d.project.code, d.deadline_status,
+                d.deadline_due, d.status,
             ])
     elif report_type == 'delay_analysis':
         writer.writerow(['Design Number', 'Delay Source', 'Delay Days', 'Status'])
@@ -147,10 +147,10 @@ def export_csv(request, report_type):
             ])
     else:
         writer.writerow(['Metric', 'Value'])
-        sla = _sla_compliance_data()
+        deadline_stats = _deadline_compliance_data()
         writer.writerow(['Total Projects', Project.objects.count()])
         writer.writerow(['Total Designs', DesignRequest.objects.count()])
-        writer.writerow(['SLA Compliance %', sla['compliance_rate']])
+        writer.writerow(['Deadline Compliance %', deadline_stats['compliance_rate']])
 
     return response
 
@@ -207,12 +207,12 @@ def export_pdf(request, report_type):
                 p.showPage()
                 y = 800
     elif report_type == 'management_summary':
-        sla = _sla_compliance_data()
+        deadline_stats = _deadline_compliance_data()
         lines = [
             f'Total Projects: {Project.objects.count()}',
             f'Total Designs: {DesignRequest.objects.count()}',
-            f'SLA Compliance: {sla["compliance_rate"]}%',
-            f'Breached SLA: {sla["red"]}',
+            f'Deadline Compliance: {deadline_stats["compliance_rate"]}%',
+            f'Missed Deadlines: {deadline_stats["red"]}',
         ]
         for line in lines:
             p.drawString(50, y, line)

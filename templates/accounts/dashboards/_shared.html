@@ -11,10 +11,10 @@
     {% endif %}
 </div>
 
-{% if stats.sla_breached %}
+{% if stats.deadline_missed %}
 <div class="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
     <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
-    <span><strong>{{ stats.sla_breached }}</strong> design{{ stats.sla_breached|pluralize }} have breached SLA deadline —</span>
+    <span><strong>{{ stats.deadline_missed }}</strong> design{{ stats.deadline_missed|pluralize }} have missed deadline —</span>
     <a href="{% url 'workflow:board' %}?priority=critical" class="font-semibold underline">View Overdue Designs →</a>
 </div>
 {% endif %}

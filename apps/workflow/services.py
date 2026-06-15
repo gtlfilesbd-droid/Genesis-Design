@@ -8,7 +8,7 @@ from apps.core.models import StageDuration
 from apps.core.utils import log_activity
 from apps.designs.models import (
     DesignAssignment, DesignRequest, DesignReview, DesignStatus,
-    DesignSubmission, SLARecord, SLAStatus, Verification,
+    DesignSubmission, DeadlineRecord, DeadlineStatus, Verification,
 )
 
 WORKFLOW_ACTIONS = {
@@ -123,41 +123,42 @@ def _start_stage(design, stage, user):
     )
 
 
-def _start_sla(design):
-    sla_days = design.drawing_type.default_sla_days
+def _start_deadline(design):
+    allowed_days = design.drawing_type.allowed_days
     now = timezone.now()
-    due = now + timedelta(days=sla_days)
-    design.sla_start = now
-    design.sla_due = due
-    design.sla_status = SLAStatus.GREEN
-    SLARecord.objects.update_or_create(
+    due = now + timedelta(days=allowed_days)
+    design.deadline_start = now
+    design.deadline_due = due
+    design.deadline_status = DeadlineStatus.GREEN
+    DeadlineRecord.objects.update_or_create(
         design=design,
         defaults={
             'started_at': now,
             'due_at': due,
-            'status': SLAStatus.GREEN,
+            'status': DeadlineStatus.GREEN,
         },
     )
 
 
-def update_sla_status(design):
-    if not design.sla_due:
+def update_deadline_status(design):
+    if not design.deadline_due:
         return
     now = timezone.now()
-    remaining = (design.sla_due - now).total_seconds()
-    total = (design.sla_due - design.sla_start).total_seconds() if design.sla_start else 1
+    remaining = (design.deadline_due - now).total_seconds()
+    total = (design.deadline_due - design.deadline_start).total_seconds() if design.deadline_start else 1
     if remaining <= 0:
-        design.sla_status = SLAStatus.RED
+        design.deadline_status = DeadlineStatus.RED
     elif remaining / total <= 0.25:
-        design.sla_status = SLAStatus.YELLOW
+        design.deadline_status = DeadlineStatus.YELLOW
     else:
-        design.sla_status = SLAStatus.GREEN
-    design.save(update_fields=['sla_status'])
-    if hasattr(design, 'sla_record'):
-        design.sla_record.status = design.sla_status
-        if design.sla_status == SLAStatus.RED and not design.sla_record.breached_at:
-            design.sla_record.breached_at = now
-        design.sla_record.save()
+        design.deadline_status = DeadlineStatus.GREEN
+    design.deadline_missed = design.deadline_status == DeadlineStatus.RED
+    design.save(update_fields=['deadline_status', 'deadline_missed'])
+    if hasattr(design, 'deadline_record'):
+        design.deadline_record.status = design.deadline_status
+        if design.deadline_status == DeadlineStatus.RED and not design.deadline_record.breached_at:
+            design.deadline_record.breached_at = now
+        design.deadline_record.save()
 
 
 def transition(design, action, user, request=None, skip_permission=False, **kwargs):
@@ -197,7 +198,7 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         )
 
     elif action == 'acknowledge':
-        _start_sla(design)
+        _start_deadline(design)
         hod = get_head_of_design()
         design.current_holder = hod or user
 
@@ -271,7 +272,7 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         transition(design, 'start_review', hod, request=request, skip_permission=True)
 
     _start_stage(design, new_status, user)
-    update_sla_status(design)
+    update_deadline_status(design)
 
     log_activity(
         'design_request', design.pk, user, action,

@@ -6,7 +6,7 @@ from django.db.models import Max
 class DrawingType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code_prefix = models.CharField(max_length=10)
-    default_sla_days = models.PositiveSmallIntegerField(default=5)
+    allowed_days = models.PositiveSmallIntegerField(default=5)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -42,10 +42,10 @@ class DesignStatus(models.TextChoices):
     CANCELLED = 'cancelled', 'Cancelled'
 
 
-class SLAStatus(models.TextChoices):
-    GREEN = 'green', 'Green'
-    YELLOW = 'yellow', 'Yellow'
-    RED = 'red', 'Red'
+class DeadlineStatus(models.TextChoices):
+    GREEN = 'green', 'On Track'
+    YELLOW = 'yellow', 'Deadline Warning'
+    RED = 'red', 'Deadline Missed'
 
 
 class PrimaryStatus(models.TextChoices):
@@ -106,7 +106,7 @@ class DesignRequest(models.Model):
         choices=PrimaryStatus.choices,
         default=PrimaryStatus.NEW,
     )
-    sla_breached = models.BooleanField(default=False)
+    deadline_missed = models.BooleanField(default=False)
     requested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -143,12 +143,12 @@ class DesignRequest(models.Model):
     assignment_instructions = models.TextField(blank=True)
     revision_count = models.PositiveSmallIntegerField(default=0)
     completion_date = models.DateTimeField(null=True, blank=True)
-    sla_start = models.DateTimeField(null=True, blank=True)
-    sla_due = models.DateTimeField(null=True, blank=True)
-    sla_status = models.CharField(
+    deadline_start = models.DateTimeField(null=True, blank=True)
+    deadline_due = models.DateTimeField(null=True, blank=True)
+    deadline_status = models.CharField(
         max_length=10,
-        choices=SLAStatus.choices,
-        default=SLAStatus.GREEN,
+        choices=DeadlineStatus.choices,
+        default=DeadlineStatus.GREEN,
     )
     delay_source = models.CharField(max_length=100, blank=True)
     delay_duration_days = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
@@ -173,7 +173,7 @@ class DesignRequest(models.Model):
         if not self.design_number and self.project_id and self.drawing_type_id:
             self.design_number = self._generate_design_number()
         self.primary_status = PRIMARY_STATUS_MAP.get(self.status, PrimaryStatus.NEW)
-        self.sla_breached = self.sla_status == SLAStatus.RED
+        self.deadline_missed = self.deadline_status == DeadlineStatus.RED
         super().save(*args, **kwargs)
 
     def _generate_design_number(self):
@@ -322,18 +322,18 @@ class Verification(models.Model):
         ordering = ['-created_at']
 
 
-class SLARecord(models.Model):
+class DeadlineRecord(models.Model):
     design = models.OneToOneField(
         DesignRequest,
         on_delete=models.CASCADE,
-        related_name='sla_record',
+        related_name='deadline_record',
     )
     started_at = models.DateTimeField()
     due_at = models.DateTimeField()
     status = models.CharField(
         max_length=10,
-        choices=SLAStatus.choices,
-        default=SLAStatus.GREEN,
+        choices=DeadlineStatus.choices,
+        default=DeadlineStatus.GREEN,
     )
     breached_at = models.DateTimeField(null=True, blank=True)
     escalation_level = models.PositiveSmallIntegerField(default=0)
