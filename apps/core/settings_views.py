@@ -4,6 +4,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from apps.permissions.decorators import require_global_permission
+from apps.accounts.models import UserRole
 from apps.designs.models import DrawingType
 
 from .models import CompanySettings, RolePermission, SLAConfiguration
