@@ -1,0 +1,71 @@
+from datetime import date
+
+from django.test import TestCase
+
+from apps.accounts.models import User, UserRole
+from apps.designs.models import DesignRequest, DesignStatus, DrawingType
+from apps.notifications.models import Notification
+from apps.notifications.services import NotificationService, notify_workflow_transition
+from apps.permissions.models import Permission, ProjectMembership
+from apps.projects.models import Project
+
+
+class NotificationServiceTests(TestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(
+            username='req', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R1',
+        )
+        self.hod = User.objects.create_user(
+            username='hod', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H1',
+        )
+        self.designer = User.objects.create_user(
+            username='des', password='pass', role=UserRole.DESIGNER, employee_id='D1',
+        )
+        self.drawing_type = DrawingType.objects.create(name='ID', code_prefix='ID', allowed_days=3)
+        self.project = Project.objects.create(
+            name='P', code='P1', client_name='C', start_date=date.today(), created_by=self.requester,
+        )
+        self.design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            status=DesignStatus.NEW_REQUEST,
+        )
+        assign_perm, _ = Permission.objects.get_or_create(
+            code='PROJECT_PERM_ASSIGN',
+            defaults={'name': 'Assign Designer', 'category': 'project', 'description': ''},
+        )
+        review_perm, _ = Permission.objects.get_or_create(
+            code='PROJECT_PERM_REVIEW',
+            defaults={'name': 'Review Design', 'category': 'project', 'description': ''},
+        )
+        membership = ProjectMembership.objects.create(
+            user=self.hod, project=self.project, is_active=True,
+        )
+        membership.permissions.add(assign_perm, review_perm)
+
+    def test_on_request_created_notifies_assign_users(self):
+        NotificationService.on_request_created(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.hod, title__contains='New Design Request').exists()
+        )
+
+    def test_on_request_acknowledged_notifies_requester(self):
+        NotificationService.on_request_acknowledged(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Acknowledged').exists()
+        )
+
+    def test_notify_workflow_transition_maps_acknowledge(self):
+        notify_workflow_transition(self.design, 'acknowledge', self.hod)
+        self.assertEqual(
+            Notification.objects.filter(user=self.requester).count(),
+            1,
+        )
+
+    def test_on_designer_assigned_notifies_designer(self):
+        self.design.assigned_designer = self.designer
+        NotificationService.on_designer_assigned(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.designer, title__contains='Assignment').exists()
+        )

@@ -10,6 +10,7 @@ from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 
 from .services import WorkflowError, suggest_designer, transition
+from .permissions import can_run_workflow_action, design_action_flags
 
 
 INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -56,13 +57,18 @@ def _check_workflow_permission(request, design, action):
         return True
     project = design.project
     if action in ('accept_assignment', 'submit_work'):
-        if PermissionService.has_project_permission(request.user, project, 'PROJECT_PERM_ASSIGN'):
+        if can_run_workflow_action(request.user, project, action, required):
             return True
-        return (
-            PermissionService.has_project_permission(request.user, project, 'DESIGN_PERM_WORK')
-            and design.assigned_designer_id == request.user.pk
-        )
-    return PermissionService.has_project_permission(request.user, project, required)
+        if action == 'accept_assignment' and design.assigned_designer_id == request.user.pk:
+            return PermissionService.has_project_permission(
+                request.user, project, 'DESIGN_PERM_WORK',
+            )
+        if action == 'submit_work' and design.assigned_designer_id == request.user.pk:
+            return PermissionService.has_project_permission(
+                request.user, project, 'DESIGN_PERM_WORK',
+            )
+        return False
+    return can_run_workflow_action(request.user, project, action, required)
 
 
 @login_required

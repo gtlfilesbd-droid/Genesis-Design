@@ -19,17 +19,18 @@
 </div>
 
 <div class="g-card p-6 mb-6 overflow-x-auto">
+    {% if progress_cancelled %}
+    <div class="mb-4">{% render_status_badge design.status %}</div>
+    {% endif %}
     <div class="flex items-center min-w-max gap-0">
-        {% for step in workflow_steps %}
-        {% with idx=forloop.counter0 %}
+        {% for step in progress_steps %}
         <div class="flex items-center">
             <div class="flex flex-col items-center">
-                <div class="w-3 h-3 rounded-full {% if idx < current_idx %}g-step-done{% elif idx == current_idx %}g-step-current{% else %}g-step-pending{% endif %}"></div>
-                <span class="text-[10px] text-slate-500 mt-2 whitespace-nowrap">{{ step|title }}</span>
+                <div class="w-3 h-3 rounded-full {% if step.state == 'completed' %}g-step-done{% elif step.state == 'active' %}g-step-current{% else %}g-step-pending{% endif %}"></div>
+                <span class="text-[10px] text-slate-500 mt-2 whitespace-nowrap">{{ step.label }}</span>
             </div>
-            {% if not forloop.last %}<div class="w-12 h-0.5 {% if idx < current_idx %}bg-primary-light{% else %}bg-slate-200{% endif %} mx-1 mb-5"></div>{% endif %}
+            {% if not forloop.last %}<div class="w-12 h-0.5 {% if step.state == 'completed' %}bg-primary-light{% else %}bg-slate-200{% endif %} mx-1 mb-5"></div>{% endif %}
         </div>
-        {% endwith %}
         {% endfor %}
     </div>
 </div>
@@ -173,9 +174,11 @@
                 <a href="{% url 'workflow:action' design.pk 'submit_work' %}" class="g-btn-primary w-full block text-center">Submit Work</a>
                 {% endif %}
                 {% endif %}
-                {% if design.status == 'under_review' and can_review %}
+                {% if design.status == 'under_review' or design.status == 'submitted' %}
+                {% if can_review %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'accept_design' %}">{% csrf_token %}<button class="g-btn-primary w-full">Accept Design</button></form>
                 <a href="{% url 'workflow:action' design.pk 'request_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
+                {% endif %}
                 {% endif %}
                 {% if design.status == 'correction_required' and can_revise and user == design.assigned_designer %}
                 <a href="{% url 'workflow:action' design.pk 'submit_work' %}" class="g-btn-primary w-full block text-center">Resubmit</a>

@@ -44,7 +44,7 @@ WORKFLOW_ACTIONS = {
         'auto': True,
     },
     'request_correction': {
-        'from': [DesignStatus.UNDER_REVIEW],
+        'from': [DesignStatus.UNDER_REVIEW, DesignStatus.SUBMITTED],
         'to': DesignStatus.CORRECTION_REQUIRED,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
@@ -54,7 +54,7 @@ WORKFLOW_ACTIONS = {
         'roles': [UserRole.DESIGNER, UserRole.ADMIN],
     },
     'accept_design': {
-        'from': [DesignStatus.UNDER_REVIEW],
+        'from': [DesignStatus.UNDER_REVIEW, DesignStatus.SUBMITTED],
         'to': DesignStatus.VERIFICATION_PENDING,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },

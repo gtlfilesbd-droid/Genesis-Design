@@ -1,7 +1,13 @@
-from django.core.mail import send_mail
+from django.contrib.auth import get_user_model
+
 from django.conf import settings
+from django.core.mail import send_mail
+
+from apps.permissions.services import PermissionService
 
 from .models import Notification, NotificationSetting, NotificationType
+
+User = get_user_model()
 
 
 def create_notification(user, title, message, link='', notification_type=NotificationType.WORKFLOW):
@@ -26,30 +32,238 @@ def create_notification(user, title, message, link='', notification_type=Notific
         )
 
 
+class NotificationService:
+    @staticmethod
+    def notify(recipient, notif_type, title, message, related_request=None, link=''):
+        if not recipient:
+            return
+        if related_request and not link:
+            link = f'/requests/{related_request.pk}/'
+        create_notification(recipient, title, message, link, notif_type)
+
+    @staticmethod
+    def _notify_many(users, notif_type, title, message, related_request=None):
+        seen = set()
+        for user in users:
+            if user and user.pk not in seen:
+                seen.add(user.pk)
+                NotificationService.notify(
+                    user, notif_type, title, message, related_request=related_request,
+                )
+
+    @staticmethod
+    def _project_users(project, permission_code):
+        return User.objects.filter(
+            project_memberships__project=project,
+            project_memberships__is_active=True,
+            project_memberships__permissions__code=permission_code,
+            is_active=True,
+        ).distinct()
+
+    @staticmethod
+    def on_request_created(design_request):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_ASSIGN',
+        )
+        title = f'New Design Request: {design_request.design_number}'
+        message = (
+            f'A new design request {design_request.design_number} was submitted '
+            f'for project {design_request.project.code}.'
+        )
+        NotificationService._notify_many(
+            users, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_request_acknowledged(design_request):
+        title = f'Request Acknowledged: {design_request.design_number}'
+        message = (
+            f'Your design request {design_request.design_number} has been acknowledged '
+            f'and is being processed.'
+        )
+        NotificationService.notify(
+            design_request.requested_by,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_designer_assigned(design_request):
+        title = f'Assignment: {design_request.design_number}'
+        message = (
+            f'You have been assigned to design request {design_request.design_number} '
+            f'for project {design_request.project.code}.'
+        )
+        NotificationService.notify(
+            design_request.assigned_designer,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_work_submitted(design_request):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_REVIEW',
+        )
+        title = f'Work Submitted: {design_request.design_number}'
+        message = (
+            f'Design work has been submitted for {design_request.design_number} '
+            f'and is ready for review.'
+        )
+        NotificationService._notify_many(
+            users, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_correction_required(design_request):
+        title = f'Correction Required: {design_request.design_number}'
+        message = (
+            f'Corrections are required on design request {design_request.design_number}. '
+            f'Please review the feedback and resubmit.'
+        )
+        NotificationService.notify(
+            design_request.assigned_designer,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_design_accepted(design_request):
+        recipients = [
+            design_request.requested_by,
+            design_request.assigned_designer,
+        ]
+        title = f'Design Accepted: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} has been accepted by review '
+            f'and will proceed to verification.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_sent_to_verification(design_request):
+        verifier = design_request.current_holder
+        if not verifier:
+            verifiers = PermissionService.get_verifiers(design_request.project)
+            verifier = verifiers.first()
+        title = f'Verification Required: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} is pending verification.'
+        )
+        if verifier:
+            NotificationService.notify(
+                verifier,
+                NotificationType.WORKFLOW,
+                title,
+                message,
+                related_request=design_request,
+            )
+        else:
+            NotificationService._notify_many(
+                PermissionService.get_verifiers(design_request.project),
+                NotificationType.WORKFLOW,
+                title,
+                message,
+                design_request,
+            )
+
+    @staticmethod
+    def on_verification_correction(design_request):
+        from apps.workflow.services import get_head_of_design
+
+        recipients = [design_request.assigned_designer, get_head_of_design()]
+        title = f'Verification Correction: {design_request.design_number}'
+        message = (
+            f'Verification corrections are required for {design_request.design_number}.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_verification_approved(design_request):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_APPROVE',
+        )
+        title = f'Verification Approved: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} has passed verification '
+            f'and is ready for final approval.'
+        )
+        NotificationService._notify_many(
+            users, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_approved(design_request):
+        recipients = [
+            design_request.requested_by,
+            design_request.assigned_designer,
+            design_request.verified_by,
+        ]
+        title = f'Design Approved: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} has been approved.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_completed(design_request):
+        recipients = [
+            design_request.requested_by,
+            design_request.assigned_designer,
+        ]
+        title = f'Design Completed: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} has been marked as completed.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+
 def notify_workflow_transition(design, action, actor):
-    link = f'/requests/{design.pk}/'
-    recipients = set()
+    """Dispatch workflow notifications for a completed transition action."""
+    handlers = {
+        'submit_request': NotificationService.on_request_created,
+        'acknowledge': NotificationService.on_request_acknowledged,
+        'assign': NotificationService.on_designer_assigned,
+        'submit_work': NotificationService.on_work_submitted,
+        'request_correction': NotificationService.on_correction_required,
+        'resubmit': NotificationService.on_work_submitted,
+        'accept_design': _notify_accept_design,
+        'verification_correction': NotificationService.on_verification_correction,
+        'forward_to_designer': NotificationService.on_correction_required,
+        'verify_approved': _notify_verify_approved,
+        'complete': NotificationService.on_completed,
+    }
+    handler = handlers.get(action)
+    if handler:
+        handler(design)
 
-    if design.current_holder:
-        recipients.add(design.current_holder)
-    if design.assigned_designer:
-        recipients.add(design.assigned_designer)
-    if design.requested_by:
-        recipients.add(design.requested_by)
 
-    recipients.discard(actor)
+def _notify_accept_design(design):
+    NotificationService.on_design_accepted(design)
+    NotificationService.on_sent_to_verification(design)
 
-    title = f'Design {design.design_number} updated'
-    message = (
-        f'{actor.get_full_name() or actor.username} performed "{action}" on '
-        f'{design.design_number}. Current status: {design.get_status_display()}.'
-    )
-    for user in recipients:
-        create_notification(user, title, message, link)
+
+def _notify_verify_approved(design):
+    NotificationService.on_verification_approved(design)
+    NotificationService.on_approved(design)
 
 
 def send_escalation(design, level):
-    from apps.accounts.models import User, UserRole
+    from apps.accounts.models import UserRole
 
     link = f'/requests/{design.pk}/'
     title = f'Deadline Escalation Level {level}: {design.design_number}'
@@ -73,7 +287,7 @@ def send_escalation(design, level):
 
 
 def notify_deadline_breach(design):
-    from apps.accounts.models import User, UserRole
+    from apps.accounts.models import UserRole
 
     link = f'/requests/{design.pk}/'
     title = f'Deadline Missed: {design.design_number}'
@@ -93,7 +307,7 @@ def notify_deadline_breach(design):
 
 
 def notify_deadline_warning(design):
-    from apps.accounts.models import User, UserRole
+    from apps.accounts.models import UserRole
 
     link = f'/requests/{design.pk}/'
     title = f'Deadline Warning: {design.design_number}'

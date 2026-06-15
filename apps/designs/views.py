@@ -26,7 +26,7 @@ def design_detail(request, pk):
         ),
         pk=pk,
     )
-    if not PermissionService.has_project_permission(request.user, design.project, 'PROJECT_PERM_VIEW'):
+    if not PermissionService.filter_design_requests(request.user).filter(pk=design.pk).exists():
         messages.error(request, 'You do not have access to this design request.')
         return redirect('requests:list')
 
@@ -72,11 +72,10 @@ def design_detail(request, pk):
         elapsed = (timezone.now() - design.deadline_start).total_seconds() if total else 0
         deadline_pct = min(100, round((elapsed / total) * 100)) if total else 0
 
-    workflow_steps = [
-        'new_request', 'acknowledged', 'assigned', 'in_progress',
-        'under_review', 'verification_pending', 'approved', 'completed',
-    ]
-    current_idx = workflow_steps.index(design.status) if design.status in workflow_steps else -1
+    from apps.designs.progress import build_progress_steps
+    from apps.workflow.permissions import design_action_flags
+    progress_steps, progress_cancelled = build_progress_steps(design)
+    action_flags = design_action_flags(request.user, design)
 
     return render(request, 'designs/detail.html', {
         'design': design,
@@ -89,8 +88,9 @@ def design_detail(request, pk):
         'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
         'stage_durations': stage_durations,
         'deadline_pct': deadline_pct,
-        'workflow_steps': workflow_steps,
-        'current_idx': current_idx,
+        'progress_steps': progress_steps,
+        'progress_cancelled': progress_cancelled,
+        **action_flags,
     })
 
 
@@ -102,6 +102,8 @@ def design_create(request, pk):
         form = DesignRequestForm(request.POST, project=project)
         if form.is_valid():
             design = create_design_request(project, request.user, form.cleaned_data)
+            from apps.notifications.services import NotificationService
+            NotificationService.on_request_created(design)
             from apps.workflow.services import get_head_of_design
             hod = get_head_of_design()
             design.current_holder = hod
