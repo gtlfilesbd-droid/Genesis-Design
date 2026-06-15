@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView, PasswordResetDoneView, PasswordResetView
 from django.db.models import Count, Q
@@ -16,6 +17,7 @@ from apps.permissions.decorators import require_global_permission
 from apps.permissions.services import PermissionService
 
 from .models import User, UserRole
+from .user_forms import ProfileEditForm
 
 
 class GenesisLoginView(LoginView):
@@ -51,11 +53,25 @@ def dashboard_redirect(request):
 @login_required
 def profile(request):
     user = request.user
+    if request.method == 'POST':
+        form = ProfileEditForm(request.POST, request.FILES, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Profile updated successfully.')
+            return redirect('accounts:profile')
+        messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ProfileEditForm(instance=user)
+
     designs = DesignRequest.objects.filter(
         Q(requested_by=user) | Q(assigned_designer=user) | Q(current_holder=user)
     ).distinct()
+    permissions_profile = PermissionService.get_user_permissions_profile(user)
     context = {
         'profile_user': user,
+        'form': form,
+        'global_permissions': permissions_profile['global_permissions'],
+        'project_memberships': permissions_profile['project_memberships'],
         'total_projects_created': Project.objects.filter(created_by=user).count(),
         'total_design_requests': designs.filter(requested_by=user).count(),
         'total_assigned_designs': designs.filter(assigned_designer=user).count(),

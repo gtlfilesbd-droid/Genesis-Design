@@ -1,0 +1,8 @@
+{% load genesis_ui %}
+{% if user.avatar %}
+<img src="{{ user.avatar.url }}" alt="{{ user.get_full_name|default:user.username }}" class="{{ size_class|default:'w-9 h-9' }} rounded-full object-cover shrink-0 {{ extra_class }}">
+{% else %}
+<div class="{{ size_class|default:'w-9 h-9' }} rounded-full flex items-center justify-center shrink-0 font-semibold {{ fallback_class|default:'bg-white/20 text-white text-xs' }} {{ extra_class }}">
+    {{ user|initials }}
+</div>
+{% endif %}

@@ -170,17 +170,33 @@ class PermissionService:
 
     @staticmethod
     def get_user_permission_labels(user) -> list:
-        labels = []
-        active_codes = UserPermission.objects.filter(
-            user=user,
-            is_active=True,
-        ).select_related('permission').values_list('permission__name', flat=True)
-        labels.extend(active_codes[:6])
-        template_names = user.project_memberships.filter(
-            is_active=True,
-        ).values_list('permissions__name', flat=True).distinct()[:4]
-        labels.extend([n for n in template_names if n])
-        return list(dict.fromkeys(labels))[:8]
+        detail = PermissionService.get_user_permissions_profile(user)
+        labels = [p.name for p in detail['global_permissions']]
+        for membership in detail['project_memberships']:
+            for perm in membership.permissions.all():
+                if perm.name not in labels:
+                    labels.append(perm.name)
+        return labels[:12]
+
+    @staticmethod
+    def get_user_permissions_profile(user):
+        """Full permission breakdown for profile page."""
+        global_permissions = list(
+            Permission.objects.filter(
+                userpermission__user=user,
+                userpermission__is_active=True,
+            ).order_by('category', 'name')
+        )
+        project_memberships = list(
+            ProjectMembership.objects.filter(
+                user=user,
+                is_active=True,
+            ).select_related('project').prefetch_related('permissions').order_by('project__code')
+        )
+        return {
+            'global_permissions': global_permissions,
+            'project_memberships': project_memberships,
+        }
 
     @staticmethod
     def get_navigation(user, request):

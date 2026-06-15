@@ -62,3 +62,21 @@ class UserEditForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': INPUT}),
             'is_active': forms.CheckboxInput(attrs={'class': 'rounded'}),
         })
+
+
+class ProfileEditForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = [
+            'first_name', 'last_name', 'email', 'mobile_number',
+            'designation', 'department', 'avatar',
+        ]
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': INPUT}),
+            'last_name': forms.TextInput(attrs={'class': INPUT}),
+            'email': forms.EmailInput(attrs={'class': INPUT}),
+            'mobile_number': forms.TextInput(attrs={'class': INPUT}),
+            'designation': forms.TextInput(attrs={'class': INPUT}),
+            'department': forms.TextInput(attrs={'class': INPUT}),
+            'avatar': forms.FileInput(attrs={'class': INPUT, 'accept': 'image/*'}),
+        }

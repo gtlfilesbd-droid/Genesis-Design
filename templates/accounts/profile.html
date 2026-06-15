@@ -4,15 +4,104 @@
 {% block content %}
 <div class="g-card p-8 mb-8">
     <div class="flex flex-col sm:flex-row sm:items-center gap-6">
-        <div class="w-20 h-20 rounded-2xl bg-primary text-white text-2xl font-bold flex items-center justify-center shrink-0">
-            {{ profile_user|initials }}
-        </div>
+        {% render_user_avatar profile_user size_class='w-20 h-20' fallback_class='bg-primary text-white text-2xl' %}
         <div class="flex-1">
             <h1 class="text-2xl font-bold text-slate-900">{{ profile_user.get_full_name }}</h1>
             <p class="text-slate-500">{{ profile_user.designation|default:profile_user.get_role_display }} · {{ profile_user.department|default:"Design" }}</p>
             <p class="text-sm text-slate-500 mt-1">{{ profile_user.employee_id|default:"—" }} · {{ profile_user.email }}</p>
+            {% if profile_user.mobile_number %}
+            <p class="text-sm text-slate-500 mt-0.5">{{ profile_user.mobile_number }}</p>
+            {% endif %}
         </div>
         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700 self-start">{{ profile_user.get_status_display }}</span>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+    <div class="g-card p-6">
+        <h2 class="text-base font-semibold text-slate-900 mb-5">Edit Profile</h2>
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">First Name</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<p class="text-xs text-red-600 mt-1">{{ form.first_name.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Last Name</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<p class="text-xs text-red-600 mt-1">{{ form.last_name.errors.0 }}</p>{% endif %}
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Email</label>
+                {{ form.email }}
+                {% if form.email.errors %}<p class="text-xs text-red-600 mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Designation</label>
+                    {{ form.designation }}
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Department</label>
+                    {{ form.department }}
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Mobile Number</label>
+                {{ form.mobile_number }}
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Profile Picture</label>
+                {{ form.avatar }}
+                <p class="text-xs text-slate-400 mt-1">JPG, PNG or WebP. Leave empty to keep current photo.</p>
+                {% if form.avatar.errors %}<p class="text-xs text-red-600 mt-1">{{ form.avatar.errors.0 }}</p>{% endif %}
+            </div>
+            <button type="submit" class="g-btn-primary g-submit-btn inline-flex items-center gap-2">
+                <i data-lucide="save" class="w-4 h-4"></i> Save Changes
+            </button>
+        </form>
+    </div>
+
+    <div class="g-card p-6">
+        <h2 class="text-base font-semibold text-slate-900 mb-5">My Permissions</h2>
+
+        <div class="mb-6">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Global Permissions</h3>
+            {% if global_permissions %}
+            <div class="flex flex-wrap gap-2">
+                {% for perm in global_permissions %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">{{ perm.name }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-slate-500">No global permissions assigned.</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Project Permissions</h3>
+            {% if project_memberships %}
+            <div class="space-y-4">
+                {% for membership in project_memberships %}
+                <div class="rounded-lg border border-slate-100 p-4">
+                    <p class="text-sm font-semibold text-slate-900 mb-2">{{ membership.project.code }} — {{ membership.project.client_name }}</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for perm in membership.permissions.all %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">{{ perm.name }}</span>
+                        {% empty %}
+                        <span class="text-xs text-slate-400">No project permissions</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-slate-500">No project-specific permissions assigned.</p>
+            {% endif %}
+        </div>
     </div>
 </div>
 

@@ -3,6 +3,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
 
+admin.site.site_header = 'Genesis Administration'
+admin.site.site_title = 'Genesis Administration'
+admin.site.index_title = 'Genesis Administration'
+
 urlpatterns = [
     path('django-admin/', admin.site.urls),
     path('', include('apps.accounts.urls')),

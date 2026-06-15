@@ -57,6 +57,7 @@ class User(AbstractUser):
         choices=UserStatus.choices,
         default=UserStatus.ACTIVE,
     )
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
 
     class Meta:
         ordering = ['first_name', 'last_name']

@@ -25,9 +25,7 @@
             {% endif %}
         </a>
         <a href="{% url 'accounts:profile' %}" class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-slate-100">
-            <div class="w-8 h-8 rounded-full bg-[#1A3C6E] text-white text-xs font-semibold flex items-center justify-center">
-                {{ user|initials }}
-            </div>
+            {% render_user_avatar user size_class='w-8 h-8' fallback_class='bg-[#1A3C6E] text-white text-xs' %}
             <span class="text-sm font-medium text-slate-700 hidden sm:inline">{{ user.get_full_name|default:user.username }}</span>
         </a>
     </div>

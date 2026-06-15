@@ -103,6 +103,16 @@ def highlight_mentions(text):
     return mark_safe(_highlight(text))
 
 
+@register.inclusion_tag('components/user_avatar.html')
+def render_user_avatar(user, size_class='w-9 h-9', extra_class='', fallback_class=''):
+    return {
+        'user': user,
+        'size_class': size_class,
+        'extra_class': extra_class,
+        'fallback_class': fallback_class,
+    }
+
+
 @register.inclusion_tag('components/priority_badge.html')
 def render_priority_badge(priority):
     label, css, _ = PRIORITY_BADGE.get(
