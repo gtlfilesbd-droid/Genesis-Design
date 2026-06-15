@@ -3,17 +3,11 @@
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-8">
-    <div class="g-card p-5 text-center">
-        <div class="text-3xl font-bold text-slate-900">{{ total_users }}</div>
-        <div class="text-sm text-slate-500 mt-1">Active Users</div>
-    </div>
-    <div class="g-card p-5 text-center">
-        <div class="text-3xl font-bold text-slate-900">{{ total_projects }}</div>
-        <div class="text-sm text-slate-500 mt-1">Total Projects</div>
-    </div>
-    <div class="g-card p-5 text-center">
-        <div class="text-3xl font-bold text-slate-900">{{ total_designs }}</div>
-        <div class="text-sm text-slate-500 mt-1">Design Requests</div>
-    </div>
+    {% url 'accounts:user_list' as users_url %}
+    {% url 'projects:list' as projects_list_url %}
+    {% url 'requests:list' as requests_list_url %}
+    {% include 'components/stat_card.html' with label='Active Users' value=total_users icon='users' icon_bg='bg-blue-50' icon_color='text-blue-600' url=users_url %}
+    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' icon_bg='bg-amber-50' icon_color='text-amber-600' url=projects_list_url %}
+    {% include 'components/stat_card.html' with label='Design Requests' value=total_designs icon='file-text' icon_bg='bg-green-50' icon_color='text-green-600' url=requests_list_url %}
 </div>
 {% endblock %}

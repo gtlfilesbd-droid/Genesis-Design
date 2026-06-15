@@ -5,11 +5,13 @@
 {% include 'accounts/dashboards/_shared.html' %}
 
 <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-8 mb-6">
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold">{{ assigned_total }}</div><div class="text-xs text-slate-500 mt-1">Assigned</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-blue-600">{{ running }}</div><div class="text-xs text-slate-500 mt-1">Running</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-orange-600">{{ corrections }}</div><div class="text-xs text-slate-500 mt-1">Corrections</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-green-600">{{ completed }}</div><div class="text-xs text-slate-500 mt-1">Completed</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-red-600">{{ overdue }}</div><div class="text-xs text-slate-500 mt-1">Overdue</div></div>
+    {% url 'my_tasks:list' as my_tasks_url %}
+    {% url 'requests:list' as requests_list_url %}
+    {% include 'components/stat_card.html' with label='Assigned' value=assigned_total icon='clipboard-list' url=my_tasks_url %}
+    {% include 'components/stat_card.html' with label='Running' value=running icon='loader' icon_bg='bg-blue-50' icon_color='text-blue-600' url=requests_list_url|add:'?status=in_progress&mine=1' %}
+    {% include 'components/stat_card.html' with label='Corrections' value=corrections icon='rotate-ccw' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=correction_required&mine=1' %}
+    {% include 'components/stat_card.html' with label='Completed' value=completed icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' url=requests_list_url|add:'?status=completed&mine=1' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue url=requests_list_url|add:'?overdue=1&mine=1' %}
 </div>
 
 <h2 class="text-lg font-semibold text-slate-900 mb-4">My Designs</h2>

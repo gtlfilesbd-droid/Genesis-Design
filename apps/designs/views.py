@@ -158,6 +158,7 @@ def design_request_list(request):
     if request.user.role == UserRole.DESIGN_REQUESTER and not request.user.is_genesis_admin:
         designs = designs.filter(requested_by=request.user)
 
+    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
     status = request.GET.get('status')
     priority = request.GET.get('priority')
     project = request.GET.get('project')
@@ -172,6 +173,19 @@ def design_request_list(request):
         designs = designs.filter(
             Q(design_number__icontains=search) | Q(project__code__icontains=search)
         )
+    if request.GET.get('running'):
+        designs = designs.exclude(status__in=terminal)
+    if request.GET.get('overdue'):
+        designs = designs.filter(due_date__lt=timezone.now()).exclude(status__in=terminal)
+    if request.GET.get('completed_month'):
+        now = timezone.now()
+        designs = designs.filter(
+            status=DesignStatus.COMPLETED,
+            completion_date__month=now.month,
+            completion_date__year=now.year,
+        )
+    if request.GET.get('mine'):
+        designs = designs.filter(assigned_designer=request.user)
 
     return render(request, 'requests/list.html', {
         'designs': designs.order_by('-created_at')[:100],

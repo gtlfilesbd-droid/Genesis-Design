@@ -5,9 +5,11 @@
 {% include 'accounts/dashboards/_shared.html' %}
 
 <div class="grid grid-cols-3 gap-4 mt-8 mb-6">
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-orange-600">{{ pending }}</div><div class="text-xs text-slate-500 mt-1">Pending</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-red-600">{{ corrections }}</div><div class="text-xs text-slate-500 mt-1">Corrections</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-green-600">{{ approved_total }}</div><div class="text-xs text-slate-500 mt-1">Verified</div></div>
+    {% url 'requests:list' as requests_list_url %}
+    {% url 'designs:library' as library_url %}
+    {% include 'components/stat_card.html' with label='Pending' value=pending icon='clock' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=verification_pending' %}
+    {% include 'components/stat_card.html' with label='Corrections' value=corrections icon='rotate-ccw' icon_bg='bg-red-50' icon_color='text-red-600' danger=corrections url=requests_list_url|add:'?status=verification_correction' %}
+    {% include 'components/stat_card.html' with label='Verified' value=approved_total icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' url=library_url %}
 </div>
 
 <h2 class="text-lg font-semibold text-slate-900 mb-4">Verification Queue</h2>

@@ -61,6 +61,24 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
 }
 
+a.g-stat-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+a.g-stat-card-link:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+  border-color: #CBD5E1;
+}
+
+a.g-stat-card-link:focus-visible {
+  outline: 2px solid var(--primary-light);
+  outline-offset: 2px;
+}
+
 .g-stat-card.danger {
   border-left: 4px solid #DC2626;
   background: linear-gradient(90deg, #FEF2F2 0%, #FFFFFF 30%);

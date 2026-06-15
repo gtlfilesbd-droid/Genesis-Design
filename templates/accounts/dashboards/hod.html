@@ -5,10 +5,11 @@
 {% include 'accounts/dashboards/_shared.html' %}
 
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 mb-6">
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-orange-600">{{ new_requests }}</div><div class="text-xs text-slate-500 mt-1">New Requests</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-blue-600">{{ waiting_review }}</div><div class="text-xs text-slate-500 mt-1">Waiting Review</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-purple-600">{{ waiting_verification }}</div><div class="text-xs text-slate-500 mt-1">Verification</div></div>
-    <div class="g-card p-4 text-center"><div class="text-2xl font-bold text-red-600">{{ overdue_designs }}</div><div class="text-xs text-slate-500 mt-1">Overdue</div></div>
+    {% url 'requests:list' as requests_list_url %}
+    {% include 'components/stat_card.html' with label='New Requests' value=new_requests icon='inbox' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=new_request' %}
+    {% include 'components/stat_card.html' with label='Waiting Review' value=waiting_review icon='eye' icon_bg='bg-blue-50' icon_color='text-blue-600' url=requests_list_url|add:'?status=under_review' %}
+    {% include 'components/stat_card.html' with label='Verification' value=waiting_verification icon='shield-check' icon_bg='bg-purple-50' icon_color='text-purple-600' url=requests_list_url|add:'?status=verification_pending' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_designs url=requests_list_url|add:'?overdue=1' %}
 </div>
 
 <h2 class="text-lg font-semibold text-slate-900 mb-4">Work Queue</h2>

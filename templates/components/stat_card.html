@@ -1,4 +1,8 @@
+{% if url %}
+<a href="{{ url }}" class="g-stat-card g-stat-card-link {% if danger %}danger{% endif %}">
+{% else %}
 <div class="g-stat-card {% if danger %}danger{% endif %}">
+{% endif %}
     <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ label }}</span>
         <div class="w-8 h-8 rounded-lg {{ icon_bg|default:'bg-blue-50' }} flex items-center justify-center">
@@ -9,4 +13,8 @@
     {% if subtext %}
     <div class="text-sm mt-1 {{ subtext_class|default:'text-slate-500' }}">{{ subtext }}</div>
     {% endif %}
+{% if url %}
+</a>
+{% else %}
 </div>
+{% endif %}
