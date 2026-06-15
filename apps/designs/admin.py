@@ -8,7 +8,7 @@ from .models import (
 
 @admin.register(DrawingType)
 class DrawingTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code_prefix', 'allowed_days', 'is_active')
+    list_display = ('name', 'code_prefix', 'allowed_days', 'allowed_hours', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name', 'code_prefix')
 

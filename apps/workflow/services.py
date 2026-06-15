@@ -124,9 +124,17 @@ def _start_stage(design, stage, user):
 
 
 def _start_deadline(design):
-    allowed_days = design.drawing_type.allowed_days
+    from apps.workflow.deadline_utils import add_allowed_duration, get_deadline_config
+
+    drawing_type = design.drawing_type
+    config = get_deadline_config()
     now = timezone.now()
-    due = now + timedelta(days=allowed_days)
+    due = add_allowed_duration(
+        now,
+        drawing_type.allowed_days,
+        drawing_type.allowed_hours,
+        count_weekends=config.count_weekends,
+    )
     design.deadline_start = now
     design.deadline_due = due
     design.deadline_status = DeadlineStatus.GREEN
@@ -136,29 +144,61 @@ def _start_deadline(design):
             'started_at': now,
             'due_at': due,
             'status': DeadlineStatus.GREEN,
+            'warning_notified_at': None,
+            'breach_notified_at': None,
+            'breached_at': None,
+            'escalation_level': 0,
         },
     )
 
 
 def update_deadline_status(design):
+    from apps.notifications.models import NotificationSetting
+    from apps.notifications.services import notify_deadline_breach, notify_deadline_warning
+    from apps.workflow.deadline_utils import get_deadline_config, warning_threshold_ratio
+
     if not design.deadline_due:
         return
+    config = get_deadline_config()
+    notif_settings = NotificationSetting.get_solo()
     now = timezone.now()
     remaining = (design.deadline_due - now).total_seconds()
     total = (design.deadline_due - design.deadline_start).total_seconds() if design.deadline_start else 1
+    warning_ratio = warning_threshold_ratio(config)
+
     if remaining <= 0:
         design.deadline_status = DeadlineStatus.RED
-    elif remaining / total <= 0.25:
+    elif remaining / total <= warning_ratio:
         design.deadline_status = DeadlineStatus.YELLOW
     else:
         design.deadline_status = DeadlineStatus.GREEN
+
     design.deadline_missed = design.deadline_status == DeadlineStatus.RED
     design.save(update_fields=['deadline_status', 'deadline_missed'])
-    if hasattr(design, 'deadline_record'):
-        design.deadline_record.status = design.deadline_status
-        if design.deadline_status == DeadlineStatus.RED and not design.deadline_record.breached_at:
-            design.deadline_record.breached_at = now
-        design.deadline_record.save()
+
+    if not hasattr(design, 'deadline_record'):
+        return
+
+    record = design.deadline_record
+    record.status = design.deadline_status
+
+    if design.deadline_status == DeadlineStatus.RED and not record.breached_at:
+        record.breached_at = now
+        if config.auto_breach_notify and not record.breach_notified_at:
+            notify_deadline_breach(design)
+            record.breach_notified_at = now
+
+    warning_window = timedelta(hours=notif_settings.deadline_warning_hours).total_seconds()
+    if (
+        remaining > 0
+        and remaining <= warning_window
+        and not record.warning_notified_at
+        and design.deadline_status in (DeadlineStatus.GREEN, DeadlineStatus.YELLOW)
+    ):
+        notify_deadline_warning(design)
+        record.warning_notified_at = now
+
+    record.save()
 
 
 def transition(design, action, user, request=None, skip_permission=False, **kwargs):

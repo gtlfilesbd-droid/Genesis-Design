@@ -144,4 +144,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# Start deadline status/escalation checks inside runserver (no Docker/Redis required).
+DEADLINE_AUTO_SCHEDULER = env.bool('DEADLINE_AUTO_SCHEDULER', default=True)
+
 from genesis_design.celery_beat_schedule import CELERY_BEAT_SCHEDULE  # noqa: E402, F401

@@ -42,13 +42,13 @@
                 <h2 class="font-semibold text-slate-900">Drawing Types</h2>
             </div>
             <table class="g-table w-full">
-                <thead><tr><th>Code</th><th>Name</th><th>Allowed Days</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Code</th><th>Name</th><th>Allowed Duration</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                 {% for dt in drawing_types %}
                 <tr>
                     <td class="font-mono text-sm">{{ dt.code_prefix }}</td>
                     <td class="font-medium">{{ dt.name }}</td>
-                    <td>{{ dt.allowed_days }} days</td>
+                    <td>{{ dt.allowed_duration_label }}</td>
                     <td>{% if dt.is_active %}<span class="text-green-600 text-sm font-medium">Active</span>{% else %}<span class="text-slate-400 text-sm">Inactive</span>{% endif %}</td>
                     <td><button type="button" onclick="document.getElementById('edit-dt-{{ dt.pk }}').classList.toggle('hidden')" class="text-primary-light text-sm font-semibold">Edit</button></td>
                 </tr>
@@ -60,7 +60,8 @@
                             <input type="hidden" name="drawing_type_id" value="{{ dt.pk }}">
                             <div><label class="text-xs text-slate-500">Name</label><input name="name" value="{{ dt.name }}" class="g-input"></div>
                             <div><label class="text-xs text-slate-500">Prefix</label><input name="code_prefix" value="{{ dt.code_prefix }}" class="g-input"></div>
-                            <div><label class="text-xs text-slate-500">Allowed Days</label><input name="allowed_days" type="number" value="{{ dt.allowed_days }}" class="g-input"></div>
+                            <div><label class="text-xs text-slate-500">Allowed days</label><input name="allowed_days" type="number" min="0" value="{{ dt.allowed_days }}" class="g-input"></div>
+                            <div><label class="text-xs text-slate-500">Allowed hours</label><input name="allowed_hours" type="number" min="0" max="23" value="{{ dt.allowed_hours }}" class="g-input"></div>
                             <div class="flex items-center gap-2"><input type="checkbox" name="is_active" {% if dt.is_active %}checked{% endif %} class="rounded"><button type="submit" class="g-btn-primary text-sm">Save</button></div>
                         </form>
                     </td>
@@ -83,17 +84,50 @@
 
         {% elif tab == 'deadline' %}
         <div class="g-card p-8">
-            <h2 class="font-semibold text-slate-900 mb-6">Deadline Configuration</h2>
-            <form method="post" class="space-y-5 max-w-lg">
+            <h2 class="font-semibold text-slate-900 mb-2">Deadline Configuration</h2>
+            <p class="text-sm text-slate-500 mb-6">Set warning thresholds and escalation delays using days and hours. Due dates include date and time.</p>
+            <form method="post" class="space-y-6 max-w-2xl">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="update_deadline">
-                {% for field in deadline_form %}
-                <div class="flex items-center justify-between gap-4 {% if field.field.widget.input_type != 'checkbox' %}flex-col items-start{% endif %}">
-                    <label class="text-sm font-medium text-slate-700">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.help_text %}<p class="text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
+
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">{{ deadline_form.default_warning_percent.label }}</label>
+                    {{ deadline_form.default_warning_percent }}
+                    {% if deadline_form.default_warning_percent.help_text %}<p class="text-xs text-slate-500">{{ deadline_form.default_warning_percent.help_text }}</p>{% endif %}
+                </div>
+
+                {% for level in "1234"|make_list %}
+                <div class="rounded-lg border border-slate-200 p-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-800">Escalation Level {{ level }}</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Days after missed deadline</label>
+                            {% if level == "1" %}{{ deadline_form.escalation_level_1_days }}{% elif level == "2" %}{{ deadline_form.escalation_level_2_days }}{% elif level == "3" %}{{ deadline_form.escalation_level_3_days }}{% else %}{{ deadline_form.escalation_level_4_days }}{% endif %}
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Hours</label>
+                            {% if level == "1" %}{{ deadline_form.escalation_level_1_hours }}{% elif level == "2" %}{{ deadline_form.escalation_level_2_hours }}{% elif level == "3" %}{{ deadline_form.escalation_level_3_hours }}{% else %}{{ deadline_form.escalation_level_4_hours }}{% endif %}
+                        </div>
+                    </div>
                 </div>
                 {% endfor %}
+
+                <div class="space-y-4">
+                    <label class="flex items-center gap-3 text-sm font-medium text-slate-700">
+                        {{ deadline_form.auto_breach_notify }}
+                        <span>{{ deadline_form.auto_breach_notify.label }}</span>
+                    </label>
+                    <label class="flex items-center gap-3 text-sm font-medium text-slate-700">
+                        {{ deadline_form.count_weekends }}
+                        <span>{{ deadline_form.count_weekends.label }}</span>
+                    </label>
+                    {% if deadline_form.count_weekends.help_text %}<p class="text-xs text-slate-500">{{ deadline_form.count_weekends.help_text }}</p>{% endif %}
+                </div>
+
+                {% if deadline_form.non_field_errors %}
+                <div class="text-sm text-red-600">{{ deadline_form.non_field_errors }}</div>
+                {% endif %}
+
                 <button type="submit" class="g-btn-primary">Save Deadline Settings</button>
             </form>
         </div>

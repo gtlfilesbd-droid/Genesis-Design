@@ -70,3 +70,45 @@ def send_escalation(design, level):
         admins = User.objects.filter(role=UserRole.ADMIN, is_active=True)
         for admin in admins:
             create_notification(admin, title, message, link, NotificationType.ESCALATION)
+
+
+def notify_deadline_breach(design):
+    from apps.accounts.models import User, UserRole
+
+    link = f'/requests/{design.pk}/'
+    title = f'Deadline Missed: {design.design_number}'
+    due_text = design.deadline_due.strftime('%d %b %Y %H:%M') if design.deadline_due else 'N/A'
+    message = (
+        f'Design {design.design_number} missed its deadline (due {due_text}). '
+        f'Please review and take action.'
+    )
+    recipients = []
+    if design.assigned_designer:
+        recipients.append(design.assigned_designer)
+    hod = User.objects.filter(role=UserRole.HEAD_OF_DESIGN, is_active=True).first()
+    if hod:
+        recipients.append(hod)
+    for user in recipients:
+        create_notification(user, title, message, link, NotificationType.DEADLINE)
+
+
+def notify_deadline_warning(design):
+    from apps.accounts.models import User, UserRole
+
+    link = f'/requests/{design.pk}/'
+    title = f'Deadline Warning: {design.design_number}'
+    due_text = design.deadline_due.strftime('%d %b %Y %H:%M') if design.deadline_due else 'N/A'
+    message = (
+        f'Design {design.design_number} is approaching its deadline (due {due_text}). '
+        f'Current status: {design.get_deadline_status_display()}.'
+    )
+    recipients = []
+    if design.assigned_designer:
+        recipients.append(design.assigned_designer)
+    if design.current_holder and design.current_holder not in recipients:
+        recipients.append(design.current_holder)
+    hod = User.objects.filter(role=UserRole.HEAD_OF_DESIGN, is_active=True).first()
+    if hod and hod not in recipients:
+        recipients.append(hod)
+    for user in recipients:
+        create_notification(user, title, message, link, NotificationType.DEADLINE)

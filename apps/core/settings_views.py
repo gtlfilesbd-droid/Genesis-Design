@@ -66,6 +66,19 @@ def settings_index(request):
                 form.save()
                 messages.success(request, 'Deadline configuration saved.')
                 redirect_tab = 'deadline'
+            else:
+                messages.error(request, 'Could not save deadline settings. Check escalation order and values.')
+                return render(request, 'settings/index.html', {
+                    'tab': 'deadline',
+                    'settings_tabs': SETTINGS_TABS,
+                    'company_form': CompanySettingsForm(instance=company),
+                    'deadline_form': form,
+                    'notification_form': NotificationSettingForm(instance=notif_settings),
+                    'drawing_types': drawing_types,
+                    'drawing_type_form': DrawingTypeForm(),
+                    'role_permissions': role_permissions,
+                    'company': company,
+                })
         elif action == 'update_notifications':
             form = NotificationSettingForm(request.POST, instance=notif_settings)
             if form.is_valid():

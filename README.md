@@ -75,11 +75,15 @@ Django Admin: http://127.0.0.1:8000/django-admin/
 5. Verification team verifies → approves or requests correction
 6. Head of Design marks completed
 
-## Celery (optional)
+## Celery (optional — production / Redis)
+
+Deadline checks run **automatically with `runserver`** (no Docker/Redis needed).
+
+For production with Redis:
 
 ```bash
 celery -A genesis_design worker -l info
 celery -A genesis_design beat -l info
 ```
 
-Runs Deadline status checks and escalation tasks.
+Set `DEADLINE_AUTO_SCHEDULER=false` in `.env` if you use Celery Beat to avoid duplicate checks.

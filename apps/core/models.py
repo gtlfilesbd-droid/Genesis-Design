@@ -98,11 +98,26 @@ class CompanySettings(models.Model):
 
 
 class DeadlineConfiguration(models.Model):
-    default_warning_percent = models.PositiveSmallIntegerField(default=20)
+    default_warning_percent = models.PositiveSmallIntegerField(
+        default=20,
+        help_text='Show warning when this percent of the allowed time remains.',
+    )
     escalation_level_1_days = models.PositiveSmallIntegerField(default=1)
+    escalation_level_1_hours = models.PositiveSmallIntegerField(default=0)
     escalation_level_2_days = models.PositiveSmallIntegerField(default=3)
-    auto_breach_notify = models.BooleanField(default=True)
-    count_weekends = models.BooleanField(default=False)
+    escalation_level_2_hours = models.PositiveSmallIntegerField(default=0)
+    escalation_level_3_days = models.PositiveSmallIntegerField(default=4)
+    escalation_level_3_hours = models.PositiveSmallIntegerField(default=0)
+    escalation_level_4_days = models.PositiveSmallIntegerField(default=5)
+    escalation_level_4_hours = models.PositiveSmallIntegerField(default=0)
+    auto_breach_notify = models.BooleanField(
+        default=True,
+        help_text='Send a notification when a design first misses its deadline.',
+    )
+    count_weekends = models.BooleanField(
+        default=False,
+        help_text='Count only weekdays when calculating deadline due dates.',
+    )
 
     class Meta:
         verbose_name_plural = 'Deadline configuration'

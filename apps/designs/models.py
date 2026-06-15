@@ -7,6 +7,7 @@ class DrawingType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     code_prefix = models.CharField(max_length=10)
     allowed_days = models.PositiveSmallIntegerField(default=5)
+    allowed_hours = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -15,6 +16,15 @@ class DrawingType(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def allowed_duration_label(self):
+        parts = []
+        if self.allowed_days:
+            parts.append(f'{self.allowed_days} day{"s" if self.allowed_days != 1 else ""}')
+        if self.allowed_hours:
+            parts.append(f'{self.allowed_hours} hour{"s" if self.allowed_hours != 1 else ""}')
+        return ', '.join(parts) if parts else '0 hours'
 
 
 class DesignPriority(models.TextChoices):
@@ -336,6 +346,8 @@ class DeadlineRecord(models.Model):
         default=DeadlineStatus.GREEN,
     )
     breached_at = models.DateTimeField(null=True, blank=True)
+    breach_notified_at = models.DateTimeField(null=True, blank=True)
+    warning_notified_at = models.DateTimeField(null=True, blank=True)
     escalation_level = models.PositiveSmallIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
