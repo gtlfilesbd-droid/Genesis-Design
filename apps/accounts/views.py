@@ -86,6 +86,7 @@ def admin_dashboard(request):
         'total_designs': DesignRequest.objects.count(),
         'charts': get_chart_data(),
         'show_charts': True,
+        'show_admin_panel_link': True,
     })
     context['charts_json'] = json.dumps(context['charts'])
     return render(request, 'accounts/dashboards/admin.html', context)

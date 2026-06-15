@@ -1,7 +1,14 @@
 {% load genesis_ui %}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">Dashboard</h1>
-    <p class="text-slate-500 text-sm mt-1">{{ today|date:"l, d F Y" }}</p>
+<div class="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div>
+        <h1 class="text-[28px] font-bold text-slate-900">Dashboard</h1>
+        <p class="text-slate-500 text-sm mt-1">{{ today|date:"l, d F Y" }}</p>
+    </div>
+    {% if show_admin_panel_link %}
+    <a href="{% url 'admin:index' %}" class="g-btn-primary inline-flex items-center gap-2 shrink-0">
+        <i data-lucide="shield" class="w-4 h-4"></i> Admin Panel
+    </a>
+    {% endif %}
 </div>
 
 {% if stats.sla_breached %}
