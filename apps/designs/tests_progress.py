@@ -45,6 +45,7 @@ class ProgressStepsTests(TestCase):
     def test_completed_marks_all_prior_steps_done(self):
         self.design.status = DesignStatus.COMPLETED
         steps, _ = build_progress_steps(self.design)
+        self.assertEqual(len(steps), 9)
         self.assertEqual(steps[-1]['state'], 'active')
         self.assertTrue(all(step['state'] == 'completed' for step in steps[:-1]))
 

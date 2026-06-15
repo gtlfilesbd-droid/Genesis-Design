@@ -7,6 +7,7 @@ PROGRESS_STEPS = [
     ('in_progress', 'In Progress'),
     ('under_review', 'Under Review'),
     ('verification_pending', 'Verification Pending'),
+    ('compliance_pending', 'Compliance Pending'),
     ('approved', 'Approved'),
     ('completed', 'Completed'),
 ]
@@ -23,7 +24,10 @@ STATUS_TO_STEP_KEY = {
     DesignStatus.RESUBMITTED: 'in_progress',
     DesignStatus.VERIFICATION_PENDING: 'verification_pending',
     DesignStatus.VERIFICATION_CORRECTION: 'verification_pending',
-    DesignStatus.FINAL_APPROVAL_PENDING: 'approved',
+    DesignStatus.AWAITING_COMPLIANCE: 'compliance_pending',
+    DesignStatus.COMPLIANCE_PENDING: 'compliance_pending',
+    DesignStatus.COMPLIANCE_CORRECTION: 'compliance_pending',
+    DesignStatus.FINAL_APPROVAL_PENDING: 'compliance_pending',
     DesignStatus.APPROVED: 'approved',
     DesignStatus.COMPLETED: 'completed',
 }

@@ -179,7 +179,6 @@ def verification_dashboard(request):
         status__in=[
             DesignStatus.VERIFICATION_PENDING,
             DesignStatus.VERIFICATION_CORRECTION,
-            DesignStatus.FINAL_APPROVAL_PENDING,
         ]
     ).select_related('project', 'drawing_type', 'assigned_designer')
     context = _base_dashboard_context(request)
@@ -187,11 +186,39 @@ def verification_dashboard(request):
         'pending': designs.filter(status=DesignStatus.VERIFICATION_PENDING).count(),
         'corrections': designs.filter(status=DesignStatus.VERIFICATION_CORRECTION).count(),
         'approved_total': DesignRequest.objects.filter(
-            verified_by=request.user, status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED]
+            verified_by=request.user, status__in=[
+                DesignStatus.AWAITING_COMPLIANCE,
+                DesignStatus.COMPLIANCE_PENDING,
+                DesignStatus.COMPLIANCE_CORRECTION,
+                DesignStatus.APPROVED,
+                DesignStatus.COMPLETED,
+            ]
         ).count(),
         'verification_queue': designs.order_by('-priority', 'updated_at')[:25],
     })
     return render(request, 'accounts/dashboards/verification.html', context)
+
+
+@login_required
+@require_global_permission('VIS_PERM_DASHBOARD')
+def compliance_dashboard(request):
+    designs = DesignRequest.objects.filter(
+        status__in=[
+            DesignStatus.COMPLIANCE_PENDING,
+            DesignStatus.COMPLIANCE_CORRECTION,
+        ]
+    ).select_related('project', 'drawing_type', 'assigned_designer')
+    context = _base_dashboard_context(request)
+    context.update({
+        'pending': designs.filter(status=DesignStatus.COMPLIANCE_PENDING).count(),
+        'corrections': designs.filter(status=DesignStatus.COMPLIANCE_CORRECTION).count(),
+        'approved_total': DesignRequest.objects.filter(
+            approved_by_compliance=request.user,
+            status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
+        ).count(),
+        'compliance_queue': designs.order_by('-priority', 'updated_at')[:25],
+    })
+    return render(request, 'accounts/dashboards/compliance.html', context)
 
 
 def _base_dashboard_context(request):

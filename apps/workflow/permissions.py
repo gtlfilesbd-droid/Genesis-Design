@@ -41,7 +41,13 @@ def design_action_flags(user, design) -> dict:
             or can_run_workflow_action(user, project, 'submit_work', 'PROJECT_PERM_ASSIGN')
         ),
         'can_review': can_run_workflow_action(
-            user, project, 'accept_design', 'PROJECT_PERM_REVIEW',
+            user, project, 'send_to_verification', 'PROJECT_PERM_REVIEW',
+        ),
+        'can_send_to_verification': can_run_workflow_action(
+            user, project, 'send_to_verification', 'PROJECT_PERM_REVIEW',
+        ),
+        'can_send_to_compliance': can_run_workflow_action(
+            user, project, 'send_to_compliance', 'PROJECT_PERM_APPROVE',
         ),
         'can_revise': (
             PermissionService.has_project_permission(user, project, 'DESIGN_PERM_REVISE')
@@ -49,6 +55,15 @@ def design_action_flags(user, design) -> dict:
         ),
         'can_verify': can_run_workflow_action(
             user, project, 'verify_approved', 'PROJECT_PERM_VERIFY',
+        ),
+        'can_compliance_review': can_run_workflow_action(
+            user, project, 'compliance_approved', 'PROJECT_PERM_COMPLIANCE',
+        ),
+        'can_forward_to_designer': can_run_workflow_action(
+            user, project, 'forward_to_designer', 'PROJECT_PERM_ASSIGN',
+        ),
+        'can_hod_fast_complete': can_run_workflow_action(
+            user, project, 'hod_fast_complete', 'PROJECT_PERM_COMPLETE',
         ),
         'can_complete': can_run_workflow_action(
             user, project, 'complete', 'PROJECT_PERM_COMPLETE',

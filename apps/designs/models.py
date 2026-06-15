@@ -46,6 +46,9 @@ class DesignStatus(models.TextChoices):
     RESUBMITTED = 'resubmitted', 'Re-Submitted'
     VERIFICATION_PENDING = 'verification_pending', 'Verification Pending'
     VERIFICATION_CORRECTION = 'verification_correction', 'Verification Correction'
+    AWAITING_COMPLIANCE = 'awaiting_compliance', 'Awaiting Compliance'
+    COMPLIANCE_PENDING = 'compliance_pending', 'Compliance Pending'
+    COMPLIANCE_CORRECTION = 'compliance_correction', 'Compliance Correction'
     FINAL_APPROVAL_PENDING = 'final_approval_pending', 'Final Approval Pending'
     APPROVED = 'approved', 'Approved'
     COMPLETED = 'completed', 'Completed'
@@ -79,6 +82,9 @@ PRIMARY_STATUS_MAP = {
     DesignStatus.RESUBMITTED: PrimaryStatus.RUNNING,
     DesignStatus.VERIFICATION_PENDING: PrimaryStatus.VERIFICATION,
     DesignStatus.VERIFICATION_CORRECTION: PrimaryStatus.VERIFICATION,
+    DesignStatus.AWAITING_COMPLIANCE: PrimaryStatus.VERIFICATION,
+    DesignStatus.COMPLIANCE_PENDING: PrimaryStatus.VERIFICATION,
+    DesignStatus.COMPLIANCE_CORRECTION: PrimaryStatus.VERIFICATION,
     DesignStatus.FINAL_APPROVAL_PENDING: PrimaryStatus.VERIFICATION,
     DesignStatus.APPROVED: PrimaryStatus.APPROVED,
     DesignStatus.COMPLETED: PrimaryStatus.COMPLETED,
@@ -143,6 +149,29 @@ class DesignRequest(models.Model):
         blank=True,
         related_name='verified_designs',
     )
+    assigned_verifier = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verifier_assignments',
+    )
+    assigned_compliance_officer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='compliance_assignments',
+    )
+    approved_by_compliance = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='compliance_approvals',
+    )
+    verification_skipped_by_hod = models.BooleanField(default=False)
+    compliance_skipped_by_hod = models.BooleanField(default=False)
     current_holder = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -212,8 +241,15 @@ class DesignRequest(models.Model):
             return 'Approved'
         if self.status == DesignStatus.VERIFICATION_CORRECTION:
             return 'Correction'
-        if self.status in [DesignStatus.VERIFICATION_PENDING, DesignStatus.FINAL_APPROVAL_PENDING]:
+        if self.status in [
+            DesignStatus.VERIFICATION_PENDING,
+            DesignStatus.VERIFICATION_CORRECTION,
+            DesignStatus.AWAITING_COMPLIANCE,
+            DesignStatus.FINAL_APPROVAL_PENDING,
+        ]:
             return 'Pending'
+        if self.status in [DesignStatus.COMPLIANCE_PENDING, DesignStatus.COMPLIANCE_CORRECTION]:
+            return 'Compliance Pending'
         return 'N/A'
 
     @property
@@ -325,6 +361,29 @@ class Verification(models.Model):
         related_name='verifications_done',
     )
     action = models.CharField(max_length=20, choices=VerificationAction.choices)
+    comments = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class ComplianceReview(models.Model):
+    class ComplianceAction(models.TextChoices):
+        APPROVED = 'approved', 'Approved'
+        CORRECTION = 'correction', 'Correction Required'
+
+    design = models.ForeignKey(
+        DesignRequest,
+        on_delete=models.CASCADE,
+        related_name='compliance_reviews',
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='compliance_reviews_done',
+    )
+    action = models.CharField(max_length=20, choices=ComplianceAction.choices)
     comments = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

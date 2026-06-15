@@ -110,6 +110,19 @@ class PermissionService:
         ).distinct()
 
     @staticmethod
+    def get_compliance_officers(project):
+        return User.objects.filter(
+            project_memberships__project=project,
+            project_memberships__is_active=True,
+            project_memberships__permissions__code='PROJECT_PERM_COMPLIANCE',
+            is_active=True,
+        ).distinct()
+
+    @staticmethod
+    def can_compliance_review(user, project) -> bool:
+        return PermissionService.has_project_permission(user, project, 'PROJECT_PERM_COMPLIANCE')
+
+    @staticmethod
     def get_user_sidebar_items(user) -> list:
         items = []
         if PermissionService.has_global_permission(user, 'VIS_PERM_DASHBOARD'):
@@ -124,6 +137,7 @@ class PermissionService:
                 'DESIGN_PERM_WORK',
                 'PROJECT_PERM_ASSIGN',
                 'PROJECT_PERM_VERIFY',
+                'PROJECT_PERM_COMPLIANCE',
             ],
         ).exists()
         if has_tasks:
@@ -219,6 +233,7 @@ class PermissionService:
                     'accounts:hod_dashboard',
                     'accounts:designer_dashboard',
                     'accounts:verification_dashboard',
+                    'accounts:compliance_dashboard',
                 ],
                 'path_prefix': '/dashboard',
                 'section': 'main',

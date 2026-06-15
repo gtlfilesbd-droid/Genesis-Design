@@ -20,6 +20,7 @@ ALL_PERMISSIONS = [
     ('PROJECT_PERM_ASSIGN', 'Assign Designer', 'project', 'Assign designers to requests'),
     ('PROJECT_PERM_REVIEW', 'Review Design', 'project', 'Accept or request correction'),
     ('PROJECT_PERM_VERIFY', 'Verify Design', 'project', 'Perform design verification'),
+    ('PROJECT_PERM_COMPLIANCE', 'Compliance Review', 'project', 'Perform compliance review'),
     ('PROJECT_PERM_APPROVE', 'Final Approval', 'project', 'Give final approval'),
     ('PROJECT_PERM_COMPLETE', 'Mark Complete', 'project', 'Mark design as completed'),
     ('PROJECT_PERM_COMMENT', 'Comment', 'project', 'Write comments on requests'),
@@ -48,9 +49,20 @@ SYSTEM_TEMPLATES = {
         'project': [
             'PROJECT_PERM_VIEW', 'PROJECT_PERM_ASSIGN',
             'PROJECT_PERM_REVIEW', 'PROJECT_PERM_VERIFY',
-            'PROJECT_PERM_APPROVE', 'PROJECT_PERM_COMPLETE',
+            'PROJECT_PERM_COMPLIANCE', 'PROJECT_PERM_APPROVE', 'PROJECT_PERM_COMPLETE',
             'PROJECT_PERM_COMMENT', 'DESIGN_PERM_WORK',
             'DESIGN_PERM_UPLOAD', 'DESIGN_PERM_REVISE',
+        ],
+    },
+    'Compliance Officer': {
+        'description': 'Compliance team permissions',
+        'global': [
+            'VIS_PERM_DASHBOARD', 'VIS_PERM_NOTIFICATIONS',
+            'SCOPE_TEAM_REQUESTS',
+        ],
+        'project': [
+            'PROJECT_PERM_VIEW', 'PROJECT_PERM_COMPLIANCE', 'PROJECT_PERM_COMMENT',
+            'DESIGN_PERM_UPLOAD',
         ],
     },
     'Designer': {
@@ -102,7 +114,7 @@ SYSTEM_TEMPLATES = {
         'project': [
             'PROJECT_PERM_VIEW', 'PROJECT_PERM_EDIT', 'PROJECT_PERM_REQUEST',
             'PROJECT_PERM_ASSIGN', 'PROJECT_PERM_REVIEW', 'PROJECT_PERM_VERIFY',
-            'PROJECT_PERM_APPROVE', 'PROJECT_PERM_COMPLETE', 'PROJECT_PERM_COMMENT',
+            'PROJECT_PERM_COMPLIANCE', 'PROJECT_PERM_APPROVE', 'PROJECT_PERM_COMPLETE', 'PROJECT_PERM_COMMENT',
             'DESIGN_PERM_WORK', 'DESIGN_PERM_UPLOAD', 'DESIGN_PERM_REVISE',
         ],
     },
@@ -113,6 +125,7 @@ ROLE_TEMPLATE_MAP = {
     UserRole.HEAD_OF_DESIGN: 'Head of Design',
     UserRole.DESIGNER: 'Designer',
     UserRole.VERIFICATION_TEAM: 'Verifier',
+    UserRole.COMPLIANCE_TEAM: 'Compliance Officer',
     UserRole.DESIGN_REQUESTER: 'Design Requester',
 }
 

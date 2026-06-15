@@ -7,7 +7,7 @@ from apps.core.middleware import log_audit
 from apps.core.models import StageDuration
 from apps.core.utils import log_activity
 from apps.designs.models import (
-    DesignAssignment, DesignRequest, DesignReview, DesignStatus,
+    ComplianceReview, DesignAssignment, DesignRequest, DesignReview, DesignStatus,
     DesignSubmission, DeadlineRecord, DeadlineStatus, Verification,
 )
 
@@ -23,7 +23,11 @@ WORKFLOW_ACTIONS = {
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
     'assign': {
-        'from': [DesignStatus.ACKNOWLEDGED],
+        'from': [
+            DesignStatus.ACKNOWLEDGED,
+            DesignStatus.VERIFICATION_CORRECTION,
+            DesignStatus.COMPLIANCE_CORRECTION,
+        ],
         'to': DesignStatus.ASSIGNED,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
@@ -53,6 +57,15 @@ WORKFLOW_ACTIONS = {
         'to': DesignStatus.RESUBMITTED,
         'roles': [UserRole.DESIGNER, UserRole.ADMIN],
     },
+    'send_to_verification': {
+        'from': [
+            DesignStatus.UNDER_REVIEW,
+            DesignStatus.SUBMITTED,
+            DesignStatus.VERIFICATION_CORRECTION,
+        ],
+        'to': DesignStatus.VERIFICATION_PENDING,
+        'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
+    },
     'accept_design': {
         'from': [DesignStatus.UNDER_REVIEW, DesignStatus.SUBMITTED],
         'to': DesignStatus.VERIFICATION_PENDING,
@@ -63,15 +76,47 @@ WORKFLOW_ACTIONS = {
         'to': DesignStatus.VERIFICATION_CORRECTION,
         'roles': [UserRole.VERIFICATION_TEAM, UserRole.ADMIN],
     },
+    'verify_approved': {
+        'from': [DesignStatus.VERIFICATION_PENDING],
+        'to': DesignStatus.AWAITING_COMPLIANCE,
+        'roles': [UserRole.VERIFICATION_TEAM, UserRole.ADMIN],
+    },
+    'send_to_compliance': {
+        'from': [
+            DesignStatus.AWAITING_COMPLIANCE,
+            DesignStatus.COMPLIANCE_CORRECTION,
+        ],
+        'to': DesignStatus.COMPLIANCE_PENDING,
+        'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
+    },
+    'compliance_correction': {
+        'from': [DesignStatus.COMPLIANCE_PENDING],
+        'to': DesignStatus.COMPLIANCE_CORRECTION,
+        'roles': [UserRole.COMPLIANCE_TEAM, UserRole.ADMIN],
+    },
+    'compliance_approved': {
+        'from': [DesignStatus.COMPLIANCE_PENDING],
+        'to': DesignStatus.APPROVED,
+        'roles': [UserRole.COMPLIANCE_TEAM, UserRole.ADMIN],
+    },
     'forward_to_designer': {
-        'from': [DesignStatus.VERIFICATION_CORRECTION],
+        'from': [DesignStatus.VERIFICATION_CORRECTION, DesignStatus.COMPLIANCE_CORRECTION],
         'to': DesignStatus.CORRECTION_REQUIRED,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
-    'verify_approved': {
-        'from': [DesignStatus.VERIFICATION_PENDING],
-        'to': DesignStatus.APPROVED,
-        'roles': [UserRole.VERIFICATION_TEAM, UserRole.ADMIN],
+    'hod_fast_complete': {
+        'from': [
+            DesignStatus.UNDER_REVIEW,
+            DesignStatus.SUBMITTED,
+            DesignStatus.VERIFICATION_PENDING,
+            DesignStatus.VERIFICATION_CORRECTION,
+            DesignStatus.AWAITING_COMPLIANCE,
+            DesignStatus.COMPLIANCE_PENDING,
+            DesignStatus.COMPLIANCE_CORRECTION,
+            DesignStatus.APPROVED,
+        ],
+        'to': DesignStatus.COMPLETED,
+        'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
     'complete': {
         'from': [DesignStatus.APPROVED],
@@ -85,6 +130,11 @@ WORKFLOW_ACTIONS = {
     },
 }
 
+_CORRECTION_FROM_STATES = frozenset({
+    DesignStatus.VERIFICATION_CORRECTION,
+    DesignStatus.COMPLIANCE_CORRECTION,
+})
+
 
 class WorkflowError(Exception):
     pass
@@ -92,13 +142,19 @@ class WorkflowError(Exception):
 
 def get_head_of_design():
     return User.objects.filter(
-        role=UserRole.HEAD_OF_DESIGN, is_active=True, status='active'
+        role=UserRole.HEAD_OF_DESIGN, is_active=True, status='active',
     ).first()
 
 
 def get_verification_team():
     return User.objects.filter(
-        role=UserRole.VERIFICATION_TEAM, is_active=True, status='active'
+        role=UserRole.VERIFICATION_TEAM, is_active=True, status='active',
+    )
+
+
+def get_compliance_team():
+    return User.objects.filter(
+        role=UserRole.COMPLIANCE_TEAM, is_active=True, status='active',
     )
 
 
@@ -110,7 +166,7 @@ def _check_permission(user, action_config):
 
 def _end_stage(design, stage):
     StageDuration.objects.filter(
-        design=design, stage=stage, ended_at__isnull=True
+        design=design, stage=stage, ended_at__isnull=True,
     ).update(ended_at=timezone.now())
 
 
@@ -163,7 +219,10 @@ def update_deadline_status(design):
     notif_settings = NotificationSetting.get_solo()
     now = timezone.now()
     remaining = (design.deadline_due - now).total_seconds()
-    total = (design.deadline_due - design.deadline_start).total_seconds() if design.deadline_start else 1
+    total = (
+        (design.deadline_due - design.deadline_start).total_seconds()
+        if design.deadline_start else 1
+    )
     warning_ratio = warning_threshold_ratio(config)
 
     if remaining <= 0:
@@ -217,11 +276,14 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     old_status = design.status
     new_status = config['to']
     comments = kwargs.get('comments', '')
+    hod = get_head_of_design()
 
     if action == 'assign':
         designer = kwargs.get('designer')
         if not designer or designer.role != UserRole.DESIGNER:
             raise WorkflowError('A valid designer must be selected.')
+        if old_status in _CORRECTION_FROM_STATES:
+            design.revision_count += 1
         due_date = kwargs.get('due_date')
         instructions = kwargs.get('instructions', '')
         design.assigned_designer = designer
@@ -239,34 +301,36 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
     elif action == 'acknowledge':
         _start_deadline(design)
-        hod = get_head_of_design()
         design.current_holder = hod or user
 
-    elif action in ('request_correction', 'verification_correction', 'forward_to_designer'):
-        design.revision_count += 1
-        if action == 'verification_correction':
-            hod = get_head_of_design()
-            design.current_holder = hod or user
-        else:
-            design.current_holder = design.assigned_designer
-        if action == 'request_correction':
-            DesignReview.objects.create(
-                design=design, reviewer=user,
-                action='correction', comments=comments,
-            )
-        elif action == 'verification_correction':
-            Verification.objects.create(
-                design=design, verifier=user,
-                action='correction', comments=comments,
-            )
+    elif action == 'request_correction':
+        design.current_holder = design.assigned_designer
+        DesignReview.objects.create(
+            design=design, reviewer=user,
+            action='correction', comments=comments,
+        )
 
-    elif action == 'accept_design':
+    elif action == 'forward_to_designer':
+        design.revision_count += 1
+        design.current_holder = design.assigned_designer
+
+    elif action in ('send_to_verification', 'accept_design'):
+        verifier = kwargs.get('verifier')
+        if not verifier:
+            raise WorkflowError('A verification team member must be selected.')
         DesignReview.objects.create(
             design=design, reviewer=user,
             action='accept', comments=comments,
         )
-        verifier = kwargs.get('verifier') or get_verification_team().first()
+        design.assigned_verifier = verifier
         design.current_holder = verifier
+
+    elif action == 'verification_correction':
+        design.current_holder = hod or user
+        Verification.objects.create(
+            design=design, verifier=user,
+            action='correction', comments=comments,
+        )
 
     elif action == 'verify_approved':
         Verification.objects.create(
@@ -274,7 +338,29 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             action='approved', comments=comments,
         )
         design.verified_by = user
-        design.current_holder = get_head_of_design() or user
+        design.current_holder = hod or user
+
+    elif action == 'send_to_compliance':
+        officer = kwargs.get('compliance_officer')
+        if not officer:
+            raise WorkflowError('A compliance team member must be selected.')
+        design.assigned_compliance_officer = officer
+        design.current_holder = officer
+
+    elif action == 'compliance_correction':
+        design.current_holder = hod or user
+        ComplianceReview.objects.create(
+            design=design, reviewer=user,
+            action='correction', comments=comments,
+        )
+
+    elif action == 'compliance_approved':
+        ComplianceReview.objects.create(
+            design=design, reviewer=user,
+            action='approved', comments=comments,
+        )
+        design.approved_by_compliance = user
+        design.current_holder = hod or user
 
     elif action == 'submit_work':
         file = kwargs.get('file')
@@ -289,18 +375,26 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             notes=notes,
             submitted_by=user,
         )
-        hod = get_head_of_design()
         design.current_holder = hod or user
 
     elif action == 'accept_assignment':
         _start_stage(design, 'design', user)
 
-    elif action == 'complete':
+    elif action in ('complete', 'hod_fast_complete'):
         design.completion_date = timezone.now()
         design.current_holder = None
+        if action == 'hod_fast_complete':
+            if old_status in (DesignStatus.UNDER_REVIEW, DesignStatus.SUBMITTED):
+                design.verification_skipped_by_hod = True
+                design.compliance_skipped_by_hod = True
+            elif old_status in (
+                DesignStatus.VERIFICATION_PENDING,
+                DesignStatus.VERIFICATION_CORRECTION,
+                DesignStatus.AWAITING_COMPLIANCE,
+            ):
+                design.compliance_skipped_by_hod = True
 
     elif action == 'submit_request':
-        hod = get_head_of_design()
         design.current_holder = hod
 
     _end_stage(design, old_status)
@@ -308,8 +402,7 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     design.save()
 
     if action == 'submit_work':
-        hod = get_head_of_design() or user
-        transition(design, 'start_review', hod, request=request, skip_permission=True)
+        transition(design, 'start_review', hod or user, request=request, skip_permission=True)
 
     _start_stage(design, new_status, user)
     update_deadline_status(design)
@@ -339,19 +432,18 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
 def suggest_designer(design):
     from django.db.models import Count, Q
-    from apps.designs.models import DesignStatus
 
     active_statuses = [
         DesignStatus.ASSIGNED, DesignStatus.IN_PROGRESS,
         DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED,
     ]
     designers = User.objects.filter(
-        role=UserRole.DESIGNER, is_active=True, status='active'
+        role=UserRole.DESIGNER, is_active=True, status='active',
     ).annotate(
         workload=Count(
             'assigned_designs',
             filter=Q(assigned_designs__status__in=active_statuses),
-        )
+        ),
     ).order_by('workload', 'first_name')
     return designers.first()
 
@@ -372,6 +464,7 @@ def compute_delay_attribution(design):
         'in_progress': 'Designer',
         'under_review': 'Head of Design',
         'verification_pending': 'Verification Team',
+        'compliance_pending': 'Compliance Team',
     }
     source = stage_labels.get(max_stage, max_stage)
     design.delay_source = source

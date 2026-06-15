@@ -32,6 +32,7 @@ DEMO_USERS = [
     ('designer1', 'design123', 'Rahim Ahmed', UserRole.DESIGNER, 'DSG001'),
     ('designer2', 'design123', 'Rafi Karim', UserRole.DESIGNER, 'DSG002'),
     ('verifier', 'verify123', 'Karim Verifier', UserRole.VERIFICATION_TEAM, 'VER001'),
+    ('compliance1', 'comply123', 'Nadia Compliance', UserRole.COMPLIANCE_TEAM, 'CMP001'),
     ('requester', 'request123', 'Karim Requester', UserRole.DESIGN_REQUESTER, 'REQ001'),
 ]
 

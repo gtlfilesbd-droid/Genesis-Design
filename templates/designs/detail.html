@@ -175,20 +175,49 @@
                 {% endif %}
                 {% endif %}
                 {% if design.status == 'under_review' or design.status == 'submitted' %}
-                {% if can_review %}
-                <form method="post" action="{% url 'workflow:action' design.pk 'accept_design' %}">{% csrf_token %}<button class="g-btn-primary w-full">Accept Design</button></form>
+                {% if can_send_to_verification %}
+                <a href="{% url 'workflow:action' design.pk 'send_to_verification' %}" class="g-btn-primary w-full block text-center">Send to Verification</a>
                 <a href="{% url 'workflow:action' design.pk 'request_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
+                {% if can_hod_fast_complete %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'hod_fast_complete' %}" class="mt-2">{% csrf_token %}<button class="g-btn-secondary w-full">Fast-Track Complete</button></form>
+                {% endif %}
                 {% endif %}
                 {% endif %}
                 {% if design.status == 'correction_required' and can_revise and user == design.assigned_designer %}
-                <a href="{% url 'workflow:action' design.pk 'submit_work' %}" class="g-btn-primary w-full block text-center">Resubmit</a>
+                <form method="post" action="{% url 'workflow:action' design.pk 'resubmit' %}">{% csrf_token %}<button class="g-btn-primary w-full">Resubmit</button></form>
                 {% endif %}
                 {% if design.status == 'verification_pending' and can_verify %}
-                <form method="post" action="{% url 'workflow:action' design.pk 'verify_approved' %}">{% csrf_token %}<button class="g-btn-primary w-full">Verify Approved</button></form>
+                <a href="{% url 'workflow:action' design.pk 'verify_approved' %}" class="g-btn-primary w-full block text-center">Accept</a>
                 <a href="{% url 'workflow:action' design.pk 'verification_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
                 {% endif %}
-                {% if design.status == 'verification_correction' and can_assign %}
+                {% if design.status == 'verification_correction' %}
+                {% if can_forward_to_designer %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'forward_to_designer' %}">{% csrf_token %}<button class="g-btn-secondary w-full">Forward to Designer</button></form>
+                {% endif %}
+                {% if can_assign %}
+                <a href="{% url 'workflow:assign' design.pk %}" class="g-btn-secondary w-full block text-center mt-2">Re-assign Designer</a>
+                {% endif %}
+                {% if can_send_to_verification %}
+                <a href="{% url 'workflow:action' design.pk 'send_to_verification' %}" class="g-btn-primary w-full block text-center mt-2">Send to Verification</a>
+                {% endif %}
+                {% endif %}
+                {% if design.status == 'awaiting_compliance' and can_send_to_compliance %}
+                <a href="{% url 'workflow:action' design.pk 'send_to_compliance' %}" class="g-btn-primary w-full block text-center">Send to Compliance</a>
+                {% endif %}
+                {% if design.status == 'compliance_pending' and can_compliance_review %}
+                <a href="{% url 'workflow:action' design.pk 'compliance_approved' %}" class="g-btn-primary w-full block text-center">Accept</a>
+                <a href="{% url 'workflow:action' design.pk 'compliance_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
+                {% endif %}
+                {% if design.status == 'compliance_correction' %}
+                {% if can_forward_to_designer %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'forward_to_designer' %}">{% csrf_token %}<button class="g-btn-secondary w-full">Forward to Designer</button></form>
+                {% endif %}
+                {% if can_assign %}
+                <a href="{% url 'workflow:assign' design.pk %}" class="g-btn-secondary w-full block text-center mt-2">Re-assign Designer</a>
+                {% endif %}
+                {% if can_send_to_compliance %}
+                <a href="{% url 'workflow:action' design.pk 'send_to_compliance' %}" class="g-btn-primary w-full block text-center mt-2">Send to Compliance</a>
+                {% endif %}
                 {% endif %}
                 {% if design.status == 'approved' and can_complete %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'complete' %}">{% csrf_token %}<button class="g-btn-primary w-full">Mark Completed</button></form>

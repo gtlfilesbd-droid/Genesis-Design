@@ -6,7 +6,6 @@ from django.shortcuts import get_object_or_404, redirect, render
 from apps.permissions.decorators import require_global_permission
 from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
-from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 
 from .services import WorkflowError, suggest_designer, transition
@@ -14,6 +13,7 @@ from .permissions import can_run_workflow_action, design_action_flags
 
 
 INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+
 
 class AssignDesignerForm(forms.Form):
     designer = forms.ModelChoiceField(
@@ -37,16 +37,58 @@ class CommentForm(forms.Form):
     comments = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
 
 
+class SendToVerificationForm(forms.Form):
+    verifier = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={'class': INPUT}),
+        label='Verification Team Member',
+    )
+    comments = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
+        required=True,
+        label='Message',
+    )
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if project:
+            self.fields['verifier'].queryset = PermissionService.get_verifiers(project)
+
+
+class SendToComplianceForm(forms.Form):
+    compliance_officer = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={'class': INPUT}),
+        label='Compliance Team Member',
+    )
+    comments = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
+        required=True,
+        label='Message',
+    )
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if project:
+            self.fields['compliance_officer'].queryset = PermissionService.get_compliance_officers(project)
+
+
 ACTION_PERMISSIONS = {
     'acknowledge': 'PROJECT_PERM_ASSIGN',
     'assign': 'PROJECT_PERM_ASSIGN',
     'accept_assignment': 'DESIGN_PERM_WORK',
     'submit_work': 'DESIGN_PERM_WORK',
     'request_correction': 'PROJECT_PERM_REVIEW',
+    'send_to_verification': 'PROJECT_PERM_REVIEW',
     'accept_design': 'PROJECT_PERM_REVIEW',
     'verification_correction': 'PROJECT_PERM_VERIFY',
     'verify_approved': 'PROJECT_PERM_VERIFY',
+    'send_to_compliance': 'PROJECT_PERM_APPROVE',
+    'compliance_correction': 'PROJECT_PERM_COMPLIANCE',
+    'compliance_approved': 'PROJECT_PERM_COMPLIANCE',
     'forward_to_designer': 'PROJECT_PERM_ASSIGN',
+    'resubmit': 'DESIGN_PERM_REVISE',
+    'hod_fast_complete': 'PROJECT_PERM_COMPLETE',
     'complete': 'PROJECT_PERM_COMPLETE',
 }
 
@@ -83,13 +125,16 @@ def workflow_action(request, pk, action):
         'submit_work': SubmitWorkForm,
         'request_correction': CommentForm,
         'verification_correction': CommentForm,
-        'accept_design': CommentForm,
+        'compliance_correction': CommentForm,
+        'accept_design': lambda **kw: SendToVerificationForm(project=design.project, **kw),
+        'send_to_verification': lambda **kw: SendToVerificationForm(project=design.project, **kw),
+        'send_to_compliance': lambda **kw: SendToComplianceForm(project=design.project, **kw),
         'verify_approved': CommentForm,
+        'compliance_approved': CommentForm,
     }
 
     if request.method == 'GET' and action in form_actions:
-        form_class = form_actions[action]
-        form = form_class()
+        form = form_actions[action]()
         return render(request, 'workflow/action_form.html', {
             'design': design, 'action': action, 'form': form,
         })
@@ -111,9 +156,29 @@ def workflow_action(request, pk, action):
                         'design': design, 'action': action, 'form': form,
                     })
                 kwargs = form.cleaned_data
+            elif action in ('send_to_verification', 'accept_design'):
+                form = SendToVerificationForm(request.POST, project=design.project)
+                if not form.is_valid():
+                    return render(request, 'workflow/action_form.html', {
+                        'design': design, 'action': action, 'form': form,
+                    })
+                kwargs = {
+                    'verifier': form.cleaned_data['verifier'],
+                    'comments': form.cleaned_data['comments'],
+                }
+            elif action == 'send_to_compliance':
+                form = SendToComplianceForm(request.POST, project=design.project)
+                if not form.is_valid():
+                    return render(request, 'workflow/action_form.html', {
+                        'design': design, 'action': action, 'form': form,
+                    })
+                kwargs = {
+                    'compliance_officer': form.cleaned_data['compliance_officer'],
+                    'comments': form.cleaned_data['comments'],
+                }
             elif action in (
-                'request_correction', 'verification_correction',
-                'accept_design', 'verify_approved',
+                'request_correction', 'verification_correction', 'compliance_correction',
+                'verify_approved', 'compliance_approved',
             ):
                 form = CommentForm(request.POST)
                 form.is_valid()

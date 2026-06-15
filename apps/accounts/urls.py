@@ -17,6 +17,7 @@ urlpatterns = [
     path('dashboard/hod/', views.hod_dashboard, name='hod_dashboard'),
     path('dashboard/designer/', views.designer_dashboard, name='designer_dashboard'),
     path('dashboard/verification/', views.verification_dashboard, name='verification_dashboard'),
+    path('dashboard/compliance/', views.compliance_dashboard, name='compliance_dashboard'),
     path('users/', user_views.user_list, name='user_list'),
     path('users/new/', user_views.user_create, name='user_create'),
     path('users/<int:pk>/', user_views.user_detail, name='user_detail'),

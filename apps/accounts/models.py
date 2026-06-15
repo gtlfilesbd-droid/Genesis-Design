@@ -7,6 +7,7 @@ class UserRole(models.TextChoices):
     HEAD_OF_DESIGN = 'head_of_design', 'Head of Design'
     DESIGNER = 'designer', 'Designer'
     VERIFICATION_TEAM = 'verification_team', 'Verification Team'
+    COMPLIANCE_TEAM = 'compliance_team', 'Compliance Team'
     ADMIN = 'admin', 'Admin'
 
 
@@ -82,6 +83,10 @@ class User(AbstractUser):
         return self.role == UserRole.VERIFICATION_TEAM
 
     @property
+    def is_compliance_team(self):
+        return self.role == UserRole.COMPLIANCE_TEAM
+
+    @property
     def is_genesis_admin(self):
         return self.role == UserRole.ADMIN or self.is_superuser
 
@@ -92,4 +97,5 @@ class User(AbstractUser):
             UserRole.HEAD_OF_DESIGN: 'accounts:hod_dashboard',
             UserRole.DESIGNER: 'accounts:designer_dashboard',
             UserRole.VERIFICATION_TEAM: 'accounts:verification_dashboard',
+            UserRole.COMPLIANCE_TEAM: 'accounts:compliance_dashboard',
         }.get(self.role, 'accounts:dashboard')

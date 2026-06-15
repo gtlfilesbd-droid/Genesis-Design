@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load genesis_ui %}
+{% block title %}Dashboard — Compliance{% endblock %}
+{% block content %}
+{% include 'accounts/dashboards/_shared.html' %}
+
+<div class="grid grid-cols-3 gap-4 mt-8 mb-6">
+    {% url 'requests:list' as requests_list_url %}
+    {% url 'designs:library' as library_url %}
+    {% include 'components/stat_card.html' with label='Pending' value=pending icon='clock' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=compliance_pending' %}
+    {% include 'components/stat_card.html' with label='Corrections' value=corrections icon='rotate-ccw' icon_bg='bg-red-50' icon_color='text-red-600' danger=corrections url=requests_list_url|add:'?status=compliance_correction' %}
+    {% include 'components/stat_card.html' with label='Approved' value=approved_total icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' url=library_url %}
+</div>
+
+<h2 class="text-lg font-semibold text-slate-900 mb-4">Compliance Queue</h2>
+<div class="g-card overflow-x-auto">
+    <table class="g-table w-full">
+        <thead><tr><th>Design</th><th>Project</th><th>Designer</th><th>Status</th><th>Priority</th><th></th></tr></thead>
+        <tbody>
+        {% for d in compliance_queue %}
+        <tr>
+            <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
+            <td>{{ d.project.code }}</td>
+            <td>{{ d.assigned_designer|default:"—" }}</td>
+            <td>{% render_status_badge d.status %}</td>
+            <td>{% render_priority_badge d.priority %}</td>
+            <td><a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1">Review</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-slate-500 py-8">Queue is empty.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

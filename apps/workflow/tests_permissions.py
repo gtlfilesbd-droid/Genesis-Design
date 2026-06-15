@@ -31,10 +31,10 @@ class WorkflowPermissionTests(TestCase):
 
     def test_hod_can_review_without_project_membership(self):
         self.assertTrue(
-            can_run_workflow_action(self.hod, self.project, 'accept_design', 'PROJECT_PERM_REVIEW')
+            can_run_workflow_action(self.hod, self.project, 'send_to_verification', 'PROJECT_PERM_REVIEW')
         )
         flags = design_action_flags(self.hod, self.design)
-        self.assertTrue(flags['can_review'])
+        self.assertTrue(flags['can_send_to_verification'])
 
     def test_hod_sees_review_actions_on_detail_page(self):
         client = Client()
@@ -43,7 +43,7 @@ class WorkflowPermissionTests(TestCase):
         client.login(username='hod', password='hod123')
         response = client.get(reverse('requests:detail', args=[self.design.pk]), follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Accept Design')
+        self.assertContains(response, 'Send to Verification')
         self.assertContains(response, 'Request Correction')
 
     def test_hod_can_review_when_status_submitted(self):
@@ -55,4 +55,4 @@ class WorkflowPermissionTests(TestCase):
         client.login(username='hod', password='hod123')
         response = client.get(reverse('requests:detail', args=[self.design.pk]), follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Accept Design')
+        self.assertContains(response, 'Send to Verification')

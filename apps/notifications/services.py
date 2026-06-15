@@ -179,27 +179,107 @@ class NotificationService:
     def on_verification_correction(design_request):
         from apps.workflow.services import get_head_of_design
 
-        recipients = [design_request.assigned_designer, get_head_of_design()]
+        hod = get_head_of_design()
         title = f'Verification Correction: {design_request.design_number}'
         message = (
             f'Verification corrections are required for {design_request.design_number}.'
+        )
+        NotificationService.notify(
+            hod,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_verification_approved(design_request):
+        from apps.workflow.services import get_head_of_design
+
+        hod = get_head_of_design()
+        title = f'Verification Approved: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} has passed verification. '
+            f'Please assign a compliance officer.'
+        )
+        NotificationService.notify(
+            hod,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_sent_to_compliance(design_request):
+        officer = design_request.assigned_compliance_officer or design_request.current_holder
+        title = f'Compliance Review Required: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} is pending compliance review.'
+        )
+        if officer:
+            NotificationService.notify(
+                officer,
+                NotificationType.WORKFLOW,
+                title,
+                message,
+                related_request=design_request,
+            )
+        else:
+            NotificationService._notify_many(
+                PermissionService.get_compliance_officers(design_request.project),
+                NotificationType.WORKFLOW,
+                title,
+                message,
+                design_request,
+            )
+
+    @staticmethod
+    def on_compliance_correction(design_request):
+        from apps.workflow.services import get_head_of_design
+
+        hod = get_head_of_design()
+        title = f'Compliance Correction: {design_request.design_number}'
+        message = (
+            f'Compliance corrections are required for {design_request.design_number}.'
+        )
+        NotificationService.notify(
+            hod,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_compliance_approved(design_request):
+        from apps.workflow.services import get_head_of_design
+
+        recipients = [
+            get_head_of_design(),
+            design_request.requested_by,
+            design_request.assigned_designer,
+        ]
+        title = f'Design Approved: {design_request.design_number}'
+        message = (
+            f'Design {design_request.design_number} has been approved by compliance.'
         )
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
 
     @staticmethod
-    def on_verification_approved(design_request):
-        users = NotificationService._project_users(
-            design_request.project, 'PROJECT_PERM_APPROVE',
-        )
-        title = f'Verification Approved: {design_request.design_number}'
+    def on_hod_fast_complete(design_request):
+        recipients = [
+            design_request.requested_by,
+            design_request.assigned_designer,
+        ]
+        title = f'Design Completed: {design_request.design_number}'
         message = (
-            f'Design {design_request.design_number} has passed verification '
-            f'and is ready for final approval.'
+            f'Design {design_request.design_number} has been fast-tracked to completed.'
         )
         NotificationService._notify_many(
-            users, NotificationType.WORKFLOW, title, message, design_request,
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
 
     @staticmethod
@@ -241,10 +321,15 @@ def notify_workflow_transition(design, action, actor):
         'submit_work': NotificationService.on_work_submitted,
         'request_correction': NotificationService.on_correction_required,
         'resubmit': NotificationService.on_work_submitted,
-        'accept_design': _notify_accept_design,
+        'send_to_verification': _notify_send_to_verification,
+        'accept_design': _notify_send_to_verification,
         'verification_correction': NotificationService.on_verification_correction,
         'forward_to_designer': NotificationService.on_correction_required,
-        'verify_approved': _notify_verify_approved,
+        'verify_approved': NotificationService.on_verification_approved,
+        'send_to_compliance': NotificationService.on_sent_to_compliance,
+        'compliance_correction': NotificationService.on_compliance_correction,
+        'compliance_approved': NotificationService.on_compliance_approved,
+        'hod_fast_complete': NotificationService.on_hod_fast_complete,
         'complete': NotificationService.on_completed,
     }
     handler = handlers.get(action)
@@ -252,14 +337,9 @@ def notify_workflow_transition(design, action, actor):
         handler(design)
 
 
-def _notify_accept_design(design):
+def _notify_send_to_verification(design):
     NotificationService.on_design_accepted(design)
     NotificationService.on_sent_to_verification(design)
-
-
-def _notify_verify_approved(design):
-    NotificationService.on_verification_approved(design)
-    NotificationService.on_approved(design)
 
 
 def send_escalation(design, level):

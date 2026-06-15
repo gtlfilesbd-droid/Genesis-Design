@@ -27,6 +27,10 @@ class WorkflowTests(TestCase):
             username='ver', password='pass', role=UserRole.VERIFICATION_TEAM,
             employee_id='V001',
         )
+        self.compliance = User.objects.create_user(
+            username='cmp', password='pass', role=UserRole.COMPLIANCE_TEAM,
+            employee_id='C001',
+        )
         self.drawing_type = DrawingType.objects.create(
             name='Initial Drawing', code_prefix='ID', allowed_days=3,
         )
@@ -63,13 +67,21 @@ class WorkflowTests(TestCase):
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.UNDER_REVIEW)
 
-        transition(self.design, 'accept_design', self.hod)
+        transition(self.design, 'send_to_verification', self.hod,
+                   verifier=self.verifier, comments='Ready for verification')
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.VERIFICATION_PENDING)
 
         transition(self.design, 'verify_approved', self.verifier)
         self.design.refresh_from_db()
-        self.assertEqual(self.design.status, DesignStatus.APPROVED)
+        self.assertEqual(self.design.status, DesignStatus.AWAITING_COMPLIANCE)
+
+        transition(self.design, 'send_to_compliance', self.hod,
+                   compliance_officer=self.compliance, comments='Compliance review')
+        self.design.refresh_from_db()
+        self.assertEqual(self.design.status, DesignStatus.COMPLIANCE_PENDING)
+
+        transition(self.design, 'compliance_approved', self.compliance)
 
         transition(self.design, 'complete', self.hod)
         self.design.refresh_from_db()

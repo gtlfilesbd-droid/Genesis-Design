@@ -31,6 +31,7 @@ def genesis_navigation(request):
                 'accounts:hod_dashboard',
                 'accounts:designer_dashboard',
                 'accounts:verification_dashboard',
+                'accounts:compliance_dashboard',
             ],
             'path_prefix': '/dashboard',
         },
