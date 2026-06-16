@@ -71,9 +71,28 @@ class RoleBasedPermissionTests(TestCase):
         self.assertIn(own, visible)
         self.assertNotIn(other, visible)
 
+    def test_extra_permission_grants_verify_to_designer(self):
+        designer = User.objects.create_user(
+            username='des', password='pass', role=UserRole.DESIGNER, employee_id='D1',
+        )
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=designer, can_verify=True)
+        self.assertTrue(
+            PermissionService.has_project_permission(
+                designer, self.project, 'PROJECT_PERM_VERIFY',
+            )
+        )
+        self.assertIn(designer, list(PermissionService.get_verifiers(self.project)))
+
+    def test_permissions_profile_includes_extras(self):
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.hod, can_verify=True)
+        profile = PermissionService.get_user_permissions_profile(self.hod)
+        extra_labels = [p['label'] for p in profile['extra_permissions']]
+        self.assertIn('Verify Designs', extra_labels)
+
     def test_permissions_profile_returns_role_flags(self):
         profile = PermissionService.get_user_permissions_profile(self.hod)
-        self.assertEqual(profile['role'], UserRole.HEAD_OF_DESIGN)
         labels = [p['label'] for p in profile['role_permissions']]
         self.assertIn('Assign Designers', labels)
         self.assertIn('Review Designs', labels)

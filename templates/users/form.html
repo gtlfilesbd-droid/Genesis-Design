@@ -1,26 +1,87 @@
 {% extends "base.html" %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-3xl mx-auto">
     <a href="{% if edit_user %}{% url 'accounts:user_detail' edit_user.pk %}{% else %}{% url 'accounts:user_list' %}{% endif %}" class="text-sm text-slate-500 hover:text-primary-light inline-flex items-center gap-1 mb-4">
         <i data-lucide="arrow-left" class="w-4 h-4"></i> Back
     </a>
-    <h1 class="text-[28px] font-bold text-slate-900 mb-8">{{ title }}</h1>
-    <div class="g-card p-8">
-        <form method="post" class="space-y-5">
+    <h1 class="text-[28px] font-bold text-slate-900 mb-2">{{ title }}</h1>
+    <p class="text-sm text-slate-500 mb-8">Assign a role group, then optionally add individual extra permissions.</p>
+
+    <div class="g-card p-8 mb-6">
+        <form method="post" class="space-y-6">
             {% csrf_token %}
             {% for field in form %}
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+            <div id="{% if field.name == 'role' %}role-group-field{% endif %}">
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                    {% if field.name == 'role' %}Group (Role){% else %}{{ field.label }}{% endif %}
+                    {% if field.field.required %} *{% endif %}
+                </label>
                 {{ field }}
+                {% if field.name == 'role' %}
+                <p class="text-xs text-slate-500 mt-1">The group defines default permissions. See summary below.</p>
+                {% endif %}
                 {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
             </div>
             {% endfor %}
+
+            <div class="border-t border-slate-100 pt-6">
+                <h2 class="text-sm font-semibold text-slate-900 mb-1">Extra Permissions (optional)</h2>
+                <p class="text-xs text-slate-500 mb-4">Tick only permissions this user needs <strong>in addition to</strong> their group.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {% for item in extra_permission_items %}
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" name="extra_{{ item.field }}" class="rounded" {% if item.checked %}checked{% endif %}>
+                        {{ item.label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
             <div class="flex items-center gap-3 pt-2">
                 <button type="submit" class="g-btn-primary">Save User</button>
                 <a href="{% if edit_user %}{% url 'accounts:user_detail' edit_user.pk %}{% else %}{% url 'accounts:user_list' %}{% endif %}" class="g-btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
+
+    <div class="g-card p-6">
+        <h2 class="text-sm font-semibold text-slate-900 mb-4">6 Role Groups — Default Permissions</h2>
+        <div class="space-y-4" id="role-group-summary">
+            {% for group in role_groups %}
+            <div class="rounded-lg border border-slate-100 p-4 role-group-card" data-role="{{ group.role }}">
+                <p class="font-medium text-slate-900">{{ group.label }}</p>
+                <p class="text-xs text-slate-500 mt-1">{{ group.description }}</p>
+                <div class="flex flex-wrap gap-1.5 mt-3">
+                    {% for perm in group.permissions %}
+                    <span class="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700">{{ perm }}</span>
+                    {% empty %}
+                    <span class="text-xs text-slate-400">No default permissions</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const roleSelect = document.querySelector('#role-group-field select');
+    const cards = document.querySelectorAll('.role-group-card');
+    function highlightRole() {
+        const val = roleSelect ? roleSelect.value : '';
+        cards.forEach(card => {
+            const active = card.dataset.role === val;
+            card.classList.toggle('border-primary', active);
+            card.classList.toggle('ring-2', active);
+            card.classList.toggle('ring-primary/20', active);
+        });
+    }
+    if (roleSelect) {
+        roleSelect.addEventListener('change', highlightRole);
+        highlightRole();
+    }
+});
+</script>
 {% endblock %}

@@ -145,3 +145,36 @@ class RolePermission(models.Model):
 
     def __str__(self):
         return self.role
+
+
+class UserExtraPermission(models.Model):
+    """Optional extra permissions for a user beyond their role group."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='extra_permissions',
+    )
+    can_create_project = models.BooleanField(default=False)
+    can_create_request = models.BooleanField(default=False)
+    can_assign_designer = models.BooleanField(default=False)
+    can_review = models.BooleanField(default=False)
+    can_verify = models.BooleanField(default=False)
+    can_compliance = models.BooleanField(default=False)
+    can_manage_users = models.BooleanField(default=False)
+    can_view_reports = models.BooleanField(default=False)
+    can_manage_settings = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name_plural = 'user extra permissions'
+
+    def __str__(self):
+        return f'Extra permissions for {self.user}'
+
+    def enabled_labels(self):
+        from apps.accounts.role_groups import PERMISSION_FIELD_LABELS
+        return [
+            PERMISSION_FIELD_LABELS[field]
+            for field in PERMISSION_FIELD_LABELS
+            if getattr(self, field, False)
+        ]

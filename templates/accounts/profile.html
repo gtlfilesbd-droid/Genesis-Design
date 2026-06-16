@@ -73,7 +73,7 @@
         </div>
 
         <div>
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Access from Role</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Access from Group</h3>
             {% if permissions_profile.role_permissions %}
             <div class="flex flex-wrap gap-2">
                 {% for perm in permissions_profile.role_permissions %}
@@ -81,9 +81,20 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p class="text-sm text-slate-500">No permissions enabled for this role. An admin can update Settings → Role Permissions.</p>
+            <p class="text-sm text-slate-500">No permissions enabled for this role group.</p>
             {% endif %}
         </div>
+
+        {% if permissions_profile.extra_permissions %}
+        <div class="mt-6">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Extra Permissions</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for perm in permissions_profile.extra_permissions %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-100">{{ perm.label }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 

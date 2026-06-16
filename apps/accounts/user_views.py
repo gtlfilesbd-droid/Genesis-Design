@@ -15,7 +15,29 @@ from apps.projects.models import Project
 from apps.permissions.decorators import require_global_permission
 from apps.permissions.services import PermissionService
 from .models import User, UserRole, UserStatus
+from .role_groups import (
+    get_extra_permission_initial,
+    get_role_groups_for_ui,
+    PERMISSION_FIELD_LABELS,
+    save_user_extra_permissions,
+)
 from .user_forms import UserCreateForm, UserEditForm
+
+
+def _user_form_context(form, edit_user=None):
+    extra_initial = get_extra_permission_initial(edit_user) if edit_user else {
+        f: False for f in PERMISSION_FIELD_LABELS
+    }
+    extra_permission_items = [
+        {'field': field, 'label': label, 'checked': extra_initial.get(field, False)}
+        for field, label in PERMISSION_FIELD_LABELS.items()
+    ]
+    return {
+        'form': form,
+        'edit_user': edit_user,
+        'role_groups': get_role_groups_for_ui(),
+        'extra_permission_items': extra_permission_items,
+    }
 
 
 @login_required
@@ -69,12 +91,15 @@ def user_create(request):
         form = UserCreateForm(request.POST)
         if form.is_valid():
             user = form.save()
+            save_user_extra_permissions(user, request.POST)
             log_activity('user', user.pk, request.user, 'user_created', f'User {user.username} created')
             messages.success(request, f'User {user.get_full_name()} created.')
             return redirect('accounts:user_detail', pk=user.pk)
     else:
         form = UserCreateForm()
-    return render(request, 'users/form.html', {'form': form, 'title': 'Add New User'})
+    context = _user_form_context(form)
+    context['title'] = 'Add New User'
+    return render(request, 'users/form.html', context)
 
 
 @login_required
@@ -85,6 +110,7 @@ def user_edit(request, pk):
         form = UserEditForm(request.POST, instance=user_obj)
         if form.is_valid():
             user = form.save()
+            save_user_extra_permissions(user, request.POST)
             if user.role == UserRole.ADMIN:
                 user.is_staff = True
                 user.save(update_fields=['is_staff'])
@@ -92,7 +118,9 @@ def user_edit(request, pk):
             return redirect('accounts:user_detail', pk=user.pk)
     else:
         form = UserEditForm(instance=user_obj)
-    return render(request, 'users/form.html', {'form': form, 'title': 'Edit User', 'edit_user': user_obj})
+    context = _user_form_context(form, edit_user=user_obj)
+    context['title'] = 'Edit User'
+    return render(request, 'users/form.html', context)
 
 
 @login_required
@@ -136,6 +164,7 @@ def user_detail(request, pk):
 
     return render(request, 'users/detail.html', {
         'profile_user': user_obj,
+        'permissions_profile': PermissionService.get_user_permissions_profile(user_obj),
         'assigned_designs': assigned.exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED])[:20],
         'running_tasks': assigned.exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count(),
         'overdue_tasks': assigned.filter(due_date__lt=timezone.now()).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count(),

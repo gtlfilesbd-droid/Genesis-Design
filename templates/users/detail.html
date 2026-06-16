@@ -30,6 +30,33 @@
     </div>
 </div>
 
+{% if permissions_profile %}
+<div class="g-card p-6 mb-8">
+    <h2 class="font-semibold text-slate-900 mb-4">Permissions</h2>
+    <p class="text-sm text-slate-600 mb-4">Group: <strong>{{ permissions_profile.role_display }}</strong></p>
+    <div class="mb-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">From Group</p>
+        <div class="flex flex-wrap gap-1.5">
+            {% for perm in permissions_profile.role_permissions %}
+            <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">{{ perm.label }}</span>
+            {% empty %}
+            <span class="text-sm text-slate-500">None</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% if permissions_profile.extra_permissions %}
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Extra</p>
+        <div class="flex flex-wrap gap-1.5">
+            {% for perm in permissions_profile.extra_permissions %}
+            <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-800">{{ perm.label }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
 {% if kpis %}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     {% include 'components/stat_card.html' with label='Total Assigned' value=kpis.total_assigned icon='clipboard-list' %}

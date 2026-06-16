@@ -67,6 +67,21 @@ class PermissionService:
         return bool(getattr(perms, field_name, False))
 
     @staticmethod
+    def _extra_flag(user, field_name: str) -> bool:
+        try:
+            extra = user.extra_permissions
+        except Exception:
+            return False
+        return bool(getattr(extra, field_name, False))
+
+    @staticmethod
+    def _matrix_flag(user, field_name: str) -> bool:
+        return (
+            PermissionService._role_flag(user, field_name)
+            or PermissionService._extra_flag(user, field_name)
+        )
+
+    @staticmethod
     def _is_admin_or_hod(user) -> bool:
         return (
             user.is_superuser
@@ -87,19 +102,28 @@ class PermissionService:
             return user.is_active and getattr(user, 'status', 'active') == 'active'
 
         if permission_code == 'VIS_PERM_WORKFLOW_BOARD':
-            return user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+            return (
+                user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+                or PermissionService._matrix_flag(user, 'can_assign_designer')
+            )
 
         if permission_code == 'VIS_PERM_TEAM_PAGE':
             return (
-                PermissionService._role_flag(user, 'can_manage_users')
+                PermissionService._matrix_flag(user, 'can_manage_users')
                 or user.role == UserRole.HEAD_OF_DESIGN
             )
 
         if permission_code == 'VIS_PERM_USER_PROFILES':
-            return user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+            return (
+                user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+                or PermissionService._matrix_flag(user, 'can_manage_users')
+            )
 
         if permission_code == 'SCOPE_ALL_REQUESTS':
-            return PermissionService._is_admin_or_hod(user)
+            return (
+                PermissionService._is_admin_or_hod(user)
+                or PermissionService._matrix_flag(user, 'can_view_reports')
+            )
 
         if permission_code == 'SCOPE_OWN_REQUESTS':
             return user.role == UserRole.DESIGN_REQUESTER
@@ -109,11 +133,14 @@ class PermissionService:
                 UserRole.DESIGNER,
                 UserRole.VERIFICATION_TEAM,
                 UserRole.COMPLIANCE_TEAM,
+            ) or any(
+                PermissionService._extra_flag(user, f)
+                for f in ('can_verify', 'can_compliance', 'can_assign_designer')
             )
 
         field = ROLE_PERM_FIELDS.get(permission_code)
         if field:
-            return PermissionService._role_flag(user, field)
+            return PermissionService._matrix_flag(user, field)
 
         return False
 
@@ -173,16 +200,19 @@ class PermissionService:
             return queryset.filter(requested_by=user)
 
         if user.role == UserRole.DESIGNER:
-            return queryset.filter(
-                Q(assigned_designer=user) | Q(current_holder=user)
-            ).distinct()
+            filters = Q(assigned_designer=user) | Q(current_holder=user)
+            if PermissionService._extra_flag(user, 'can_verify'):
+                filters |= Q(status__in=VERIFICATION_STATUSES)
+            if PermissionService._extra_flag(user, 'can_compliance'):
+                filters |= Q(status__in=COMPLIANCE_STATUSES)
+            return queryset.filter(filters).distinct()
 
-        if user.role == UserRole.VERIFICATION_TEAM:
+        if user.role == UserRole.VERIFICATION_TEAM or PermissionService._extra_flag(user, 'can_verify'):
             return queryset.filter(
                 Q(status__in=VERIFICATION_STATUSES) | Q(current_holder=user)
             ).distinct()
 
-        if user.role == UserRole.COMPLIANCE_TEAM:
+        if user.role == UserRole.COMPLIANCE_TEAM or PermissionService._extra_flag(user, 'can_compliance'):
             return queryset.filter(
                 Q(status__in=COMPLIANCE_STATUSES) | Q(current_holder=user)
             ).distinct()
@@ -206,26 +236,26 @@ class PermissionService:
     @staticmethod
     def get_assignable_designers(project):
         return User.objects.filter(
-            role=UserRole.DESIGNER,
+            Q(role=UserRole.DESIGNER) | Q(extra_permissions__can_assign_designer=True),
             is_active=True,
             status='active',
-        )
+        ).distinct()
 
     @staticmethod
     def get_verifiers(project):
         return User.objects.filter(
-            role=UserRole.VERIFICATION_TEAM,
+            Q(role=UserRole.VERIFICATION_TEAM) | Q(extra_permissions__can_verify=True),
             is_active=True,
             status='active',
-        )
+        ).distinct()
 
     @staticmethod
     def get_compliance_officers(project):
         return User.objects.filter(
-            role=UserRole.COMPLIANCE_TEAM,
+            Q(role=UserRole.COMPLIANCE_TEAM) | Q(extra_permissions__can_compliance=True),
             is_active=True,
             status='active',
-        )
+        ).distinct()
 
     @staticmethod
     def can_compliance_review(user, project) -> bool:
@@ -284,27 +314,45 @@ class PermissionService:
 
     @staticmethod
     def get_user_permission_labels(user) -> list:
-        perms = PermissionService._get_role_perms(user)
-        if not perms:
-            return []
         labels = []
-        for field, label in ROLE_PERMISSION_LABELS.items():
-            if getattr(perms, field, False):
-                labels.append(label)
+        seen = set()
+        perms = PermissionService._get_role_perms(user)
+        if perms:
+            for field, label in ROLE_PERMISSION_LABELS.items():
+                if getattr(perms, field, False) and label not in seen:
+                    labels.append(label)
+                    seen.add(label)
+        try:
+            extra = user.extra_permissions
+            for field, label in ROLE_PERMISSION_LABELS.items():
+                if getattr(extra, field, False) and label not in seen:
+                    labels.append(f'{label} (extra)')
+                    seen.add(label)
+        except Exception:
+            pass
         return labels
 
     @staticmethod
     def get_user_permissions_profile(user):
         perms = PermissionService._get_role_perms(user)
-        enabled = []
+        role_enabled = []
         if perms:
             for field, label in ROLE_PERMISSION_LABELS.items():
                 if getattr(perms, field, False):
-                    enabled.append({'field': field, 'label': label})
+                    role_enabled.append({'field': field, 'label': label})
+        extra_enabled = []
+        try:
+            extra = user.extra_permissions
+            for field, label in ROLE_PERMISSION_LABELS.items():
+                if getattr(extra, field, False):
+                    extra_enabled.append({'field': field, 'label': label})
+        except Exception:
+            pass
         return {
             'role': user.role,
             'role_display': user.get_role_display(),
-            'role_permissions': enabled,
+            'role_permissions': role_enabled,
+            'extra_permissions': extra_enabled,
         }
 
     @staticmethod
