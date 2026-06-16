@@ -13,7 +13,7 @@ from apps.core.utils import log_activity
 from apps.projects.models import Project
 
 from .forms import DesignRequestForm, create_design_request
-from .models import DesignComment, DesignRequest, DesignStatus, DrawingType, RequestAttachment
+from .models import DesignComment, DesignRequest, DesignStatus, DrawingType
 from .utils import create_design_comment
 
 
@@ -52,13 +52,14 @@ def design_detail(request, pk):
             messages.success(request, 'Design request cancelled.')
         return redirect('requests:detail', pk=pk)
 
-    from apps.core.models import ActivityLog
+    from apps.core.models import ActivityLog, CompanySettings
     logs = ActivityLog.objects.filter(
         entity_type='design_request', entity_id=design.pk
     ).select_related('user')[:50]
     submissions = design.submissions.select_related('submitted_by', 'reviewed_by')
     reviews = design.reviews.select_related('reviewer')
     verifications = design.verifications.select_related('verifier')
+    compliance_reviews = design.compliance_reviews.select_related('reviewer')
     attachments = design.attachments.select_related('uploaded_by')
     comments = design.comments.select_related('author').prefetch_related('mentions')
     from apps.workflow.services import compute_delay_attribution
@@ -76,6 +77,7 @@ def design_detail(request, pk):
     from apps.workflow.permissions import design_action_flags
     progress_steps, progress_cancelled = build_progress_steps(design)
     action_flags = design_action_flags(request.user, design)
+    company = CompanySettings.objects.first()
 
     return render(request, 'designs/detail.html', {
         'design': design,
@@ -83,7 +85,10 @@ def design_detail(request, pk):
         'submissions': submissions,
         'reviews': reviews,
         'verifications': verifications,
+        'compliance_reviews': compliance_reviews,
         'attachments': attachments,
+        'legacy_attachment_count': attachments.count(),
+        'file_sharing_policy': company.file_sharing_policy if company else '',
         'comments': comments,
         'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
         'stage_durations': stage_durations,
@@ -108,10 +113,6 @@ def design_create(request, pk):
             hod = get_head_of_design()
             design.current_holder = hod
             design.save(update_fields=['current_holder'])
-            for uploaded in request.FILES.getlist('attachments'):
-                RequestAttachment.objects.create(
-                    design=design, file=uploaded, filename=uploaded.name, uploaded_by=request.user,
-                )
             log_activity(
                 'design_request', design.pk, request.user,
                 'design_requested',

@@ -10,9 +10,13 @@
 
     <p class="text-sm text-slate-500 mb-8">Project: <strong>{{ project.client_name }}</strong> ({{ project.code }})</p>
 
+    <div class="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-900">
+        Design files must be placed on the internal file server. This form does not accept file uploads.
+    </div>
+
     <div class="g-card p-8">
 
-        <form method="post" enctype="multipart/form-data" class="space-y-5" x-data="{ priority: '{{ form.priority.value|default:'medium' }}' }">
+        <form method="post" class="space-y-5" x-data="{ priority: '{{ form.priority.value|default:'medium' }}' }">
 
             {% csrf_token %}
 
@@ -63,11 +67,6 @@
             {% endif %}
 
             {% endfor %}
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Attachments (Optional)</label>
-                <input type="file" name="attachments" multiple class="g-input file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-100 file:text-sm">
-                <p class="text-xs text-slate-500 mt-1">Upload reference files or brief documents</p>
-            </div>
             <div class="flex items-center gap-3 pt-2">
 
                 <button type="submit" class="g-btn-primary">Submit Request</button>

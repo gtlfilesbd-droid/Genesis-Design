@@ -16,7 +16,12 @@ class DrawingTypeAdmin(admin.ModelAdmin):
 class DesignSubmissionInline(admin.TabularInline):
     model = DesignSubmission
     extra = 0
-    readonly_fields = ('version_number', 'submitted_at')
+    readonly_fields = (
+        'version_number', 'file_name', 'revision_date', 'submitted_at',
+        'file', 'internal_file_reference', 'change_summary', 'notes',
+        'verification_status', 'approval_status', 'reviewed_by',
+    )
+    fields = readonly_fields
 
 
 @admin.register(DesignRequest)

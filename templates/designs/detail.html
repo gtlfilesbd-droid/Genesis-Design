@@ -65,24 +65,37 @@
         {% if submissions %}
         <div class="g-card overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-100"><h2 class="font-semibold text-slate-900">Revision History</h2></div>
+            {% if file_sharing_policy %}
+            <p class="px-6 py-3 text-xs text-slate-500 border-b border-slate-100">{{ file_sharing_policy }}</p>
+            {% endif %}
+            <div class="overflow-x-auto">
             <table class="g-table w-full">
-                <thead><tr><th>Ver</th><th>Submitted By</th><th>Date</th><th>File Ref</th><th>Notes</th></tr></thead>
+                <thead><tr>
+                    <th>Ver</th><th>File Name</th><th>Revision Date</th><th>Submitted By</th>
+                    <th>Reviewed By</th><th>Verification</th><th>Approval</th>
+                    <th>Internal Reference</th><th>Change Summary</th>
+                </tr></thead>
                 <tbody>
                 {% for s in submissions %}
                 <tr>
                     <td class="font-medium">V{{ s.version_number }}</td>
+                    <td>{{ s.file_name|default:"—" }}</td>
+                    <td class="text-slate-500">{{ s.revision_date|date:"d M Y"|default:"—" }}</td>
                     <td>{{ s.submitted_by }}</td>
-                    <td class="text-slate-500">{{ s.submitted_at|date:"d M Y" }}</td>
-                    <td class="text-xs">{{ s.internal_file_reference|default:s.file.name|default:"—" }}</td>
-                    <td>{{ s.notes|default:"—" }}</td>
+                    <td>{{ s.reviewed_by|default:"—" }}</td>
+                    <td>{{ s.verification_status|default:"—" }}</td>
+                    <td>{{ s.approval_status|default:"—" }}</td>
+                    <td class="text-xs font-mono">{{ s.internal_file_reference|default:"—" }}</td>
+                    <td>{{ s.change_summary|default:s.notes|default:"—" }}</td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
         {% endif %}
 
-        {% if reviews or verifications %}
+        {% if reviews or verifications or compliance_reviews %}
         <div class="g-card p-6">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Comments & Reviews</h2>
             <div class="space-y-4">
@@ -106,21 +119,24 @@
                     </div>
                 </div>
                 {% endfor %}
+                {% for c in compliance_reviews %}
+                <div class="flex gap-3 p-3 rounded-lg bg-slate-50">
+                    <div class="w-8 h-8 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center shrink-0">{{ c.reviewer|initials }}</div>
+                    <div>
+                        <p class="text-sm"><span class="font-semibold">{{ c.reviewer }}</span> — Compliance: {{ c.get_action_display }}</p>
+                        <p class="text-xs text-slate-500">{{ c.created_at|date:"d M Y H:i" }}</p>
+                        {% if c.comments %}<p class="text-sm text-slate-700 mt-1">{{ c.comments }}</p>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
         {% endif %}
 
-        {% if attachments %}
+        {% if legacy_attachment_count %}
         <div class="g-card p-6">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Attachments</h2>
-            <ul class="divide-y divide-slate-100">
-                {% for a in attachments %}
-                <li class="flex items-center justify-between py-2 text-sm">
-                    <span>{{ a.filename }}</span>
-                    <a href="{{ a.file.url }}" class="text-primary-light font-semibold" target="_blank">Download</a>
-                </li>
-                {% endfor %}
-            </ul>
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Legacy Attachments</h2>
+            <p class="text-sm text-slate-600">{{ legacy_attachment_count }} archived file(s) from before reference-only storage. Contact an administrator for access.</p>
         </div>
         {% endif %}
 

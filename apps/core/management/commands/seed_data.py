@@ -191,18 +191,20 @@ class Command(BaseCommand):
                     design.status = DesignStatus.UNDER_REVIEW
                     design.revision_count = 3
                     design.save()
-                    for ver, note, accepted in [
-                        (1, 'Column dimensions wrong', False),
-                        (2, 'Scale issue on level 3', False),
-                        (3, 'Final version — all corrections addressed', True),
+                    for ver, note, fname, accepted in [
+                        (1, 'Column dimensions wrong', 'ID-REV1.dwg', False),
+                        (2, 'Scale issue on level 3', 'ID-REV2.dwg', False),
+                        (3, 'Final version — all corrections addressed', 'ID-REV3.dwg', True),
                     ]:
                         DesignSubmission.objects.get_or_create(
                             design=design,
                             version_number=ver,
                             defaults={
                                 'submitted_by': designer1,
+                                'file_name': fname,
+                                'revision_date': date.today(),
                                 'notes': note,
-                                'internal_file_reference': f'REF-{project.code}-V{ver}',
+                                'internal_file_reference': f'\\\\fileserver\\{project.code}\\{fname}',
                                 'approval_status': 'Accepted' if accepted else 'Correction Required',
                             },
                         )

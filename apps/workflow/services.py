@@ -260,6 +260,15 @@ def update_deadline_status(design):
     record.save()
 
 
+def _update_latest_submission(design, **fields):
+    submission = design.submissions.order_by('-version_number').first()
+    if not submission:
+        return
+    for key, value in fields.items():
+        setattr(submission, key, value)
+    submission.save(update_fields=list(fields.keys()))
+
+
 def transition(design, action, user, request=None, skip_permission=False, **kwargs):
     if action not in WORKFLOW_ACTIONS:
         raise WorkflowError(f'Unknown action: {action}')
@@ -309,6 +318,7 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             design=design, reviewer=user,
             action='correction', comments=comments,
         )
+        _update_latest_submission(design, reviewed_by=user)
 
     elif action == 'forward_to_designer':
         design.revision_count += 1
@@ -331,6 +341,11 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             design=design, verifier=user,
             action='correction', comments=comments,
         )
+        _update_latest_submission(
+            design,
+            verification_status='Correction Required',
+            reviewed_by=user,
+        )
 
     elif action == 'verify_approved':
         Verification.objects.create(
@@ -339,6 +354,11 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         )
         design.verified_by = user
         design.current_holder = hod or user
+        _update_latest_submission(
+            design,
+            verification_status='Approved',
+            reviewed_by=user,
+        )
 
     elif action == 'send_to_compliance':
         officer = kwargs.get('compliance_officer')
@@ -353,6 +373,11 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             design=design, reviewer=user,
             action='correction', comments=comments,
         )
+        _update_latest_submission(
+            design,
+            approval_status='Correction Required',
+            reviewed_by=user,
+        )
 
     elif action == 'compliance_approved':
         ComplianceReview.objects.create(
@@ -361,18 +386,29 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         )
         design.approved_by_compliance = user
         design.current_holder = hod or user
+        _update_latest_submission(
+            design,
+            approval_status='Approved',
+            reviewed_by=user,
+        )
 
     elif action == 'submit_work':
-        file = kwargs.get('file')
+        file_name = (kwargs.get('file_name') or '').strip()
+        if not file_name:
+            raise WorkflowError('File name is required.')
+        revision_date = kwargs.get('revision_date') or timezone.localdate()
         file_ref = kwargs.get('internal_file_reference', '')
         notes = kwargs.get('notes', '')
+        change_summary = kwargs.get('change_summary', '')
         version = design.submissions.count() + 1
         DesignSubmission.objects.create(
             design=design,
             version_number=version,
-            file=file,
+            file_name=file_name,
+            revision_date=revision_date,
             internal_file_reference=file_ref,
             notes=notes,
+            change_summary=change_summary,
             submitted_by=user,
         )
         design.current_holder = hod or user

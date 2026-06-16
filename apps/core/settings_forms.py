@@ -12,11 +12,15 @@ DURATION_INPUT = 'w-24 border border-slate-200 rounded-lg px-3 py-2 text-sm focu
 class CompanySettingsForm(forms.ModelForm):
     class Meta:
         model = CompanySettings
-        fields = ['company_name', 'tagline', 'address', 'phone', 'email', 'website', 'timezone_name']
+        fields = [
+            'company_name', 'tagline', 'address', 'phone', 'email', 'website',
+            'timezone_name', 'file_sharing_policy',
+        ]
         widgets = {f: forms.TextInput(attrs={'class': INPUT}) for f in ['company_name', 'tagline', 'phone', 'website', 'timezone_name']}
         widgets.update({
             'address': forms.Textarea(attrs={'class': INPUT, 'rows': 3}),
             'email': forms.EmailInput(attrs={'class': INPUT}),
+            'file_sharing_policy': forms.Textarea(attrs={'class': INPUT, 'rows': 3}),
         })
 
 

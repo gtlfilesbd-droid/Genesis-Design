@@ -122,23 +122,13 @@
 
 {% if tab == 'documents' %}
 <div class="g-card p-6">
-    {% if attachments %}
-    <ul class="divide-y divide-slate-100">
-        {% for a in attachments %}
-        <li class="flex items-center justify-between py-3">
-            <div class="flex items-center gap-3">
-                <i data-lucide="file" class="w-5 h-5 text-slate-400"></i>
-                <div>
-                    <p class="text-sm font-medium">{{ a.name|default:a.file.name }}</p>
-                    <p class="text-xs text-slate-500">{{ a.uploaded_at|date:"d M Y" }} · {{ a.uploaded_by }}</p>
-                </div>
-            </div>
-            <a href="{{ a.file.url }}" class="g-btn-secondary text-xs" target="_blank">Download</a>
-        </li>
-        {% endfor %}
-    </ul>
+    {% if file_sharing_policy %}
+    <p class="text-sm text-slate-700 mb-4 p-4 rounded-lg bg-blue-50 border border-blue-100">{{ file_sharing_policy }}</p>
+    {% endif %}
+    {% if legacy_attachment_count %}
+    <p class="text-sm text-slate-600">{{ legacy_attachment_count }} legacy document(s) archived from before reference-only storage. Files are not hosted in Genesis Design — use your internal file server.</p>
     {% else %}
-    <p class="text-slate-500 text-center py-8">No documents uploaded.</p>
+    <p class="text-slate-500 text-center py-8">Documents are managed on the company internal file server. No files are stored in Genesis Design.</p>
     {% endif %}
 </div>
 {% endif %}

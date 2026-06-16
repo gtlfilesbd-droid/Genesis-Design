@@ -8,6 +8,8 @@ from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 
+from django.utils import timezone
+
 from .services import WorkflowError, suggest_designer, transition
 from .permissions import can_run_workflow_action, design_action_flags
 
@@ -28,9 +30,34 @@ class AssignDesignerForm(forms.Form):
 
 
 class SubmitWorkForm(forms.Form):
-    file = forms.FileField(required=False, widget=forms.FileInput(attrs={'class': INPUT}))
-    internal_file_reference = forms.CharField(max_length=500, required=False, widget=forms.TextInput(attrs={'class': INPUT}))
-    notes = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
+    file_name = forms.CharField(
+        max_length=255,
+        required=True,
+        label='File name',
+        widget=forms.TextInput(attrs={'class': INPUT, 'placeholder': 'e.g. ID-01-Foundation.dwg'}),
+    )
+    revision_date = forms.DateField(
+        required=True,
+        initial=timezone.localdate,
+        label='Revision date',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': INPUT}),
+    )
+    internal_file_reference = forms.CharField(
+        max_length=500,
+        required=False,
+        label='Internal file path / reference',
+        widget=forms.TextInput(attrs={'class': INPUT, 'placeholder': 'UNC path or repository ID'}),
+    )
+    change_summary = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2, 'class': INPUT}),
+        required=False,
+        label='Change summary',
+    )
+    notes = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
+        required=False,
+        label='Additional notes',
+    )
 
 
 class CommentForm(forms.Form):
@@ -135,8 +162,13 @@ def workflow_action(request, pk, action):
 
     if request.method == 'GET' and action in form_actions:
         form = form_actions[action]()
+        from apps.core.models import CompanySettings
+        company = CompanySettings.objects.first()
         return render(request, 'workflow/action_form.html', {
-            'design': design, 'action': action, 'form': form,
+            'design': design,
+            'action': action,
+            'form': form,
+            'file_sharing_policy': company.file_sharing_policy if company else '',
         })
 
     if request.method == 'POST':
@@ -150,10 +182,13 @@ def workflow_action(request, pk, action):
                     })
                 kwargs = form.cleaned_data
             elif action == 'submit_work':
-                form = SubmitWorkForm(request.POST, request.FILES)
+                form = SubmitWorkForm(request.POST)
                 if not form.is_valid():
+                    from apps.core.models import CompanySettings
+                    company = CompanySettings.objects.first()
                     return render(request, 'workflow/action_form.html', {
                         'design': design, 'action': action, 'form': form,
+                        'file_sharing_policy': company.file_sharing_policy if company else '',
                     })
                 kwargs = form.cleaned_data
             elif action in ('send_to_verification', 'accept_design'):

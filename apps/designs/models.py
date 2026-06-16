@@ -294,7 +294,14 @@ class DesignSubmission(models.Model):
         related_name='submissions',
     )
     version_number = models.PositiveSmallIntegerField()
-    file = models.FileField(upload_to='design_submissions/%Y/%m/', blank=True, null=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    revision_date = models.DateField(null=True, blank=True)
+    file = models.FileField(
+        upload_to='design_submissions/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text='Deprecated — reference-only storage; do not upload new files.',
+    )
     internal_file_reference = models.CharField(max_length=500, blank=True)
     notes = models.TextField(blank=True)
     change_summary = models.TextField(blank=True)

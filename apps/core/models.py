@@ -87,6 +87,14 @@ class CompanySettings(models.Model):
     email = models.EmailField(blank=True, default='info@genesisdesign.local')
     website = models.URLField(blank=True)
     timezone_name = models.CharField(max_length=64, default='Asia/Dhaka')
+    file_sharing_policy = models.TextField(
+        blank=True,
+        default=(
+            'Design files must be stored on the company internal file sharing system '
+            '(shared drive, BIM server, or CAD server). Genesis Design stores references only.'
+        ),
+        help_text='Shown on submit forms and design detail pages.',
+    )
 
     class Meta:
         verbose_name_plural = 'company settings'

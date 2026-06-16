@@ -12,7 +12,7 @@ from apps.permissions.services import PermissionService
 from apps.core.models import ActivityLog
 from apps.core.utils import log_activity
 
-from .models import Project, ProjectAttachment, ProjectStatus
+from .models import Project, ProjectStatus
 
 
 INPUT_CLASS = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -46,11 +46,6 @@ class ProjectForm(forms.ModelForm):
         return project
 
 
-class ProjectAttachmentForm(forms.Form):
-    file = forms.FileField(required=False, label='Document')
-    name = forms.CharField(max_length=255, required=False, label='Document name', widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Document name (optional)'}))
-
-
 @login_required
 def project_list(request):
     qs = PermissionService.get_user_projects(request.user).select_related('created_by')
@@ -77,19 +72,10 @@ def project_list(request):
 def project_create(request):
     if request.method == 'POST':
         form = ProjectForm(request.POST)
-        attachment_form = ProjectAttachmentForm(request.POST, request.FILES)
         if form.is_valid():
             project = form.save(commit=False)
             project.created_by = request.user
             project.save()
-            uploaded_file = request.FILES.get('file')
-            if uploaded_file:
-                ProjectAttachment.objects.create(
-                    project=project,
-                    file=uploaded_file,
-                    name=attachment_form.data.get('name', ''),
-                    uploaded_by=request.user,
-                )
             log_activity(
                 'project', project.pk, request.user,
                 'project_created', f'Project {project.code} created',
@@ -99,10 +85,7 @@ def project_create(request):
         messages.error(request, 'Could not create project. Please check the form and try again.')
     else:
         form = ProjectForm()
-        attachment_form = ProjectAttachmentForm()
-    return render(request, 'projects/create.html', {
-        'form': form, 'attachment_form': attachment_form,
-    })
+    return render(request, 'projects/create.html', {'form': form})
 
 
 @login_required
@@ -131,11 +114,16 @@ def project_detail(request, pk):
     chart_labels = list(status_breakdown.keys())
     chart_data = list(status_breakdown.values())
 
+    from apps.core.models import CompanySettings
+    company = CompanySettings.objects.first()
+
     return render(request, 'projects/detail.html', {
         'project': project,
         'designs': designs,
         'logs': logs,
         'attachments': project.attachments.all(),
+        'legacy_attachment_count': project.attachments.count(),
+        'file_sharing_policy': company.file_sharing_policy if company else '',
         'tab': tab,
         'status_breakdown': status_breakdown,
         'completion_pct': round((project.completed_designs / project.total_design_requests * 100) if project.total_design_requests else 0),
