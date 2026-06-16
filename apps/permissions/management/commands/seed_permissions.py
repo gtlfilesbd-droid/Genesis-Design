@@ -8,6 +8,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         ensure_role_permissions()
+        from django.core.management import call_command
+        call_command('sync_auth_groups')
         self.stdout.write(self.style.SUCCESS(
             'Role permissions synced from defaults. '
             'Adjust access in Settings -> Role Permissions.'
