@@ -135,6 +135,7 @@ class RolePermission(models.Model):
     can_assign_designer = models.BooleanField(default=False)
     can_review = models.BooleanField(default=False)
     can_verify = models.BooleanField(default=False)
+    can_compliance = models.BooleanField(default=False)
     can_manage_users = models.BooleanField(default=False)
     can_view_reports = models.BooleanField(default=False)
     can_manage_settings = models.BooleanField(default=False)

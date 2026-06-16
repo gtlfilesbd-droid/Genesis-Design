@@ -1,17 +1,77 @@
 from django.db.models import Q
 from django.urls import reverse
 
-from apps.accounts.models import User
+from apps.accounts.models import User, UserRole
+from apps.core.models import RolePermission
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
 
-from .models import Permission, ProjectMembership, UserPermission
+ROLE_PERM_FIELDS = {
+    'PERM_ADMIN_PANEL': 'can_manage_settings',
+    'PERM_MANAGE_USERS': 'can_manage_users',
+    'PERM_VIEW_REPORTS': 'can_view_reports',
+    'PROJECT_PERM_CREATE': 'can_create_project',
+    'PROJECT_PERM_REQUEST': 'can_create_request',
+    'PROJECT_PERM_ASSIGN': 'can_assign_designer',
+    'PROJECT_PERM_REVIEW': 'can_review',
+    'PROJECT_PERM_VERIFY': 'can_verify',
+    'PROJECT_PERM_COMPLIANCE': 'can_compliance',
+    'PROJECT_PERM_APPROVE': 'can_review',
+    'PROJECT_PERM_COMPLETE': 'can_assign_designer',
+}
 
-GLOBAL_PROJECT_CODES = frozenset({'PROJECT_PERM_CREATE'})
+VERIFICATION_STATUSES = [
+    DesignStatus.VERIFICATION_PENDING,
+    DesignStatus.VERIFICATION_CORRECTION,
+]
+
+COMPLIANCE_STATUSES = [
+    DesignStatus.AWAITING_COMPLIANCE,
+    DesignStatus.COMPLIANCE_PENDING,
+    DesignStatus.COMPLIANCE_CORRECTION,
+]
+
+ROLE_PERMISSION_LABELS = {
+    'can_create_project': 'Create Projects',
+    'can_create_request': 'Submit Requests',
+    'can_assign_designer': 'Assign Designers',
+    'can_review': 'Review Designs',
+    'can_verify': 'Verify Designs',
+    'can_compliance': 'Compliance Review',
+    'can_manage_users': 'Manage Users',
+    'can_view_reports': 'View Reports',
+    'can_manage_settings': 'Manage Settings',
+}
 
 
 class PermissionService:
-    """Central service for all permission checks."""
+    """Role-based permission checks via User.role and RolePermission matrix."""
+
+    @staticmethod
+    def _get_role_perms(user):
+        if not user or not user.is_authenticated:
+            return None
+        cache_attr = '_cached_role_perms'
+        if not hasattr(user, cache_attr):
+            try:
+                setattr(user, cache_attr, RolePermission.objects.get(role=user.role))
+            except RolePermission.DoesNotExist:
+                setattr(user, cache_attr, None)
+        return getattr(user, cache_attr)
+
+    @staticmethod
+    def _role_flag(user, field_name: str) -> bool:
+        perms = PermissionService._get_role_perms(user)
+        if not perms:
+            return False
+        return bool(getattr(perms, field_name, False))
+
+    @staticmethod
+    def _is_admin_or_hod(user) -> bool:
+        return (
+            user.is_superuser
+            or user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+        )
 
     @staticmethod
     def has_global_permission(user, permission_code: str) -> bool:
@@ -19,11 +79,43 @@ class PermissionService:
             return False
         if user.is_superuser:
             return True
-        return UserPermission.objects.filter(
-            user=user,
-            permission__code=permission_code,
-            is_active=True,
-        ).exists()
+
+        if permission_code == 'PERM_VIEW_ALL_PROJECTS':
+            return PermissionService._is_admin_or_hod(user)
+
+        if permission_code in ('VIS_PERM_DASHBOARD', 'VIS_PERM_NOTIFICATIONS'):
+            return user.is_active and getattr(user, 'status', 'active') == 'active'
+
+        if permission_code == 'VIS_PERM_WORKFLOW_BOARD':
+            return user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+
+        if permission_code == 'VIS_PERM_TEAM_PAGE':
+            return (
+                PermissionService._role_flag(user, 'can_manage_users')
+                or user.role == UserRole.HEAD_OF_DESIGN
+            )
+
+        if permission_code == 'VIS_PERM_USER_PROFILES':
+            return user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
+
+        if permission_code == 'SCOPE_ALL_REQUESTS':
+            return PermissionService._is_admin_or_hod(user)
+
+        if permission_code == 'SCOPE_OWN_REQUESTS':
+            return user.role == UserRole.DESIGN_REQUESTER
+
+        if permission_code == 'SCOPE_TEAM_REQUESTS':
+            return user.role in (
+                UserRole.DESIGNER,
+                UserRole.VERIFICATION_TEAM,
+                UserRole.COMPLIANCE_TEAM,
+            )
+
+        field = ROLE_PERM_FIELDS.get(permission_code)
+        if field:
+            return PermissionService._role_flag(user, field)
+
+        return False
 
     @staticmethod
     def has_project_permission(user, project, permission_code: str) -> bool:
@@ -31,32 +123,42 @@ class PermissionService:
             return False
         if user.is_superuser:
             return True
-        if PermissionService.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS'):
-            if permission_code == 'PROJECT_PERM_VIEW':
+
+        if permission_code == 'PROJECT_PERM_VIEW':
+            if PermissionService._is_admin_or_hod(user):
                 return True
-        if permission_code in GLOBAL_PROJECT_CODES:
+            return PermissionService.get_user_projects(user).filter(pk=project.pk).exists()
+
+        if permission_code == 'PROJECT_PERM_EDIT':
+            return PermissionService._is_admin_or_hod(user)
+
+        if permission_code == 'PROJECT_PERM_COMMENT':
+            return PermissionService.has_project_permission(user, project, 'PROJECT_PERM_VIEW')
+
+        if permission_code in ('DESIGN_PERM_WORK', 'DESIGN_PERM_UPLOAD', 'DESIGN_PERM_REVISE'):
+            return user.role in (UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN)
+
+        if permission_code in ROLE_PERM_FIELDS:
             return PermissionService.has_global_permission(user, permission_code)
-        try:
-            membership = ProjectMembership.objects.get(
-                user=user,
-                project=project,
-                is_active=True,
-            )
-            return membership.permissions.filter(code=permission_code).exists()
-        except ProjectMembership.DoesNotExist:
-            return False
+
+        return False
 
     @staticmethod
     def get_user_projects(user):
         if not user or not user.is_authenticated:
             return Project.objects.none()
-        if user.is_superuser or PermissionService.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS'):
+        if PermissionService._is_admin_or_hod(user):
             return Project.objects.all()
-        return Project.objects.filter(
-            members__user=user,
-            members__is_active=True,
-            members__permissions__code='PROJECT_PERM_VIEW',
-        ).distinct()
+
+        involved_project_ids = DesignRequest.objects.filter(
+            Q(requested_by=user)
+            | Q(assigned_designer=user)
+            | Q(current_holder=user)
+        ).values_list('project_id', flat=True).distinct()
+
+        created_ids = Project.objects.filter(created_by=user).values_list('pk', flat=True)
+        all_ids = set(involved_project_ids) | set(created_ids)
+        return Project.objects.filter(pk__in=all_ids)
 
     @staticmethod
     def filter_design_requests(user, queryset=None):
@@ -64,17 +166,27 @@ class PermissionService:
             queryset = DesignRequest.objects.all()
         if not user or not user.is_authenticated:
             return queryset.none()
-        if user.is_superuser or PermissionService.has_global_permission(user, 'SCOPE_ALL_REQUESTS'):
+        if PermissionService._is_admin_or_hod(user):
             return queryset
-        if PermissionService.has_global_permission(user, 'SCOPE_TEAM_REQUESTS'):
-            team_user_ids = User.objects.filter(
-                Q(team=user.team) | Q(manager=user) | Q(pk=user.pk)
-            ).values_list('pk', flat=True)
+
+        if user.role == UserRole.DESIGN_REQUESTER:
+            return queryset.filter(requested_by=user)
+
+        if user.role == UserRole.DESIGNER:
             return queryset.filter(
-                Q(requested_by_id__in=team_user_ids)
-                | Q(assigned_designer_id__in=team_user_ids)
-                | Q(current_holder_id__in=team_user_ids)
+                Q(assigned_designer=user) | Q(current_holder=user)
             ).distinct()
+
+        if user.role == UserRole.VERIFICATION_TEAM:
+            return queryset.filter(
+                Q(status__in=VERIFICATION_STATUSES) | Q(current_holder=user)
+            ).distinct()
+
+        if user.role == UserRole.COMPLIANCE_TEAM:
+            return queryset.filter(
+                Q(status__in=COMPLIANCE_STATUSES) | Q(current_holder=user)
+            ).distinct()
+
         visible_project_ids = PermissionService.get_user_projects(user).values_list('pk', flat=True)
         return queryset.filter(
             Q(requested_by=user)
@@ -94,33 +206,40 @@ class PermissionService:
     @staticmethod
     def get_assignable_designers(project):
         return User.objects.filter(
-            project_memberships__project=project,
-            project_memberships__is_active=True,
-            project_memberships__permissions__code='DESIGN_PERM_WORK',
+            role=UserRole.DESIGNER,
             is_active=True,
-        ).distinct()
+            status='active',
+        )
 
     @staticmethod
     def get_verifiers(project):
         return User.objects.filter(
-            project_memberships__project=project,
-            project_memberships__is_active=True,
-            project_memberships__permissions__code='PROJECT_PERM_VERIFY',
+            role=UserRole.VERIFICATION_TEAM,
             is_active=True,
-        ).distinct()
+            status='active',
+        )
 
     @staticmethod
     def get_compliance_officers(project):
         return User.objects.filter(
-            project_memberships__project=project,
-            project_memberships__is_active=True,
-            project_memberships__permissions__code='PROJECT_PERM_COMPLIANCE',
+            role=UserRole.COMPLIANCE_TEAM,
             is_active=True,
-        ).distinct()
+            status='active',
+        )
 
     @staticmethod
     def can_compliance_review(user, project) -> bool:
         return PermissionService.has_project_permission(user, project, 'PROJECT_PERM_COMPLIANCE')
+
+    @staticmethod
+    def _has_my_tasks(user) -> bool:
+        return user.role in (
+            UserRole.ADMIN,
+            UserRole.HEAD_OF_DESIGN,
+            UserRole.DESIGNER,
+            UserRole.VERIFICATION_TEAM,
+            UserRole.COMPLIANCE_TEAM,
+        )
 
     @staticmethod
     def get_user_sidebar_items(user) -> list:
@@ -130,17 +249,7 @@ class PermissionService:
         items.append('projects')
         if PermissionService._can_see_design_requests(user):
             items.append('design_requests')
-        has_tasks = ProjectMembership.objects.filter(
-            user=user,
-            is_active=True,
-            permissions__code__in=[
-                'DESIGN_PERM_WORK',
-                'PROJECT_PERM_ASSIGN',
-                'PROJECT_PERM_VERIFY',
-                'PROJECT_PERM_COMPLIANCE',
-            ],
-        ).exists()
-        if has_tasks:
+        if PermissionService._has_my_tasks(user):
             items.append('my_tasks')
         if PermissionService._can_see_design_library(user):
             items.append('design_library')
@@ -159,57 +268,43 @@ class PermissionService:
 
     @staticmethod
     def _can_see_design_requests(user) -> bool:
-        if PermissionService.has_global_permission(user, 'SCOPE_ALL_REQUESTS'):
-            return True
-        if PermissionService.has_global_permission(user, 'SCOPE_OWN_REQUESTS'):
-            return True
-        if PermissionService.has_global_permission(user, 'SCOPE_TEAM_REQUESTS'):
-            return True
-        return ProjectMembership.objects.filter(
-            user=user,
-            is_active=True,
-            permissions__code='PROJECT_PERM_VIEW',
-        ).exists()
+        return (
+            PermissionService.has_global_permission(user, 'SCOPE_ALL_REQUESTS')
+            or PermissionService.has_global_permission(user, 'SCOPE_OWN_REQUESTS')
+            or PermissionService.has_global_permission(user, 'SCOPE_TEAM_REQUESTS')
+            or PermissionService.get_user_projects(user).exists()
+        )
 
     @staticmethod
     def _can_see_design_library(user) -> bool:
         return (
-            PermissionService.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS')
-            or ProjectMembership.objects.filter(
-                user=user,
-                is_active=True,
-                permissions__code='PROJECT_PERM_VIEW',
-            ).exists()
+            PermissionService._is_admin_or_hod(user)
+            or PermissionService.get_user_projects(user).exists()
         )
 
     @staticmethod
     def get_user_permission_labels(user) -> list:
-        detail = PermissionService.get_user_permissions_profile(user)
-        labels = [p.name for p in detail['global_permissions']]
-        for membership in detail['project_memberships']:
-            for perm in membership.permissions.all():
-                if perm.name not in labels:
-                    labels.append(perm.name)
-        return labels[:12]
+        perms = PermissionService._get_role_perms(user)
+        if not perms:
+            return []
+        labels = []
+        for field, label in ROLE_PERMISSION_LABELS.items():
+            if getattr(perms, field, False):
+                labels.append(label)
+        return labels
 
     @staticmethod
     def get_user_permissions_profile(user):
-        """Full permission breakdown for profile page."""
-        global_permissions = list(
-            Permission.objects.filter(
-                userpermission__user=user,
-                userpermission__is_active=True,
-            ).order_by('category', 'name')
-        )
-        project_memberships = list(
-            ProjectMembership.objects.filter(
-                user=user,
-                is_active=True,
-            ).select_related('project').prefetch_related('permissions').order_by('project__code')
-        )
+        perms = PermissionService._get_role_perms(user)
+        enabled = []
+        if perms:
+            for field, label in ROLE_PERMISSION_LABELS.items():
+                if getattr(perms, field, False):
+                    enabled.append({'field': field, 'label': label})
         return {
-            'global_permissions': global_permissions,
-            'project_memberships': project_memberships,
+            'role': user.role,
+            'role_display': user.get_role_display(),
+            'role_permissions': enabled,
         }
 
     @staticmethod
@@ -404,34 +499,5 @@ class PermissionService:
 
     @staticmethod
     def apply_template_to_user(user, template_name, granted_by=None, projects=None):
-        """Apply a role template — global perms to UserPermission, project perms to memberships."""
-        from .models import RoleTemplate
-
-        template = RoleTemplate.objects.get(name=template_name)
-        if projects is None:
-            projects = Project.objects.all()
-
-        global_categories = {'system', 'visibility', 'scope'}
-        global_codes = GLOBAL_PROJECT_CODES
-
-        for perm in template.permissions.all():
-            if perm.category in global_categories or perm.code in global_codes:
-                UserPermission.objects.update_or_create(
-                    user=user,
-                    permission=perm,
-                    defaults={'granted_by': granted_by, 'is_active': True},
-                )
-
-        project_perms = template.permissions.exclude(
-            category__in=global_categories,
-        ).exclude(code__in=global_codes)
-
-        for project in projects:
-            membership, _ = ProjectMembership.objects.get_or_create(
-                user=user,
-                project=project,
-                defaults={'added_by': granted_by, 'is_active': True},
-            )
-            membership.is_active = True
-            membership.save(update_fields=['is_active'])
-            membership.permissions.add(*project_perms)
+        """Deprecated — permissions are derived from user.role only."""
+        return None

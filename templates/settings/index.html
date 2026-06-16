@@ -182,6 +182,7 @@
                             <th>Assign</th>
                             <th>Review</th>
                             <th>Verify</th>
+                            <th>Compliance</th>
                             <th>Users</th>
                             <th>Reports</th>
                             <th>Settings</th>
@@ -197,6 +198,7 @@
                         <td><input type="checkbox" name="perm_{{ perm.pk }}_can_assign_designer" {% if perm.can_assign_designer %}checked{% endif %} class="rounded"></td>
                         <td><input type="checkbox" name="perm_{{ perm.pk }}_can_review" {% if perm.can_review %}checked{% endif %} class="rounded"></td>
                         <td><input type="checkbox" name="perm_{{ perm.pk }}_can_verify" {% if perm.can_verify %}checked{% endif %} class="rounded"></td>
+                        <td><input type="checkbox" name="perm_{{ perm.pk }}_can_compliance" {% if perm.can_compliance %}checked{% endif %} class="rounded"></td>
                         <td><input type="checkbox" name="perm_{{ perm.pk }}_can_manage_users" {% if perm.can_manage_users %}checked{% endif %} class="rounded"></td>
                         <td><input type="checkbox" name="perm_{{ perm.pk }}_can_view_reports" {% if perm.can_view_reports %}checked{% endif %} class="rounded"></td>
                         <td><input type="checkbox" name="perm_{{ perm.pk }}_can_manage_settings" {% if perm.can_manage_settings %}checked{% endif %} class="rounded"></td>

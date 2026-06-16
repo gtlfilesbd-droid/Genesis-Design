@@ -3,15 +3,16 @@ from datetime import date
 from django.test import TestCase
 
 from apps.accounts.models import User, UserRole
+from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.notifications.models import Notification
 from apps.notifications.services import NotificationService, notify_workflow_transition
-from apps.permissions.models import Permission, ProjectMembership
 from apps.projects.models import Project
 
 
 class NotificationServiceTests(TestCase):
     def setUp(self):
+        ensure_role_permissions()
         self.requester = User.objects.create_user(
             username='req', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R1',
         )
@@ -31,18 +32,6 @@ class NotificationServiceTests(TestCase):
             requested_by=self.requester,
             status=DesignStatus.NEW_REQUEST,
         )
-        assign_perm, _ = Permission.objects.get_or_create(
-            code='PROJECT_PERM_ASSIGN',
-            defaults={'name': 'Assign Designer', 'category': 'project', 'description': ''},
-        )
-        review_perm, _ = Permission.objects.get_or_create(
-            code='PROJECT_PERM_REVIEW',
-            defaults={'name': 'Review Design', 'category': 'project', 'description': ''},
-        )
-        membership = ProjectMembership.objects.create(
-            user=self.hod, project=self.project, is_active=True,
-        )
-        membership.permissions.add(assign_perm, review_perm)
 
     def test_on_request_created_notifies_assign_users(self):
         NotificationService.on_request_created(self.design)

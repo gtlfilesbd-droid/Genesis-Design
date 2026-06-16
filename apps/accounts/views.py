@@ -70,8 +70,7 @@ def profile(request):
     context = {
         'profile_user': user,
         'form': form,
-        'global_permissions': permissions_profile['global_permissions'],
-        'project_memberships': permissions_profile['project_memberships'],
+        'permissions_profile': permissions_profile,
         'total_projects_created': Project.objects.filter(created_by=user).count(),
         'total_design_requests': designs.filter(requested_by=user).count(),
         'total_assigned_designs': designs.filter(assigned_designer=user).count(),

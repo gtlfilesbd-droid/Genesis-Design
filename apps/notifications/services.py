@@ -53,12 +53,10 @@ class NotificationService:
 
     @staticmethod
     def _project_users(project, permission_code):
-        return User.objects.filter(
-            project_memberships__project=project,
-            project_memberships__is_active=True,
-            project_memberships__permissions__code=permission_code,
-            is_active=True,
-        ).distinct()
+        return [
+            user for user in User.objects.filter(is_active=True, status='active')
+            if PermissionService.has_project_permission(user, project, permission_code)
+        ]
 
     @staticmethod
     def on_request_created(design_request):

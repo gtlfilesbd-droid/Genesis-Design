@@ -133,40 +133,45 @@ class RolePermissionForm(forms.ModelForm):
         model = RolePermission
         fields = [
             'can_create_project', 'can_create_request', 'can_assign_designer',
-            'can_review', 'can_verify', 'can_manage_users', 'can_view_reports',
-            'can_manage_settings',
+            'can_review', 'can_verify', 'can_compliance', 'can_manage_users',
+            'can_view_reports', 'can_manage_settings',
         ]
         widgets = {f: forms.CheckboxInput(attrs={'class': 'rounded'}) for f in [
             'can_create_project', 'can_create_request', 'can_assign_designer',
-            'can_review', 'can_verify', 'can_manage_users', 'can_view_reports',
-            'can_manage_settings',
+            'can_review', 'can_verify', 'can_compliance', 'can_manage_users',
+            'can_view_reports', 'can_manage_settings',
         ]}
 
 
 DEFAULT_ROLE_PERMISSIONS = {
     UserRole.ADMIN: dict(
         can_create_project=True, can_create_request=True, can_assign_designer=True,
-        can_review=True, can_verify=True, can_manage_users=True,
+        can_review=True, can_verify=True, can_compliance=True, can_manage_users=True,
         can_view_reports=True, can_manage_settings=True,
     ),
     UserRole.HEAD_OF_DESIGN: dict(
         can_create_project=True, can_create_request=True, can_assign_designer=True,
-        can_review=True, can_verify=False, can_manage_users=False,
+        can_review=True, can_verify=False, can_compliance=False, can_manage_users=False,
         can_view_reports=True, can_manage_settings=False,
     ),
     UserRole.DESIGNER: dict(
         can_create_project=False, can_create_request=False, can_assign_designer=False,
-        can_review=False, can_verify=False, can_manage_users=False,
+        can_review=False, can_verify=False, can_compliance=False, can_manage_users=False,
         can_view_reports=False, can_manage_settings=False,
     ),
     UserRole.VERIFICATION_TEAM: dict(
         can_create_project=False, can_create_request=False, can_assign_designer=False,
-        can_review=False, can_verify=True, can_manage_users=False,
+        can_review=False, can_verify=True, can_compliance=False, can_manage_users=False,
+        can_view_reports=False, can_manage_settings=False,
+    ),
+    UserRole.COMPLIANCE_TEAM: dict(
+        can_create_project=False, can_create_request=False, can_assign_designer=False,
+        can_review=False, can_verify=False, can_compliance=True, can_manage_users=False,
         can_view_reports=False, can_manage_settings=False,
     ),
     UserRole.DESIGN_REQUESTER: dict(
         can_create_project=True, can_create_request=True, can_assign_designer=False,
-        can_review=False, can_verify=False, can_manage_users=False,
+        can_review=False, can_verify=False, can_compliance=False, can_manage_users=False,
         can_view_reports=False, can_manage_settings=False,
     ),
 }
