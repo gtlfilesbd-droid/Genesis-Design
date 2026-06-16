@@ -23,6 +23,11 @@ class ProjectForm(forms.ModelForm):
         max_length=255,
         widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Client / project name'}),
     )
+    code = forms.CharField(
+        label='Short Name',
+        max_length=50,
+        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'e.g. PRJ-001'}),
+    )
 
     class Meta:
         model = Project
@@ -31,7 +36,6 @@ class ProjectForm(forms.ModelForm):
             'start_date', 'expected_completion_date', 'description',
         ]
         widgets = {
-            'code': forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'e.g. PRJ-001'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': INPUT_CLASS}),
             'expected_completion_date': forms.DateInput(attrs={'type': 'date', 'class': INPUT_CLASS}),
             'address': forms.Textarea(attrs={'rows': 2, 'class': INPUT_CLASS}),
