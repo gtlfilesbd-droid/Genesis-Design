@@ -20,9 +20,12 @@
     <div class="flex items-center gap-3">
         <a href="{% url 'notifications:list' %}" class="relative p-2 rounded-lg hover:bg-slate-100 text-slate-600">
             <i data-lucide="bell" class="w-5 h-5"></i>
-            {% if unread_notification_count %}
-            <span class="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{{ unread_notification_count }}</span>
-            {% endif %}
+            <span id="notification-badge"
+                  hx-get="{% url 'api:notification_badge' %}"
+                  hx-trigger="every 15s"
+                  hx-swap="innerHTML">
+                {% include 'components/notification_badge.html' %}
+            </span>
         </a>
         <a href="{% url 'accounts:profile' %}" class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg hover:bg-slate-100">
             {% render_user_avatar user size_class='w-8 h-8' fallback_class='bg-[#1A3C6E] text-white text-xs' %}

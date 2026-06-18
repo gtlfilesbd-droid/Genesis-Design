@@ -71,13 +71,7 @@ class SRSWorkflowFlowTests(TestCase):
         self.assertEqual(self.design.status, DesignStatus.CORRECTION_REQUIRED)
         self.assertEqual(self.design.revision_count, 1)
 
-        transition(self.design, 'resubmit', self.designer)
-        transition(
-            self.design, 'submit_work', self.designer,
-            file_name='ID-02.dwg',
-            revision_date=timezone.localdate(),
-            notes='Fixed',
-        )
+        transition(self.design, 'resubmit', self.designer, comments='Fixed')
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.UNDER_REVIEW)
 

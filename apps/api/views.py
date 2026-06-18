@@ -2,8 +2,8 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_GET, require_POST
 
 from apps.designs.models import DesignRequest
 from apps.notifications.models import Notification
@@ -44,3 +44,40 @@ def api_mark_notification_read(request):
     notification.read_at = timezone.now()
     notification.save(update_fields=['read_at'])
     return JsonResponse({'success': True})
+
+
+@login_required
+@require_GET
+def api_notification_unread_count(request):
+    count = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
+    return JsonResponse({'count': count})
+
+
+@login_required
+@require_GET
+def api_notification_badge(request):
+    count = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
+    return render(request, 'components/notification_badge.html', {
+        'unread_notification_count': count,
+    })
+
+
+@login_required
+@require_GET
+def api_notification_recent(request):
+    recent = Notification.objects.filter(user=request.user).order_by('-created_at')[:5]
+    unread = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
+    return JsonResponse({
+        'unread_count': unread,
+        'notifications': [
+            {
+                'id': n.pk,
+                'title': n.title,
+                'message': n.message,
+                'link': n.link,
+                'read': n.read_at is not None,
+                'created_at': n.created_at.isoformat(),
+            }
+            for n in recent
+        ],
+    })

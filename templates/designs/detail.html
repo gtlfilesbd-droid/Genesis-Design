@@ -3,9 +3,15 @@
 {% block title %}{{ design.design_number }}{% endblock %}
 {% block content %}
 <div class="mb-6">
+    {% if can_view_project %}
     <a href="{% url 'projects:detail' design.project.pk %}" class="text-sm text-slate-500 hover:text-primary-light inline-flex items-center gap-1 mb-3">
         <i data-lucide="arrow-left" class="w-4 h-4"></i> {{ design.project.client_name }}
     </a>
+    {% else %}
+    <p class="text-sm text-slate-500 mb-3 inline-flex items-center gap-1">
+        <i data-lucide="folder" class="w-4 h-4"></i> {{ design.project.client_name }}
+    </p>
+    {% endif %}
     <div class="flex flex-wrap items-center gap-3">
         <h1 class="text-[28px] font-bold text-slate-900">{{ design.design_number }}</h1>
         {% render_priority_badge design.priority %}
@@ -47,6 +53,18 @@
                 <div><dt class="text-slate-500">Target Date</dt><dd class="font-medium">{{ design.target_completion_date|date:"d M Y"|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Revisions</dt><dd class="font-medium">{{ design.revision_count }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Message</dt><dd>{{ design.request_message|default:"—" }}</dd></div>
+            </dl>
+        </div>
+
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Project Information</h2>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div><dt class="text-slate-500">Client Name</dt><dd class="font-medium">{{ design.project.client_name }}</dd></div>
+                <div><dt class="text-slate-500">Short Name</dt><dd class="font-medium font-mono">{{ design.project.code }}</dd></div>
+                <div class="col-span-2"><dt class="text-slate-500">Address</dt><dd>{{ design.project.address|default:"—" }}</dd></div>
+                <div><dt class="text-slate-500">Start Date</dt><dd class="font-medium">{{ design.project.start_date|date:"d M Y" }}</dd></div>
+                <div><dt class="text-slate-500">Target Completion</dt><dd class="font-medium">{{ design.project.expected_completion_date|date:"d M Y"|default:"—" }}</dd></div>
+                <div class="col-span-2"><dt class="text-slate-500">Description</dt><dd>{{ design.project.description|default:"—" }}</dd></div>
             </dl>
         </div>
 
@@ -185,8 +203,8 @@
                 {% if design.status == 'assigned' and can_do_design_work and user == design.assigned_designer %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'accept_assignment' %}">{% csrf_token %}<button class="g-btn-primary w-full">Accept Assignment</button></form>
                 {% endif %}
-                {% if design.status == 'in_progress' or design.status == 'resubmitted' %}
-                {% if can_submit_work %}
+                {% if design.status == 'in_progress' %}
+                {% if can_submit_work and user == design.assigned_designer %}
                 <a href="{% url 'workflow:action' design.pk 'submit_work' %}" class="g-btn-primary w-full block text-center">Submit Work</a>
                 {% endif %}
                 {% endif %}
@@ -200,7 +218,7 @@
                 {% endif %}
                 {% endif %}
                 {% if design.status == 'correction_required' and can_revise and user == design.assigned_designer %}
-                <form method="post" action="{% url 'workflow:action' design.pk 'resubmit' %}">{% csrf_token %}<button class="g-btn-primary w-full">Resubmit</button></form>
+                <a href="{% url 'workflow:action' design.pk 'resubmit' %}" class="g-btn-primary w-full block text-center">Resubmit</a>
                 {% endif %}
                 {% if design.status == 'verification_pending' and can_verify %}
                 <a href="{% url 'workflow:action' design.pk 'verify_approved' %}" class="g-btn-primary w-full block text-center">Accept</a>

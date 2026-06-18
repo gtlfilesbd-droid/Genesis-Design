@@ -103,6 +103,21 @@ class NotificationService:
         )
 
     @staticmethod
+    def on_assignment_accepted(design_request, actor):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_ASSIGN',
+        )
+        recipients = [u for u in users if u and u.pk != actor.pk]
+        title = f'Assignment Accepted: {design_request.design_number}'
+        message = (
+            f'{actor.get_full_name() or actor.username} has accepted the assignment '
+            f'for design request {design_request.design_number}.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
     def on_work_submitted(design_request):
         users = NotificationService._project_users(
             design_request.project, 'PROJECT_PERM_REVIEW',
@@ -316,6 +331,7 @@ def notify_workflow_transition(design, action, actor):
         'submit_request': NotificationService.on_request_created,
         'acknowledge': NotificationService.on_request_acknowledged,
         'assign': NotificationService.on_designer_assigned,
+        'accept_assignment': NotificationService.on_assignment_accepted,
         'submit_work': NotificationService.on_work_submitted,
         'request_correction': NotificationService.on_correction_required,
         'resubmit': NotificationService.on_work_submitted,
@@ -332,7 +348,10 @@ def notify_workflow_transition(design, action, actor):
     }
     handler = handlers.get(action)
     if handler:
-        handler(design)
+        if action == 'accept_assignment':
+            handler(design, actor)
+        else:
+            handler(design)
 
 
 def _notify_send_to_verification(design):

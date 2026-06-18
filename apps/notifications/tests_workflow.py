@@ -58,3 +58,15 @@ class NotificationServiceTests(TestCase):
         self.assertTrue(
             Notification.objects.filter(user=self.designer, title__contains='Assignment').exists()
         )
+
+    def test_accept_assignment_notifies_hod(self):
+        self.design.assigned_designer = self.designer
+        self.design.status = DesignStatus.ASSIGNED
+        self.design.save()
+        notify_workflow_transition(self.design, 'accept_assignment', self.designer)
+        self.assertTrue(
+            Notification.objects.filter(user=self.hod, title__contains='Assignment Accepted').exists()
+        )
+        self.assertFalse(
+            Notification.objects.filter(user=self.designer, title__contains='Assignment Accepted').exists()
+        )

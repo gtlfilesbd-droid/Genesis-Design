@@ -9,7 +9,7 @@ from apps.accounts.models import User, UserRole
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DesignSubmission, DrawingType, RequestAttachment
 from apps.projects.models import Project
-from apps.workflow.services import WorkflowError, transition
+from apps.workflow.services import transition
 
 
 class ReferenceOnlyFileStorageTests(TestCase):
@@ -58,21 +58,14 @@ class ReferenceOnlyFileStorageTests(TestCase):
         self.assertIsNotNone(design)
         self.assertEqual(RequestAttachment.objects.filter(design=design).count(), 0)
 
-    def test_submit_work_requires_file_name(self):
-        with self.assertRaises(WorkflowError):
-            transition(self.design, 'submit_work', self.designer, notes='No name')
-
-        transition(
-            self.design, 'submit_work', self.designer,
-            file_name='ID-01.dwg',
-            revision_date=timezone.localdate(),
-            internal_file_reference='\\\\server\\drawings\\ID-01.dwg',
-            change_summary='Initial submit',
-        )
+    def test_submit_work_auto_generates_metadata(self):
+        transition(self.design, 'submit_work', self.designer, comments='Initial submit')
         self.design.refresh_from_db()
         submission = DesignSubmission.objects.get(design=self.design)
-        self.assertEqual(submission.file_name, 'ID-01.dwg')
+        self.assertTrue(submission.file_name.endswith('-V01'))
+        self.assertIn('ID', submission.file_name)
         self.assertIsNotNone(submission.revision_date)
+        self.assertEqual(submission.change_summary, 'Initial submit')
         self.assertFalse(submission.file)
 
     def test_design_detail_hides_attachment_download_urls(self):

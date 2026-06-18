@@ -1,5 +1,6 @@
 from django.urls import reverse
 
+from apps.accounts.models import UserRole
 from .services import PermissionService
 
 
@@ -103,9 +104,14 @@ def user_permissions(request):
             'can_comment': ps.has_project_permission(user, design_project, 'PROJECT_PERM_COMMENT'),
             'can_acknowledge': ps.has_project_permission(user, design_project, 'PROJECT_PERM_ASSIGN'),
             'can_submit_work': (
-                ps.has_project_permission(user, design_project, 'DESIGN_PERM_WORK')
-                and current_design.assigned_designer_id == user.pk
-            ) or ps.has_project_permission(user, design_project, 'PROJECT_PERM_ASSIGN'),
+                current_design.assigned_designer_id == user.pk
+                and (
+                    ps.has_project_permission(user, design_project, 'DESIGN_PERM_WORK')
+                    or user.role in (
+                        UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN,
+                    )
+                )
+            ),
             'can_cancel_request': (
                 ps.has_project_permission(user, design_project, 'PROJECT_PERM_REQUEST')
                 and current_design.requested_by_id == user.pk

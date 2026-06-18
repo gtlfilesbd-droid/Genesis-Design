@@ -1,4 +1,5 @@
 from apps.accounts.models import UserRole
+from apps.accounts.models import UserRole
 from apps.permissions.services import PermissionService
 from apps.workflow.services import WORKFLOW_ACTIONS
 
@@ -20,6 +21,18 @@ def can_run_workflow_action(user, project, action: str, permission_code: str) ->
     return PermissionService.has_project_permission(user, project, permission_code)
 
 
+def can_user_submit_work(user, design) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if not design.assigned_designer_id or design.assigned_designer_id != user.pk:
+        return False
+    project = design.project
+    return (
+        PermissionService.has_project_permission(user, project, 'DESIGN_PERM_WORK')
+        or user.role in (UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN)
+    )
+
+
 def design_action_flags(user, design) -> dict:
     project = design.project
     return {
@@ -33,12 +46,9 @@ def design_action_flags(user, design) -> dict:
             PermissionService.has_project_permission(user, project, 'DESIGN_PERM_WORK')
             or workflow_role_allows(user, 'accept_assignment')
         ),
-        'can_submit_work': (
-            (
-                PermissionService.has_project_permission(user, project, 'DESIGN_PERM_WORK')
-                and design.assigned_designer_id == user.pk
-            )
-            or can_run_workflow_action(user, project, 'submit_work', 'PROJECT_PERM_ASSIGN')
+        'can_submit_work': can_user_submit_work(user, design),
+        'can_view_project': PermissionService.has_project_permission(
+            user, project, 'PROJECT_PERM_VIEW',
         ),
         'can_review': can_run_workflow_action(
             user, project, 'send_to_verification', 'PROJECT_PERM_REVIEW',

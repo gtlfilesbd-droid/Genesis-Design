@@ -34,12 +34,12 @@ WORKFLOW_ACTIONS = {
     'accept_assignment': {
         'from': [DesignStatus.ASSIGNED],
         'to': DesignStatus.IN_PROGRESS,
-        'roles': [UserRole.DESIGNER, UserRole.ADMIN],
+        'roles': [UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
     'submit_work': {
-        'from': [DesignStatus.IN_PROGRESS, DesignStatus.RESUBMITTED],
+        'from': [DesignStatus.IN_PROGRESS],
         'to': DesignStatus.SUBMITTED,
-        'roles': [UserRole.DESIGNER, UserRole.ADMIN],
+        'roles': [UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
     'start_review': {
         'from': [DesignStatus.SUBMITTED],
@@ -54,8 +54,8 @@ WORKFLOW_ACTIONS = {
     },
     'resubmit': {
         'from': [DesignStatus.CORRECTION_REQUIRED],
-        'to': DesignStatus.RESUBMITTED,
-        'roles': [UserRole.DESIGNER, UserRole.ADMIN],
+        'to': DesignStatus.SUBMITTED,
+        'roles': [UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
     'send_to_verification': {
         'from': [
@@ -130,10 +130,45 @@ WORKFLOW_ACTIONS = {
     },
 }
 
+_ASSIGNABLE_ROLES = frozenset({
+    UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN,
+})
+
 _CORRECTION_FROM_STATES = frozenset({
     DesignStatus.VERIFICATION_CORRECTION,
     DesignStatus.COMPLIANCE_CORRECTION,
 })
+
+
+def _build_auto_submission_metadata(design, comment=''):
+    version = design.submissions.count() + 1
+    prefix = design.drawing_type.code_prefix or 'DWG'
+    prev = design.submissions.order_by('-version_number').first()
+    return {
+        'file_name': f'{design.design_number}-{prefix}-V{version:02d}',
+        'revision_date': timezone.localdate(),
+        'internal_file_reference': (
+            prev.internal_file_reference if prev
+            else f'{design.project.code}/{design.design_number}'
+        ),
+        'change_summary': comment,
+        'notes': comment,
+    }
+
+
+def _create_design_submission(design, user, comment=''):
+    metadata = _build_auto_submission_metadata(design, comment)
+    version = design.submissions.count() + 1
+    return DesignSubmission.objects.create(
+        design=design,
+        version_number=version,
+        file_name=metadata['file_name'],
+        revision_date=metadata['revision_date'],
+        internal_file_reference=metadata['internal_file_reference'],
+        notes=metadata['notes'],
+        change_summary=metadata['change_summary'],
+        submitted_by=user,
+    )
 
 
 class WorkflowError(Exception):
@@ -287,9 +322,11 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     comments = kwargs.get('comments', '')
     hod = get_head_of_design()
 
+    hod_self_assigned = False
+
     if action == 'assign':
         designer = kwargs.get('designer')
-        if not designer or designer.role != UserRole.DESIGNER:
+        if not designer or designer.role not in _ASSIGNABLE_ROLES:
             raise WorkflowError('A valid designer must be selected.')
         if old_status in _CORRECTION_FROM_STATES:
             design.revision_count += 1
@@ -300,6 +337,9 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         design.due_date = due_date
         design.assignment_instructions = instructions
         design.current_holder = designer
+        hod_self_assigned = (
+            designer.pk == user.pk and user.role == UserRole.HEAD_OF_DESIGN
+        )
         DesignAssignment.objects.create(
             design=design,
             designer=designer,
@@ -307,6 +347,8 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             due_date=due_date,
             instructions=instructions,
         )
+        if hod_self_assigned:
+            new_status = DesignStatus.IN_PROGRESS
 
     elif action == 'acknowledge':
         _start_deadline(design)
@@ -392,25 +434,8 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             reviewed_by=user,
         )
 
-    elif action == 'submit_work':
-        file_name = (kwargs.get('file_name') or '').strip()
-        if not file_name:
-            raise WorkflowError('File name is required.')
-        revision_date = kwargs.get('revision_date') or timezone.localdate()
-        file_ref = kwargs.get('internal_file_reference', '')
-        notes = kwargs.get('notes', '')
-        change_summary = kwargs.get('change_summary', '')
-        version = design.submissions.count() + 1
-        DesignSubmission.objects.create(
-            design=design,
-            version_number=version,
-            file_name=file_name,
-            revision_date=revision_date,
-            internal_file_reference=file_ref,
-            notes=notes,
-            change_summary=change_summary,
-            submitted_by=user,
-        )
+    elif action in ('submit_work', 'resubmit'):
+        _create_design_submission(design, user, comments)
         design.current_holder = hod or user
 
     elif action == 'accept_assignment':
@@ -437,8 +462,11 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     design.status = new_status
     design.save()
 
-    if action == 'submit_work':
+    if action in ('submit_work', 'resubmit'):
         transition(design, 'start_review', hod or user, request=request, skip_permission=True)
+
+    if action == 'assign' and hod_self_assigned:
+        _start_stage(design, 'design', user)
 
     _start_stage(design, new_status, user)
     update_deadline_status(design)

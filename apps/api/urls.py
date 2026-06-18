@@ -14,4 +14,7 @@ urlpatterns = [
     path('requests/<int:pk>/complete/', views.api_workflow_action, {'action': 'complete'}, name='complete'),
     path('requests/<int:pk>/cancel/', views.api_workflow_action, {'action': 'cancel'}, name='cancel'),
     path('notifications/mark-read/', views.api_mark_notification_read, name='mark_notification_read'),
+    path('notifications/unread-count/', views.api_notification_unread_count, name='notification_unread_count'),
+    path('notifications/badge/', views.api_notification_badge, name='notification_badge'),
+    path('notifications/recent/', views.api_notification_recent, name='notification_recent'),
 ]

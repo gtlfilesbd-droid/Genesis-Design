@@ -8,10 +8,8 @@ from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 
-from django.utils import timezone
-
 from .services import WorkflowError, suggest_designer, transition
-from .permissions import can_run_workflow_action, design_action_flags
+from .permissions import can_run_workflow_action, can_user_submit_work, design_action_flags
 
 
 INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
@@ -29,39 +27,12 @@ class AssignDesignerForm(forms.Form):
     instructions = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
 
 
-class SubmitWorkForm(forms.Form):
-    file_name = forms.CharField(
-        max_length=255,
-        required=True,
-        label='File name',
-        widget=forms.TextInput(attrs={'class': INPUT, 'placeholder': 'e.g. ID-01-Foundation.dwg'}),
-    )
-    revision_date = forms.DateField(
-        required=True,
-        initial=timezone.localdate,
-        label='Revision date',
-        widget=forms.DateInput(attrs={'type': 'date', 'class': INPUT}),
-    )
-    internal_file_reference = forms.CharField(
-        max_length=500,
-        required=False,
-        label='Internal file path / reference',
-        widget=forms.TextInput(attrs={'class': INPUT, 'placeholder': 'UNC path or repository ID'}),
-    )
-    change_summary = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 2, 'class': INPUT}),
-        required=False,
-        label='Change summary',
-    )
-    notes = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
-        required=False,
-        label='Additional notes',
-    )
-
-
 class CommentForm(forms.Form):
-    comments = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
+    comments = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4, 'class': INPUT, 'placeholder': 'Add a comment (optional)'}),
+        required=False,
+        label='Comment',
+    )
 
 
 class SendToVerificationForm(forms.Form):
@@ -72,7 +43,7 @@ class SendToVerificationForm(forms.Form):
     )
     comments = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
-        required=True,
+        required=False,
         label='Message',
     )
 
@@ -125,14 +96,12 @@ def _check_workflow_permission(request, design, action):
     if not required:
         return True
     project = design.project
-    if action in ('accept_assignment', 'submit_work'):
+    if action in ('accept_assignment', 'submit_work', 'resubmit'):
+        if action in ('submit_work', 'resubmit'):
+            return can_user_submit_work(request.user, design)
         if can_run_workflow_action(request.user, project, action, required):
             return True
-        if action == 'accept_assignment' and design.assigned_designer_id == request.user.pk:
-            return PermissionService.has_project_permission(
-                request.user, project, 'DESIGN_PERM_WORK',
-            )
-        if action == 'submit_work' and design.assigned_designer_id == request.user.pk:
+        if design.assigned_designer_id == request.user.pk:
             return PermissionService.has_project_permission(
                 request.user, project, 'DESIGN_PERM_WORK',
             )
@@ -149,7 +118,8 @@ def workflow_action(request, pk, action):
 
     form_actions = {
         'assign': AssignDesignerForm,
-        'submit_work': SubmitWorkForm,
+        'submit_work': CommentForm,
+        'resubmit': CommentForm,
         'request_correction': CommentForm,
         'verification_correction': CommentForm,
         'compliance_correction': CommentForm,
@@ -181,8 +151,8 @@ def workflow_action(request, pk, action):
                         'design': design, 'action': action, 'form': form,
                     })
                 kwargs = form.cleaned_data
-            elif action == 'submit_work':
-                form = SubmitWorkForm(request.POST)
+            elif action in ('submit_work', 'resubmit'):
+                form = CommentForm(request.POST)
                 if not form.is_valid():
                     from apps.core.models import CompanySettings
                     company = CompanySettings.objects.first()
@@ -190,7 +160,7 @@ def workflow_action(request, pk, action):
                         'design': design, 'action': action, 'form': form,
                         'file_sharing_policy': company.file_sharing_policy if company else '',
                     })
-                kwargs = form.cleaned_data
+                kwargs['comments'] = form.cleaned_data.get('comments', '')
             elif action in ('send_to_verification', 'accept_design'):
                 form = SendToVerificationForm(request.POST, project=design.project)
                 if not form.is_valid():

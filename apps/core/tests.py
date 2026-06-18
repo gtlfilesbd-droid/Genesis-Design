@@ -63,12 +63,7 @@ class WorkflowTests(TestCase):
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.IN_PROGRESS)
 
-        transition(
-            self.design, 'submit_work', self.designer,
-            file_name='ID-01.dwg',
-            revision_date=timezone.localdate(),
-            notes='Done',
-        )
+        transition(self.design, 'submit_work', self.designer, comments='Done')
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.UNDER_REVIEW)
 
