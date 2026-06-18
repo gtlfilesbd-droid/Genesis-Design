@@ -4,32 +4,47 @@
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 
-<div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-8 mb-6">
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mt-8 mb-6">
     {% url 'my_tasks:list' as my_tasks_url %}
     {% url 'requests:list' as requests_list_url %}
     {% include 'components/stat_card.html' with label='Assigned' value=assigned_total icon='clipboard-list' url=my_tasks_url %}
     {% include 'components/stat_card.html' with label='Running' value=running icon='loader' icon_bg='bg-blue-50' icon_color='text-blue-600' url=requests_list_url|add:'?status=in_progress&mine=1' %}
     {% include 'components/stat_card.html' with label='Corrections' value=corrections icon='rotate-ccw' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=correction_required&mine=1' %}
+    {% include 'components/stat_card.html' with label='Rework' value=rework_count icon='repeat' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?mine=1' %}
     {% include 'components/stat_card.html' with label='Completed' value=completed icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' url=requests_list_url|add:'?status=completed&mine=1' %}
     {% include 'components/stat_card.html' with label='Overdue' value=overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue url=requests_list_url|add:'?overdue=1&mine=1' %}
+</div>
+
+<div class="g-card p-6 mb-6">
+    <h2 class="text-base font-semibold text-slate-900 mb-4">Productivity</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
+        <div><p class="text-slate-500">Avg Completion</p><p class="text-xl font-bold text-slate-900">{% if productivity.avg_completion_days %}{{ productivity.avg_completion_days }} days{% else %}—{% endif %}</p></div>
+        <div><p class="text-slate-500">Fastest</p><p class="text-xl font-bold text-green-600">{% if productivity.fastest_days %}{{ productivity.fastest_days }} days{% else %}—{% endif %}</p></div>
+        <div><p class="text-slate-500">Slowest</p><p class="text-xl font-bold text-amber-600">{% if productivity.slowest_days %}{{ productivity.slowest_days }} days{% else %}—{% endif %}</p></div>
+        <div><p class="text-slate-500">Monthly Output</p><p class="text-xl font-bold text-slate-900">{{ productivity.monthly_output }}</p></div>
+        <div><p class="text-slate-500">Yearly Output</p><p class="text-xl font-bold text-slate-900">{{ productivity.yearly_output }}</p></div>
+    </div>
 </div>
 
 <h2 class="text-lg font-semibold text-slate-900 mb-4">My Designs</h2>
 <div class="g-card overflow-x-auto">
     <table class="g-table w-full">
-        <thead><tr><th>Design</th><th>Project</th><th>Status</th><th>Due</th><th>Revisions</th><th></th></tr></thead>
+        <thead><tr><th>Design</th><th>Project</th><th>Request Date</th><th>Assigned</th><th>Due</th><th>Status</th><th>Stage</th><th>Revisions</th><th></th></tr></thead>
         <tbody>
         {% for d in my_designs %}
         <tr>
             <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
             <td>{{ d.project.code }}</td>
+            <td class="text-slate-500">{{ d.created_at|date:"d M Y, h:i A" }}</td>
+            <td class="text-slate-500">{{ d.latest_assigned_at|date:"d M Y, h:i A"|default:"—" }}</td>
+            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"d M Y, h:i A"|default:"—" }}</td>
             <td>{% render_status_badge d.status %}</td>
-            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"M d"|default:"—" }}</td>
+            <td class="text-slate-500">{{ d.get_status_display }}</td>
             <td>{{ d.revision_count }}</td>
             <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">Open →</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-slate-500 py-8">No assigned designs.</td></tr>
+        <tr><td colspan="9" class="text-center text-slate-500 py-8">No assigned designs.</td></tr>
         {% endfor %}
         </tbody>
     </table>

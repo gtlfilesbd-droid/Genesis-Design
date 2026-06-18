@@ -3,6 +3,28 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.mail import send_mail
 
+from apps.core.notification_messages import (
+    acknowledged_message,
+    assignment_accepted_message,
+    compliance_acknowledged_message,
+    compliance_approved_message,
+    compliance_correction_message,
+    correction_required_message,
+    design_accepted_message,
+    design_approved_message,
+    design_completed_message,
+    designer_assigned_message,
+    designer_assigned_requester_message,
+    hod_fast_complete_message,
+    request_created_message,
+    sent_to_compliance_message,
+    sent_to_compliance_requester_message,
+    sent_to_verification_message,
+    verification_acknowledged_message,
+    verification_approved_message,
+    verification_correction_message,
+    work_submitted_message,
+)
 from apps.permissions.services import PermissionService
 
 from .models import Notification, NotificationSetting, NotificationType
@@ -98,10 +120,7 @@ class NotificationService:
             design_request.project, 'PROJECT_PERM_ASSIGN',
         )
         title = f'New Design Request: {design_request.design_number}'
-        message = (
-            f'A new design request {design_request.design_number} was submitted '
-            f'for project {design_request.project.code}.'
-        )
+        message = request_created_message(design_request)
         NotificationService._notify_many(
             users, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -109,10 +128,8 @@ class NotificationService:
     @staticmethod
     def on_request_acknowledged(design_request):
         title = f'Request Acknowledged: {design_request.design_number}'
-        message = (
-            f'Design request {design_request.design_number} has been acknowledged '
-            f'and is being processed.'
-        )
+        hod_name = design_request.current_holder.get_full_name() if design_request.current_holder else 'Head of Design'
+        message = acknowledged_message(design_request, hod_name)
         NotificationService._notify_many(
             NotificationService._requester_side_recipients(design_request),
             NotificationType.WORKFLOW,
@@ -124,10 +141,7 @@ class NotificationService:
     @staticmethod
     def on_designer_assigned(design_request):
         title = f'Assignment: {design_request.design_number}'
-        message = (
-            f'You have been assigned to design request {design_request.design_number} '
-            f'for project {design_request.project.code}.'
-        )
+        message = designer_assigned_message(design_request)
         NotificationService.notify(
             design_request.assigned_designer,
             NotificationType.WORKFLOW,
@@ -136,10 +150,7 @@ class NotificationService:
             related_request=design_request,
         )
         requester_title = f'Designer Assigned: {design_request.design_number}'
-        requester_message = (
-            f'A designer has been assigned to your request {design_request.design_number} '
-            f'for project {design_request.project.code}.'
-        )
+        requester_message = designer_assigned_requester_message(design_request)
         NotificationService._notify_many(
             NotificationService._requester_side_recipients(design_request),
             NotificationType.WORKFLOW,
@@ -158,10 +169,7 @@ class NotificationService:
             exclude=actor,
         )
         title = f'Assignment Accepted: {design_request.design_number}'
-        message = (
-            f'{actor.get_full_name() or actor.username} has accepted the assignment '
-            f'for design request {design_request.design_number}.'
-        )
+        message = assignment_accepted_message(design_request, actor)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -175,10 +183,7 @@ class NotificationService:
             NotificationService._requester_side_recipients(design_request),
         )
         title = f'Work Submitted: {design_request.design_number}'
-        message = (
-            f'Design work has been submitted for {design_request.design_number} '
-            f'and is ready for review.'
-        )
+        message = work_submitted_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -186,10 +191,7 @@ class NotificationService:
     @staticmethod
     def on_correction_required(design_request):
         title = f'Correction Required: {design_request.design_number}'
-        message = (
-            f'Corrections are required on design request {design_request.design_number}. '
-            f'Please review the feedback and resubmit.'
-        )
+        message = correction_required_message(design_request)
         NotificationService.notify(
             design_request.assigned_designer,
             NotificationType.WORKFLOW,
@@ -205,10 +207,7 @@ class NotificationService:
             [design_request.assigned_designer] if design_request.assigned_designer_id else [],
         )
         title = f'Design Accepted: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} has been accepted by review '
-            f'and will proceed to verification.'
-        )
+        message = design_accepted_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -220,9 +219,7 @@ class NotificationService:
             verifiers = PermissionService.get_verifiers(design_request.project)
             verifier = verifiers.first()
         title = f'Verification Required: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} is pending verification.'
-        )
+        message = sent_to_verification_message(design_request)
         if verifier:
             NotificationService.notify(
                 verifier,
@@ -252,9 +249,7 @@ class NotificationService:
             NotificationService._requester_side_recipients(design_request),
         )
         title = f'Verification Correction: {design_request.design_number}'
-        message = (
-            f'Verification corrections are required for {design_request.design_number}.'
-        )
+        message = verification_correction_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -268,9 +263,9 @@ class NotificationService:
             NotificationService._requester_side_recipients(design_request),
         )
         title = f'Verification Approved: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} has passed verification. '
-            f'Please forward to compliance or mark complete.'
+        message = verification_approved_message(
+            design_request,
+            design_request.verified_by.get_full_name() if design_request.verified_by else 'Verifier',
         )
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
@@ -286,10 +281,8 @@ class NotificationService:
             exclude=actor,
         )
         title = f'Verification Acknowledged: {design_request.design_number}'
-        message = (
-            f'{actor.get_full_name() or actor.username} has acknowledged '
-            f'verification for {design_request.design_number}.'
-        )
+        verifier_name = actor.get_full_name() or actor.username
+        message = verification_acknowledged_message(design_request, verifier_name)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -304,10 +297,8 @@ class NotificationService:
             exclude=actor,
         )
         title = f'Compliance Acknowledged: {design_request.design_number}'
-        message = (
-            f'{actor.get_full_name() or actor.username} has acknowledged '
-            f'compliance review for {design_request.design_number}.'
-        )
+        compliance_name = actor.get_full_name() or actor.username
+        message = compliance_acknowledged_message(design_request, compliance_name)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -316,9 +307,7 @@ class NotificationService:
     def on_sent_to_compliance(design_request):
         officer = design_request.assigned_compliance_officer or design_request.current_holder
         title = f'Compliance Review Required: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} is pending compliance review.'
-        )
+        message = sent_to_compliance_message(design_request)
         if officer:
             NotificationService.notify(
                 officer,
@@ -336,9 +325,7 @@ class NotificationService:
                 design_request,
             )
         requester_title = f'Sent to Compliance: {design_request.design_number}'
-        requester_message = (
-            f'Design {design_request.design_number} has been sent for compliance review.'
-        )
+        requester_message = sent_to_compliance_requester_message(design_request)
         NotificationService._notify_many(
             NotificationService._requester_side_recipients(design_request),
             NotificationType.WORKFLOW,
@@ -359,9 +346,7 @@ class NotificationService:
             NotificationService._requester_side_recipients(design_request),
         )
         title = f'Compliance Correction: {design_request.design_number}'
-        message = (
-            f'Compliance corrections are required for {design_request.design_number}.'
-        )
+        message = compliance_correction_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -376,9 +361,11 @@ class NotificationService:
             [design_request.assigned_designer] if design_request.assigned_designer_id else [],
         )
         title = f'Design Approved: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} has been approved by compliance.'
+        officer_name = (
+            design_request.approved_by_compliance.get_full_name()
+            if design_request.approved_by_compliance else 'Compliance officer'
         )
+        message = compliance_approved_message(design_request, officer_name)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -390,9 +377,7 @@ class NotificationService:
             [design_request.assigned_designer] if design_request.assigned_designer_id else [],
         )
         title = f'Design Completed: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} has been fast-tracked to completed.'
-        )
+        message = hod_fast_complete_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -405,9 +390,7 @@ class NotificationService:
             [design_request.verified_by] if design_request.verified_by_id else [],
         )
         title = f'Design Approved: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} has been approved.'
-        )
+        message = design_approved_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
@@ -419,9 +402,7 @@ class NotificationService:
             [design_request.assigned_designer] if design_request.assigned_designer_id else [],
         )
         title = f'Design Completed: {design_request.design_number}'
-        message = (
-            f'Design {design_request.design_number} has been marked as completed.'
-        )
+        message = design_completed_message(design_request)
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,
         )

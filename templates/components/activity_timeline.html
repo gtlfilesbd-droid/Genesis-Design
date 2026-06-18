@@ -1,0 +1,20 @@
+{% load genesis_ui %}
+<div class="relative pl-5">
+    <div class="absolute left-[4px] top-2 bottom-2 w-px bg-[#E2E8F0]"></div>
+    <div class="space-y-5 max-h-96 overflow-y-auto">
+        {% for log in logs %}
+        <div class="relative pl-5">
+            {% if log.action == 'complete' or log.action == 'hod_fast_complete' %}
+            <div class="absolute left-[-1px] top-1 w-3.5 h-3.5 rounded-full ring-2 ring-white" style="background-color: {{ log.action|activity_dot_color }};"></div>
+            {% else %}
+            <div class="absolute left-0 top-1.5 w-2.5 h-2.5 rounded-full ring-2 ring-white" style="background-color: {{ log.action|activity_dot_color }};"></div>
+            {% endif %}
+            <p class="text-sm font-semibold text-[#0F172A]">{{ log.action|activity_title }}</p>
+            <p class="text-[13px] text-[#64748B] mt-0.5">{{ log.description|default:log.action }}</p>
+            <p class="text-xs text-[#94A3B8] mt-1">{{ log.created_at|datetime_with_hint }}</p>
+        </div>
+        {% empty %}
+        <p class="text-sm text-slate-500">No activity yet.</p>
+        {% endfor %}
+    </div>
+</div>

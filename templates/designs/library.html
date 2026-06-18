@@ -32,7 +32,7 @@
             <td>{{ d.project.code }}</td>
             <td>{{ d.project.client_name }}</td>
             <td>{{ d.assigned_designer|default:"—" }}</td>
-            <td class="text-slate-500">{{ d.completion_date|date:"d M Y"|default:"—" }}</td>
+            <td class="text-slate-500">{{ d.completion_date|date:"d M Y, h:i A"|default:"—" }}</td>
             <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
         </tr>
         {% empty %}

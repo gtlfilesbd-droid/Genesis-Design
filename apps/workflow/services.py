@@ -511,14 +511,22 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         _start_stage(design, new_status, user)
     update_deadline_status(design)
 
+    from apps.core.activity_messages import (
+        build_project_activity_description,
+        build_workflow_activity_description,
+    )
+    activity_context = {**kwargs, 'hod_self_assigned': hod_self_assigned}
+    activity_description = build_workflow_activity_description(
+        action, user, design, **activity_context,
+    )
     log_activity(
         'design_request', design.pk, user, action,
-        f'Status changed from {old_status} to {new_status}',
+        activity_description,
         {'old_status': old_status, 'new_status': new_status, 'comments': comments},
     )
     log_activity(
         'project', design.project_id, user, action,
-        f'Design {design.design_number}: {old_status} → {new_status}',
+        build_project_activity_description(action, user, design, **activity_context),
     )
     log_audit(
         user, action, 'design_request', design.pk,

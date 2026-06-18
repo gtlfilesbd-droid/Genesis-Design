@@ -47,7 +47,7 @@
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Request Information</h2>
             <dl class="grid grid-cols-2 gap-4 text-sm">
                 <div><dt class="text-slate-500">Requested By</dt><dd class="font-medium">{{ design.requested_by }}</dd></div>
-                <div><dt class="text-slate-500">Request Date</dt><dd class="font-medium">{{ design.created_at|date:"d M Y" }}</dd></div>
+                <div><dt class="text-slate-500">Request Date</dt><dd class="font-medium">{{ design.created_at|date:"d M Y, h:i A" }}</dd></div>
                 <div><dt class="text-slate-500">Drawing Type</dt><dd class="font-medium">{{ design.drawing_type.name }}</dd></div>
                 <div><dt class="text-slate-500">Priority</dt><dd>{% render_priority_badge design.priority %}</dd></div>
                 <div><dt class="text-slate-500">Target Date</dt><dd class="font-medium">{{ design.target_completion_date|date:"d M Y"|default:"—" }}</dd></div>
@@ -74,7 +74,7 @@
             <dl class="grid grid-cols-2 gap-4 text-sm">
                 <div><dt class="text-slate-500">Assigned To</dt><dd class="font-medium">{{ design.assigned_designer }}</dd></div>
                 <div><dt class="text-slate-500">Assigned By</dt><dd class="font-medium">{{ design.assigned_by|default:"—" }}</dd></div>
-                <div><dt class="text-slate-500">Due Date</dt><dd class="font-medium {% if design.is_overdue %}text-red-600{% endif %}">{{ design.due_date|date:"d M Y H:i"|default:"—" }}</dd></div>
+                <div><dt class="text-slate-500">Due Date</dt><dd class="font-medium {% if design.is_overdue %}text-red-600{% endif %}">{{ design.due_date|date:"d M Y, h:i A"|default:"—" }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Instructions</dt><dd>{{ design.assignment_instructions|default:"—" }}</dd></div>
             </dl>
         </div>
@@ -122,7 +122,7 @@
                     <div class="w-8 h-8 rounded-full bg-primary text-white text-xs flex items-center justify-center shrink-0">{{ r.reviewer|initials }}</div>
                     <div>
                         <p class="text-sm"><span class="font-semibold">{{ r.reviewer }}</span> — {{ r.get_action_display }}</p>
-                        <p class="text-xs text-slate-500">{{ r.created_at|date:"d M Y H:i" }}</p>
+                        <p class="text-xs text-slate-500">{{ r.created_at|date:"d M Y, h:i A" }}</p>
                         {% if r.comments %}<p class="text-sm text-slate-700 mt-1">{{ r.comments }}</p>{% endif %}
                     </div>
                 </div>
@@ -132,7 +132,7 @@
                     <div class="w-8 h-8 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center shrink-0">{{ v.verifier|initials }}</div>
                     <div>
                         <p class="text-sm"><span class="font-semibold">{{ v.verifier }}</span> — {{ v.get_action_display }}</p>
-                        <p class="text-xs text-slate-500">{{ v.created_at|date:"d M Y H:i" }}</p>
+                        <p class="text-xs text-slate-500">{{ v.created_at|date:"d M Y, h:i A" }}</p>
                         {% if v.comments %}<p class="text-sm text-slate-700 mt-1">{{ v.comments }}</p>{% endif %}
                     </div>
                 </div>
@@ -142,7 +142,7 @@
                     <div class="w-8 h-8 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center shrink-0">{{ c.reviewer|initials }}</div>
                     <div>
                         <p class="text-sm"><span class="font-semibold">{{ c.reviewer }}</span> — Compliance: {{ c.get_action_display }}</p>
-                        <p class="text-xs text-slate-500">{{ c.created_at|date:"d M Y H:i" }}</p>
+                        <p class="text-xs text-slate-500">{{ c.created_at|date:"d M Y, h:i A" }}</p>
                         {% if c.comments %}<p class="text-sm text-slate-700 mt-1">{{ c.comments }}</p>{% endif %}
                     </div>
                 </div>
@@ -166,7 +166,7 @@
                     <div class="w-8 h-8 rounded-full bg-slate-600 text-white text-xs flex items-center justify-center shrink-0">{{ c.author|initials }}</div>
                     <div>
                         <p class="text-sm"><span class="font-semibold">{{ c.author }}</span></p>
-                        <p class="text-xs text-slate-500">{{ c.created_at|timesince_short }}</p>
+                        <p class="text-xs text-slate-500">{{ c.created_at|datetime_with_hint }}</p>
                         <p class="text-sm text-slate-700 mt-1">{{ c.message|highlight_mentions }}</p>
                     </div>
                 </div>
@@ -279,7 +279,7 @@
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Deadline Timer</h2>
             <div class="g-progress mb-2"><div class="g-progress-fill {% if design.deadline_status == 'red' %}!bg-red-500{% elif design.deadline_status == 'yellow' %}!bg-amber-500{% endif %}" style="width: {{ deadline_pct }}%"></div></div>
             <p class="text-sm text-slate-600">{{ deadline_pct }}% elapsed</p>
-            {% if design.deadline_due %}<p class="text-xs text-slate-500 mt-1">Due: {{ design.deadline_due|date:"d M Y H:i" }}</p>{% endif %}
+            {% if design.deadline_due %}<p class="text-xs text-slate-500 mt-1">Due: {{ design.deadline_due|date:"d M Y, h:i A" }}</p>{% endif %}
         </div>
 
         {% if design.delay_source %}
@@ -289,29 +289,9 @@
         </div>
         {% endif %}
 
-        <div class="g-card p-6">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Activity</h2>
-            <div class="space-y-3 max-h-64 overflow-y-auto">
-                {% for log in logs %}
-                <div class="text-sm border-l-2 border-blue-200 pl-3">
-                    <p class="font-medium">{{ log.description|default:log.action }}</p>
-                    <p class="text-xs text-slate-500">{{ log.user }} · {{ log.created_at|timesince_short }}{% if log.metadata.old_status %} · {{ log.metadata.old_status }} → {{ log.metadata.new_status }}{% endif %}</p>
-                </div>
-                {% empty %}<p class="text-sm text-slate-500">No activity.</p>{% endfor %}
-            </div>
-        </div>
-
-        <div class="g-card p-6">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Notifications</h2>
-            <div class="space-y-3 max-h-64 overflow-y-auto">
-                {% for n in request_notifications %}
-                <div class="text-sm border-l-2 {% if n.is_read %}border-slate-200{% else %}border-blue-500{% endif %} pl-3">
-                    <p class="{% if not n.is_read %}font-semibold text-slate-900{% else %}font-medium text-slate-700{% endif %}">{{ n.title }}</p>
-                    <p class="text-xs text-slate-600 mt-0.5">{{ n.message }}</p>
-                    <p class="text-xs text-slate-400 mt-1">{{ n.created_at|timesince_short }}</p>
-                </div>
-                {% empty %}<p class="text-sm text-slate-500">No notifications for this request.</p>{% endfor %}
-            </div>
+        <div class="g-card p-5 rounded-xl border border-[#E2E8F0] bg-white">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Activity History</h2>
+            {% include 'components/activity_timeline.html' with logs=logs %}
         </div>
     </div>
 </div>

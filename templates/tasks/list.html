@@ -23,7 +23,7 @@
                 <div>
                     <p class="text-sm font-medium text-primary-light">{{ d.design_number }}</p>
                     <p class="text-xs text-slate-500">{{ d.project.code }} · {{ d.drawing_type.name }}</p>
-                    {% if d.due_date %}<p class="text-xs {% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-400{% endif %} mt-1">Due {{ d.due_date|date:"d M Y" }}</p>{% endif %}
+                    {% if d.due_date %}<p class="text-xs {% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-400{% endif %} mt-1">Due {{ d.due_date|date:"d M Y, h:i A" }}</p>{% endif %}
                 </div>
                 {% render_status_badge d.status %}
             </a>

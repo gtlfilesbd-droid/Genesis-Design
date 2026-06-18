@@ -2,12 +2,23 @@
 {% block title %}Dashboard — Admin{% endblock %}
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mt-8">
     {% url 'accounts:user_list' as users_url %}
     {% url 'projects:list' as projects_list_url %}
     {% url 'requests:list' as requests_list_url %}
     {% include 'components/stat_card.html' with label='Active Users' value=total_users icon='users' icon_bg='bg-blue-50' icon_color='text-blue-600' url=users_url %}
-    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' icon_bg='bg-amber-50' icon_color='text-amber-600' url=projects_list_url %}
+    {% include 'components/stat_card.html' with label='Active Projects' value=total_projects icon='folder' icon_bg='bg-amber-50' icon_color='text-amber-600' url=projects_list_url %}
     {% include 'components/stat_card.html' with label='Design Requests' value=total_designs icon='file-text' icon_bg='bg-green-50' icon_color='text-green-600' url=requests_list_url %}
+    {% include 'components/stat_card.html' with label='Overdue' value=total_overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=total_overdue url=requests_list_url|add:'?overdue=1' %}
+</div>
+
+<div class="g-card p-6 mt-6">
+    <h2 class="text-base font-semibold text-slate-900 mb-4">Quick Links</h2>
+    <div class="flex flex-wrap gap-3">
+        <a href="{% url 'accounts:user_list' %}" class="g-btn-secondary inline-flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> User Management</a>
+        <a href="{% url 'settings:index' %}?tab=permissions" class="g-btn-secondary inline-flex items-center gap-2"><i data-lucide="shield" class="w-4 h-4"></i> Permission Management</a>
+        <a href="{% url 'settings:index' %}?tab=drawing_types" class="g-btn-secondary inline-flex items-center gap-2"><i data-lucide="layers" class="w-4 h-4"></i> Drawing Type Settings</a>
+        <a href="{% url 'reports:index' %}" class="g-btn-secondary inline-flex items-center gap-2"><i data-lucide="bar-chart-2" class="w-4 h-4"></i> Reports</a>
+    </div>
 </div>
 {% endblock %}

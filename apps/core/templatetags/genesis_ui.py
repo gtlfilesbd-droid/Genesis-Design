@@ -84,6 +84,63 @@ def timesince_short(value):
 
 
 @register.filter
+def datetime_with_hint(value):
+    """Full date+time with optional relative hint."""
+    if not value:
+        return '—'
+    absolute = timezone.localtime(value).strftime('%d %b %Y, %I:%M %p')
+    hint = timesince_short(value)
+    if hint == 'just now':
+        return absolute
+    return f'{absolute} · {hint}'
+
+
+ACTIVITY_DOT_COLORS = {
+    'submit_request': '#2E75B6',
+    'design_requested': '#2E75B6',
+    'submit_work': '#2E75B6',
+    'resubmit': '#2E75B6',
+    'assign': '#2E75B6',
+    'send_to_verification': '#2E75B6',
+    'send_to_compliance': '#2E75B6',
+    'accept_assignment': '#2E75B6',
+    'acknowledge': '#64748B',
+    'accept_verification': '#64748B',
+    'accept_compliance': '#64748B',
+    'start_review': '#64748B',
+    'request_correction': '#D97706',
+    'verification_correction': '#D97706',
+    'compliance_correction': '#D97706',
+    'forward_to_designer': '#D97706',
+    'cancel': '#D97706',
+    'cancelled': '#D97706',
+    'accept_design': '#16A34A',
+    'verify_approved': '#16A34A',
+    'compliance_approved': '#16A34A',
+    'complete': '#1A3C6E',
+    'hod_fast_complete': '#1A3C6E',
+}
+
+
+@register.filter
+def activity_title(action):
+    from apps.core.activity_messages import activity_title as _activity_title
+    return _activity_title(action)
+
+
+@register.filter
+def activity_dot_color(action):
+    return ACTIVITY_DOT_COLORS.get(action, '#2E75B6')
+
+
+@register.filter
+def activity_dot_size(action):
+    if action in ('complete', 'hod_fast_complete'):
+        return '14px'
+    return '10px'
+
+
+@register.filter
 def progress_pct(completed, total):
     if not total:
         return 0

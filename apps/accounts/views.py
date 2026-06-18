@@ -1,16 +1,24 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView, PasswordResetDoneView, PasswordResetView
-from django.db.models import Count, Q
+from django.db.models import Count, OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 import json
 
 from apps.core.dashboard_helpers import (
-    get_chart_data, get_dashboard_stats, get_pending_actions, get_recent_activity,
+    enrich_review_queue,
+    get_chart_data,
+    get_compliance_performance,
+    get_dashboard_stats,
+    get_designer_productivity,
+    get_hod_performance,
+    get_pending_actions,
+    get_recent_activity,
+    get_verification_performance,
 )
-from apps.designs.models import DesignRequest, DesignStatus
+from apps.designs.models import DesignAssignment, DesignRequest, DesignStatus
 from apps.projects.models import Project, ProjectStatus
 
 from apps.permissions.decorators import require_global_permission
@@ -103,6 +111,9 @@ def admin_dashboard(request):
         'total_users': User.objects.filter(is_active=True).count(),
         'total_projects': Project.objects.count(),
         'total_designs': DesignRequest.objects.count(),
+        'total_overdue': DesignRequest.objects.filter(
+            due_date__lt=timezone.now(),
+        ).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count(),
         'charts': get_chart_data(),
         'show_charts': True,
     })
@@ -122,8 +133,10 @@ def requester_dashboard(request):
     context.update({
         'projects': projects,
         'designs': designs,
+        'total_projects': projects.count(),
         'active_projects': projects.filter(status=ProjectStatus.ACTIVE).count(),
         'completed_projects': projects.filter(status=ProjectStatus.COMPLETED).count(),
+        'cancelled_projects': projects.filter(status=ProjectStatus.CANCELLED).count(),
     })
     return render(request, 'accounts/dashboards/requester.html', context)
 
@@ -140,10 +153,34 @@ def hod_dashboard(request):
     context = _base_dashboard_context(request)
     context.update({
         'new_requests': designs.filter(status=DesignStatus.NEW_REQUEST).count(),
+        'assigned_to_designer': designs.filter(
+            status__in=[
+                DesignStatus.ASSIGNED, DesignStatus.IN_PROGRESS,
+                DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED,
+            ],
+        ).count(),
         'waiting_review': designs.filter(status=DesignStatus.UNDER_REVIEW).count(),
-        'waiting_verification': designs.filter(status=DesignStatus.VERIFICATION_PENDING).count(),
+        'waiting_verification': designs.filter(
+            status__in=[
+                DesignStatus.VERIFICATION_PENDING_ACK,
+                DesignStatus.VERIFICATION_PENDING,
+                DesignStatus.VERIFICATION_CORRECTION,
+            ],
+        ).count(),
+        'waiting_compliance': designs.filter(
+            status__in=[
+                DesignStatus.AWAITING_COMPLIANCE,
+                DesignStatus.COMPLIANCE_PENDING_ACK,
+                DesignStatus.COMPLIANCE_PENDING,
+                DesignStatus.COMPLIANCE_CORRECTION,
+            ],
+        ).count(),
+        'waiting_approval': designs.filter(status=DesignStatus.FINAL_APPROVAL_PENDING).count(),
         'overdue_designs': designs.filter(due_date__lt=timezone.now()).count(),
-        'work_queue': designs.order_by('-priority', 'due_date')[:25],
+        'work_queue': designs.select_related(
+            'assigned_designer', 'assigned_verifier', 'assigned_compliance_officer',
+        ).order_by('-priority', 'due_date')[:25],
+        'hod_performance': get_hod_performance(),
         'charts': get_chart_data(),
         'show_charts': True,
     })
@@ -154,8 +191,13 @@ def hod_dashboard(request):
 @login_required
 @require_global_permission('VIS_PERM_DASHBOARD')
 def designer_dashboard(request):
+    latest_assignment = DesignAssignment.objects.filter(
+        design=OuterRef('pk'),
+    ).order_by('-assigned_at')
     designs = DesignRequest.objects.filter(
         assigned_designer=request.user
+    ).annotate(
+        latest_assigned_at=Subquery(latest_assignment.values('assigned_at')[:1]),
     ).select_related('project', 'drawing_type')
     context = _base_dashboard_context(request)
     context.update({
@@ -166,6 +208,8 @@ def designer_dashboard(request):
         'overdue': designs.filter(
             due_date__lt=timezone.now()
         ).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count(),
+        'rework_count': designs.filter(revision_count__gt=0).count(),
+        'productivity': get_designer_productivity(request.user),
         'my_designs': designs.order_by('-updated_at')[:25],
     })
     return render(request, 'accounts/dashboards/designer.html', context)
@@ -176,13 +220,25 @@ def designer_dashboard(request):
 def verification_dashboard(request):
     designs = DesignRequest.objects.filter(
         status__in=[
+            DesignStatus.VERIFICATION_PENDING_ACK,
             DesignStatus.VERIFICATION_PENDING,
             DesignStatus.VERIFICATION_CORRECTION,
         ]
-    ).select_related('project', 'drawing_type', 'assigned_designer')
+    ).select_related(
+        'project', 'drawing_type', 'assigned_designer', 'assigned_by',
+    ).prefetch_related('reviews')
+    queue = enrich_review_queue(
+        list(designs.order_by('-priority', 'updated_at')[:25]),
+        stage='verification',
+    )
     context = _base_dashboard_context(request)
     context.update({
-        'pending': designs.filter(status=DesignStatus.VERIFICATION_PENDING).count(),
+        'pending': designs.filter(
+            status__in=[
+                DesignStatus.VERIFICATION_PENDING_ACK,
+                DesignStatus.VERIFICATION_PENDING,
+            ],
+        ).count(),
         'corrections': designs.filter(status=DesignStatus.VERIFICATION_CORRECTION).count(),
         'approved_total': DesignRequest.objects.filter(
             verified_by=request.user, status__in=[
@@ -193,7 +249,8 @@ def verification_dashboard(request):
                 DesignStatus.COMPLETED,
             ]
         ).count(),
-        'verification_queue': designs.order_by('-priority', 'updated_at')[:25],
+        'verification_performance': get_verification_performance(request.user),
+        'verification_queue': queue,
     })
     return render(request, 'accounts/dashboards/verification.html', context)
 
@@ -203,19 +260,32 @@ def verification_dashboard(request):
 def compliance_dashboard(request):
     designs = DesignRequest.objects.filter(
         status__in=[
+            DesignStatus.COMPLIANCE_PENDING_ACK,
             DesignStatus.COMPLIANCE_PENDING,
             DesignStatus.COMPLIANCE_CORRECTION,
         ]
-    ).select_related('project', 'drawing_type', 'assigned_designer')
+    ).select_related(
+        'project', 'drawing_type', 'assigned_designer', 'assigned_by',
+    ).prefetch_related('reviews')
+    queue = enrich_review_queue(
+        list(designs.order_by('-priority', 'updated_at')[:25]),
+        stage='compliance',
+    )
     context = _base_dashboard_context(request)
     context.update({
-        'pending': designs.filter(status=DesignStatus.COMPLIANCE_PENDING).count(),
+        'pending': designs.filter(
+            status__in=[
+                DesignStatus.COMPLIANCE_PENDING_ACK,
+                DesignStatus.COMPLIANCE_PENDING,
+            ],
+        ).count(),
         'corrections': designs.filter(status=DesignStatus.COMPLIANCE_CORRECTION).count(),
         'approved_total': DesignRequest.objects.filter(
             approved_by_compliance=request.user,
             status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
         ).count(),
-        'compliance_queue': designs.order_by('-priority', 'updated_at')[:25],
+        'compliance_performance': get_compliance_performance(request.user),
+        'compliance_queue': queue,
     })
     return render(request, 'accounts/dashboards/compliance.html', context)
 

@@ -198,18 +198,18 @@ class WorkflowBugfixTests(TestCase):
             'pk': self.design.pk, 'action': 'hod_fast_complete',
         }))
 
-    def test_detail_shows_request_notifications(self):
-        Notification.objects.create(
-            user=self.hod,
-            title='Verification Approved: TEST-001',
-            message='Design has passed verification.',
-            link=f'/requests/{self.design.pk}/',
+    def test_detail_shows_activity_history(self):
+        from apps.core.utils import log_activity
+        log_activity(
+            'design_request', self.design.pk, self.hod, 'verify_approved',
+            'Sarah Ahmed approved the design after verification',
         )
         self.client.login(username='hod', password='pass')
         response = self.client.get(reverse('requests:detail', kwargs={'pk': self.design.pk}))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Verification Approved: TEST-001')
-        self.assertContains(response, 'Notifications')
+        self.assertContains(response, 'Activity History')
+        self.assertContains(response, 'approved the design after verification')
+        self.assertNotContains(response, 'No notifications for this request.')
 
     def test_requester_can_view_own_design_after_verify_approved(self):
         self.design.status = DesignStatus.UNDER_REVIEW

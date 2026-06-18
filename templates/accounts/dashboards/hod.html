@@ -4,31 +4,49 @@
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 mb-6">
+<div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-4 mt-8 mb-6">
     {% url 'requests:list' as requests_list_url %}
     {% include 'components/stat_card.html' with label='New Requests' value=new_requests icon='inbox' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=new_request' %}
+    {% include 'components/stat_card.html' with label='With Designer' value=assigned_to_designer icon='pen-tool' icon_bg='bg-indigo-50' icon_color='text-indigo-600' url=requests_list_url|add:'?status=in_progress' %}
     {% include 'components/stat_card.html' with label='Waiting Review' value=waiting_review icon='eye' icon_bg='bg-blue-50' icon_color='text-blue-600' url=requests_list_url|add:'?status=under_review' %}
     {% include 'components/stat_card.html' with label='Verification' value=waiting_verification icon='shield-check' icon_bg='bg-purple-50' icon_color='text-purple-600' url=requests_list_url|add:'?status=verification_pending' %}
+    {% include 'components/stat_card.html' with label='Compliance' value=waiting_compliance icon='scale' icon_bg='bg-violet-50' icon_color='text-violet-600' url=requests_list_url|add:'?status=compliance_pending' %}
+    {% include 'components/stat_card.html' with label='Final Approval' value=waiting_approval icon='stamp' icon_bg='bg-cyan-50' icon_color='text-cyan-600' url=requests_list_url|add:'?status=final_approval_pending' %}
     {% include 'components/stat_card.html' with label='Overdue' value=overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_designs url=requests_list_url|add:'?overdue=1' %}
+</div>
+
+<div class="g-card p-6 mb-6">
+    <h2 class="text-base font-semibold text-slate-900 mb-4">Performance Statistics</h2>
+    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 text-sm">
+        <div><p class="text-slate-500">Requests Managed</p><p class="text-xl font-bold text-slate-900">{{ hod_performance.total_managed }}</p></div>
+        <div><p class="text-slate-500">Approved</p><p class="text-xl font-bold text-green-600">{{ hod_performance.total_approved }}</p></div>
+        <div><p class="text-slate-500">Cancelled</p><p class="text-xl font-bold text-slate-600">{{ hod_performance.total_cancelled }}</p></div>
+        <div><p class="text-slate-500">Corrections Issued</p><p class="text-xl font-bold text-amber-600">{{ hod_performance.total_corrections }}</p></div>
+        <div><p class="text-slate-500">Avg Review Time</p><p class="text-xl font-bold text-slate-900">{% if hod_performance.avg_review_hours %}{{ hod_performance.avg_review_hours }}h{% else %}—{% endif %}</p></div>
+        <div><p class="text-slate-500">Avg Assignment Time</p><p class="text-xl font-bold text-slate-900">{% if hod_performance.avg_assignment_hours %}{{ hod_performance.avg_assignment_hours }}h{% else %}—{% endif %}</p></div>
+    </div>
 </div>
 
 <h2 class="text-lg font-semibold text-slate-900 mb-4">Work Queue</h2>
 <div class="g-card overflow-x-auto">
     <table class="g-table w-full">
-        <thead><tr><th>Design</th><th>Project</th><th>Stage</th><th>Designer</th><th>Due</th><th>Priority</th><th></th></tr></thead>
+        <thead><tr><th>Design</th><th>Project</th><th>Stage</th><th>Holder</th><th>Pending Since</th><th>Due</th><th>Priority</th><th></th></tr></thead>
         <tbody>
         {% for d in work_queue %}
         <tr>
             <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
             <td>{{ d.project.code }}</td>
             <td>{% render_status_badge d.status %}</td>
-            <td>{{ d.assigned_designer|default:"—" }}</td>
-            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"M d, H:i"|default:"—" }}</td>
+            <td>
+                {% if d.assigned_verifier %}{{ d.assigned_verifier }}{% elif d.assigned_compliance_officer %}{{ d.assigned_compliance_officer }}{% elif d.assigned_designer %}{{ d.assigned_designer }}{% elif d.current_holder %}{{ d.current_holder }}{% else %}—{% endif %}
+            </td>
+            <td class="text-slate-500">{{ d.updated_at|date:"d M Y, h:i A" }}</td>
+            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"d M Y, h:i A"|default:"—" }}</td>
             <td>{% render_priority_badge d.priority %}</td>
             <td><a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1">Open</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-slate-500 py-8">Queue is empty.</td></tr>
+        <tr><td colspan="8" class="text-center text-slate-500 py-8">Queue is empty.</td></tr>
         {% endfor %}
         </tbody>
     </table>

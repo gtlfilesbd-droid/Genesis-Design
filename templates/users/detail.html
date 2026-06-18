@@ -95,7 +95,7 @@
             <td class="font-medium text-primary-light">{{ d.design_number }}</td>
             <td>{{ d.project.code }}</td>
             <td>{{ d.drawing_type.name }}</td>
-            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"d M Y"|default:"—" }}</td>
+            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"d M Y, h:i A"|default:"—" }}</td>
             <td>{% render_status_badge d.status %}</td>
             <td>{% render_priority_badge d.priority %}</td>
             <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">Open →</a></td>
@@ -132,7 +132,7 @@
         {% for log in activity %}
         <div class="text-sm border-l-2 border-blue-200 pl-3">
             <p class="font-medium">{{ log.description|default:log.action }}</p>
-            <p class="text-xs text-slate-500">{{ log.created_at|date:"d M Y H:i" }}</p>
+            <p class="text-xs text-slate-500">{{ log.created_at|date:"d M Y, h:i A" }}</p>
         </div>
         {% empty %}
         <p class="text-sm text-slate-500">No recent activity.</p>

@@ -63,23 +63,19 @@ def design_detail(request, pk):
             old_status = design.status
             design.status = DesignStatus.CANCELLED
             design.save(update_fields=['status', 'primary_status', 'deadline_missed'])
+            from apps.core.activity_messages import build_workflow_activity_description
             log_activity(
                 'design_request', design.pk, request.user, 'cancelled',
-                f'Status changed from {old_status} to {DesignStatus.CANCELLED}',
+                build_workflow_activity_description('cancelled', request.user, design),
                 {'old_status': old_status, 'new_status': DesignStatus.CANCELLED},
             )
             messages.success(request, 'Design request cancelled.')
         return redirect('requests:detail', pk=pk)
 
     from apps.core.models import ActivityLog, CompanySettings
-    from apps.notifications.models import Notification
     logs = ActivityLog.objects.filter(
         entity_type='design_request', entity_id=design.pk
     ).select_related('user')[:50]
-    request_notifications = Notification.objects.filter(
-        user=request.user,
-        link__contains=f'/requests/{design.pk}',
-    ).order_by('-created_at')[:10]
     submissions = design.submissions.select_related('submitted_by', 'reviewed_by')
     reviews = design.reviews.select_related('reviewer')
     verifications = design.verifications.select_related('verifier')
@@ -119,7 +115,6 @@ def design_detail(request, pk):
         'deadline_pct': deadline_pct,
         'progress_steps': progress_steps,
         'progress_cancelled': progress_cancelled,
-        'request_notifications': request_notifications,
         **action_flags,
     })
 
@@ -138,16 +133,20 @@ def design_create(request, pk):
             hod = get_head_of_design()
             design.current_holder = hod
             design.save(update_fields=['current_holder'])
+            from apps.core.activity_messages import (
+                build_project_activity_description,
+                build_workflow_activity_description,
+            )
             log_activity(
                 'design_request', design.pk, request.user,
                 'design_requested',
-                f'Design request {design.design_number} created',
+                build_workflow_activity_description('design_requested', request.user, design),
                 {'drawing_type': design.drawing_type.name},
             )
             log_activity(
                 'project', project.pk, request.user,
                 'design_requested',
-                f'Design {design.design_number} requested for project',
+                build_project_activity_description('design_requested', request.user, design),
             )
             messages.success(request, f'Design request {design.design_number} submitted.')
             return redirect('projects:detail', pk=project.pk)
