@@ -220,6 +220,9 @@
                 {% if design.status == 'correction_required' and can_revise and user == design.assigned_designer %}
                 <a href="{% url 'workflow:action' design.pk 'resubmit' %}" class="g-btn-primary w-full block text-center">Resubmit</a>
                 {% endif %}
+                {% if design.status == 'verification_pending_acknowledgement' and can_acknowledge_verification %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'accept_verification' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge Verification</button></form>
+                {% endif %}
                 {% if design.status == 'verification_pending' and can_verify %}
                 <a href="{% url 'workflow:action' design.pk 'verify_approved' %}" class="g-btn-primary w-full block text-center">Accept</a>
                 <a href="{% url 'workflow:action' design.pk 'verification_correction' %}" class="g-btn-secondary w-full block text-center mt-2">Request Correction</a>
@@ -237,6 +240,9 @@
                 {% endif %}
                 {% if design.status == 'awaiting_compliance' and can_send_to_compliance %}
                 <a href="{% url 'workflow:action' design.pk 'send_to_compliance' %}" class="g-btn-primary w-full block text-center">Send to Compliance</a>
+                {% endif %}
+                {% if design.status == 'compliance_pending_acknowledgement' and can_acknowledge_compliance %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'accept_compliance' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge Compliance Review</button></form>
                 {% endif %}
                 {% if design.status == 'compliance_pending' and can_compliance_review %}
                 <a href="{% url 'workflow:action' design.pk 'compliance_approved' %}" class="g-btn-primary w-full block text-center">Accept</a>
@@ -285,8 +291,8 @@
             <div class="space-y-3 max-h-64 overflow-y-auto">
                 {% for log in logs %}
                 <div class="text-sm border-l-2 border-blue-200 pl-3">
-                    <p class="font-medium">{{ log.action }}</p>
-                    <p class="text-xs text-slate-500">{{ log.user }} · {{ log.created_at|timesince_short }}</p>
+                    <p class="font-medium">{{ log.description|default:log.action }}</p>
+                    <p class="text-xs text-slate-500">{{ log.user }} · {{ log.created_at|timesince_short }}{% if log.metadata.old_status %} · {{ log.metadata.old_status }} → {{ log.metadata.new_status }}{% endif %}</p>
                 </div>
                 {% empty %}<p class="text-sm text-slate-500">No activity.</p>{% endfor %}
             </div>

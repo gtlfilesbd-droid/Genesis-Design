@@ -10,6 +10,16 @@ from apps.projects.models import Project
 from apps.workflow.services import WorkflowError, transition
 
 
+def _send_to_verification(design, hod, verifier):
+    transition(
+        design, 'send_to_verification', hod,
+        verifier=verifier,
+        due_date=timezone.now() + timedelta(days=2),
+        comments='Please verify',
+    )
+    transition(design, 'accept_verification', verifier)
+
+
 class SRSWorkflowFlowTests(TestCase):
     def setUp(self):
         self.requester = User.objects.create_user(
@@ -45,10 +55,7 @@ class SRSWorkflowFlowTests(TestCase):
         )
 
     def test_hod_send_to_verification_then_verifier_accepts(self):
-        transition(
-            self.design, 'send_to_verification', self.hod,
-            verifier=self.verifier, comments='Please verify',
-        )
+        _send_to_verification(self.design, self.hod, self.verifier)
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.VERIFICATION_PENDING)
         self.assertEqual(self.design.assigned_verifier, self.verifier)
@@ -58,10 +65,7 @@ class SRSWorkflowFlowTests(TestCase):
         self.assertEqual(self.design.status, DesignStatus.AWAITING_COMPLIANCE)
 
     def test_verifier_correction_loop_increments_revision_on_forward(self):
-        transition(
-            self.design, 'send_to_verification', self.hod,
-            verifier=self.verifier, comments='Verify',
-        )
+        _send_to_verification(self.design, self.hod, self.verifier)
         transition(self.design, 'verification_correction', self.verifier, comments='Fix dims')
         self.design.refresh_from_db()
         self.assertEqual(self.design.revision_count, 0)
@@ -75,23 +79,20 @@ class SRSWorkflowFlowTests(TestCase):
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.UNDER_REVIEW)
 
-        transition(
-            self.design, 'send_to_verification', self.hod,
-            verifier=self.verifier, comments='Re-verify',
-        )
+        _send_to_verification(self.design, self.hod, self.verifier)
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.VERIFICATION_PENDING)
 
     def test_full_path_through_compliance(self):
-        transition(
-            self.design, 'send_to_verification', self.hod,
-            verifier=self.verifier, comments='Verify',
-        )
+        _send_to_verification(self.design, self.hod, self.verifier)
         transition(self.design, 'verify_approved', self.verifier)
         transition(
             self.design, 'send_to_compliance', self.hod,
-            compliance_officer=self.compliance, comments='Compliance check',
+            compliance_officer=self.compliance,
+            due_date=timezone.now() + timedelta(days=2),
+            comments='Compliance check',
         )
+        transition(self.design, 'accept_compliance', self.compliance)
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.COMPLIANCE_PENDING)
         self.assertEqual(self.design.assigned_compliance_officer, self.compliance)
@@ -129,4 +130,8 @@ class SRSWorkflowFlowTests(TestCase):
 
     def test_send_to_verification_requires_verifier(self):
         with self.assertRaises(WorkflowError):
-            transition(self.design, 'send_to_verification', self.hod, comments='No verifier')
+            transition(
+                self.design, 'send_to_verification', self.hod,
+                due_date=timezone.now() + timedelta(days=1),
+                comments='No verifier',
+            )

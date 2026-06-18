@@ -207,20 +207,58 @@ class NotificationService:
 
     @staticmethod
     def on_verification_approved(design_request):
-        from apps.workflow.services import get_head_of_design
-
-        hod = get_head_of_design()
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_ASSIGN',
+        )
         title = f'Verification Approved: {design_request.design_number}'
         message = (
             f'Design {design_request.design_number} has passed verification. '
-            f'Please assign a compliance officer.'
+            f'Please forward to compliance or mark complete.'
         )
-        NotificationService.notify(
-            hod,
-            NotificationType.WORKFLOW,
-            title,
-            message,
-            related_request=design_request,
+        NotificationService._notify_many(
+            users, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_verification_acknowledged(design_request, actor):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_ASSIGN',
+        )
+        recipients = [u for u in users if u and u.pk != actor.pk]
+        if (
+            design_request.requested_by_id
+            and design_request.requested_by_id != actor.pk
+            and design_request.requested_by not in recipients
+        ):
+            recipients.append(design_request.requested_by)
+        title = f'Verification Acknowledged: {design_request.design_number}'
+        message = (
+            f'{actor.get_full_name() or actor.username} has acknowledged '
+            f'verification for {design_request.design_number}.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_compliance_acknowledged(design_request, actor):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_ASSIGN',
+        )
+        recipients = [u for u in users if u and u.pk != actor.pk]
+        if (
+            design_request.requested_by_id
+            and design_request.requested_by_id != actor.pk
+            and design_request.requested_by not in recipients
+        ):
+            recipients.append(design_request.requested_by)
+        title = f'Compliance Acknowledged: {design_request.design_number}'
+        message = (
+            f'{actor.get_full_name() or actor.username} has acknowledged '
+            f'compliance review for {design_request.design_number}.'
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
         )
 
     @staticmethod
@@ -339,8 +377,10 @@ def notify_workflow_transition(design, action, actor):
         'accept_design': _notify_send_to_verification,
         'verification_correction': NotificationService.on_verification_correction,
         'forward_to_designer': NotificationService.on_correction_required,
+        'accept_verification': NotificationService.on_verification_acknowledged,
         'verify_approved': NotificationService.on_verification_approved,
         'send_to_compliance': NotificationService.on_sent_to_compliance,
+        'accept_compliance': NotificationService.on_compliance_acknowledged,
         'compliance_correction': NotificationService.on_compliance_correction,
         'compliance_approved': NotificationService.on_compliance_approved,
         'hod_fast_complete': NotificationService.on_hod_fast_complete,
@@ -348,7 +388,7 @@ def notify_workflow_transition(design, action, actor):
     }
     handler = handlers.get(action)
     if handler:
-        if action == 'accept_assignment':
+        if action in ('accept_assignment', 'accept_verification', 'accept_compliance'):
             handler(design, actor)
         else:
             handler(design)

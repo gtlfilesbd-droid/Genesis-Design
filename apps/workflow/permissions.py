@@ -1,5 +1,5 @@
 from apps.accounts.models import UserRole
-from apps.accounts.models import UserRole
+from apps.designs.models import DesignStatus
 from apps.permissions.services import PermissionService
 from apps.workflow.services import WORKFLOW_ACTIONS
 
@@ -63,11 +63,33 @@ def design_action_flags(user, design) -> dict:
             PermissionService.has_project_permission(user, project, 'DESIGN_PERM_REVISE')
             or workflow_role_allows(user, 'resubmit')
         ),
-        'can_verify': can_run_workflow_action(
-            user, project, 'verify_approved', 'PROJECT_PERM_VERIFY',
+        'can_verify': (
+            design.status == DesignStatus.VERIFICATION_PENDING
+            and design.assigned_verifier_id == user.pk
+            and can_run_workflow_action(
+                user, project, 'verify_approved', 'PROJECT_PERM_VERIFY',
+            )
         ),
-        'can_compliance_review': can_run_workflow_action(
-            user, project, 'compliance_approved', 'PROJECT_PERM_COMPLIANCE',
+        'can_acknowledge_verification': (
+            design.status == DesignStatus.VERIFICATION_PENDING_ACK
+            and design.assigned_verifier_id == user.pk
+            and can_run_workflow_action(
+                user, project, 'accept_verification', 'PROJECT_PERM_VERIFY',
+            )
+        ),
+        'can_compliance_review': (
+            design.status == DesignStatus.COMPLIANCE_PENDING
+            and design.assigned_compliance_officer_id == user.pk
+            and can_run_workflow_action(
+                user, project, 'compliance_approved', 'PROJECT_PERM_COMPLIANCE',
+            )
+        ),
+        'can_acknowledge_compliance': (
+            design.status == DesignStatus.COMPLIANCE_PENDING_ACK
+            and design.assigned_compliance_officer_id == user.pk
+            and can_run_workflow_action(
+                user, project, 'accept_compliance', 'PROJECT_PERM_COMPLIANCE',
+            )
         ),
         'can_forward_to_designer': can_run_workflow_action(
             user, project, 'forward_to_designer', 'PROJECT_PERM_ASSIGN',
@@ -79,7 +101,11 @@ def design_action_flags(user, design) -> dict:
             user, project, 'complete', 'PROJECT_PERM_COMPLETE',
         ),
         'can_cancel_request': (
-            PermissionService.has_project_permission(user, project, 'PROJECT_PERM_REQUEST')
+            design.status == DesignStatus.NEW_REQUEST
             and design.requested_by_id == user.pk
-        ) or PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL'),
+            and PermissionService.has_project_permission(user, project, 'PROJECT_PERM_REQUEST')
+        ) or (
+            PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL')
+            and design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED)
+        ),
     }

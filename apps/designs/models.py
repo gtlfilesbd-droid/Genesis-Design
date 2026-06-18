@@ -44,9 +44,11 @@ class DesignStatus(models.TextChoices):
     UNDER_REVIEW = 'under_review', 'Under Review'
     CORRECTION_REQUIRED = 'correction_required', 'Correction Required'
     RESUBMITTED = 'resubmitted', 'Re-Submitted'
+    VERIFICATION_PENDING_ACK = 'verification_pending_acknowledgement', 'Verification Pending Acknowledgement'
     VERIFICATION_PENDING = 'verification_pending', 'Verification Pending'
     VERIFICATION_CORRECTION = 'verification_correction', 'Verification Correction'
     AWAITING_COMPLIANCE = 'awaiting_compliance', 'Awaiting Compliance'
+    COMPLIANCE_PENDING_ACK = 'compliance_pending_acknowledgement', 'Compliance Pending Acknowledgement'
     COMPLIANCE_PENDING = 'compliance_pending', 'Compliance Pending'
     COMPLIANCE_CORRECTION = 'compliance_correction', 'Compliance Correction'
     FINAL_APPROVAL_PENDING = 'final_approval_pending', 'Final Approval Pending'
@@ -80,9 +82,11 @@ PRIMARY_STATUS_MAP = {
     DesignStatus.UNDER_REVIEW: PrimaryStatus.RUNNING,
     DesignStatus.CORRECTION_REQUIRED: PrimaryStatus.RUNNING,
     DesignStatus.RESUBMITTED: PrimaryStatus.RUNNING,
+    DesignStatus.VERIFICATION_PENDING_ACK: PrimaryStatus.VERIFICATION,
     DesignStatus.VERIFICATION_PENDING: PrimaryStatus.VERIFICATION,
     DesignStatus.VERIFICATION_CORRECTION: PrimaryStatus.VERIFICATION,
     DesignStatus.AWAITING_COMPLIANCE: PrimaryStatus.VERIFICATION,
+    DesignStatus.COMPLIANCE_PENDING_ACK: PrimaryStatus.VERIFICATION,
     DesignStatus.COMPLIANCE_PENDING: PrimaryStatus.VERIFICATION,
     DesignStatus.COMPLIANCE_CORRECTION: PrimaryStatus.VERIFICATION,
     DesignStatus.FINAL_APPROVAL_PENDING: PrimaryStatus.VERIFICATION,
@@ -113,7 +117,7 @@ class DesignRequest(models.Model):
     due_date = models.DateTimeField(null=True, blank=True)
     request_message = models.TextField(blank=True)
     status = models.CharField(
-        max_length=30,
+        max_length=40,
         choices=DesignStatus.choices,
         default=DesignStatus.DRAFT,
     )
@@ -180,6 +184,14 @@ class DesignRequest(models.Model):
         related_name='held_designs',
     )
     assignment_instructions = models.TextField(blank=True)
+    verification_due_date = models.DateTimeField(null=True, blank=True)
+    verification_instructions = models.TextField(blank=True)
+    verification_assigned_at = models.DateTimeField(null=True, blank=True)
+    verification_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    compliance_due_date = models.DateTimeField(null=True, blank=True)
+    compliance_instructions = models.TextField(blank=True)
+    compliance_assigned_at = models.DateTimeField(null=True, blank=True)
+    compliance_acknowledged_at = models.DateTimeField(null=True, blank=True)
     revision_count = models.PositiveSmallIntegerField(default=0)
     completion_date = models.DateTimeField(null=True, blank=True)
     deadline_start = models.DateTimeField(null=True, blank=True)

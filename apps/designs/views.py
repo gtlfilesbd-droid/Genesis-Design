@@ -45,10 +45,29 @@ def design_detail(request, pk):
         return redirect('requests:detail', pk=pk)
 
     if request.method == 'POST' and request.POST.get('action') == 'cancel_request':
+        if design.requested_by_id != request.user.pk and not PermissionService.has_global_permission(
+            request.user, 'PERM_ADMIN_PANEL',
+        ):
+            messages.error(request, 'You do not have permission to cancel this request.')
+            return redirect('requests:detail', pk=pk)
+        if (
+            design.requested_by_id == request.user.pk
+            and design.status != DesignStatus.NEW_REQUEST
+        ):
+            messages.error(
+                request,
+                'This request has already been acknowledged and cannot be cancelled.',
+            )
+            return redirect('requests:detail', pk=pk)
         if design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
+            old_status = design.status
             design.status = DesignStatus.CANCELLED
             design.save(update_fields=['status', 'primary_status', 'deadline_missed'])
-            log_activity('design_request', design.pk, request.user, 'cancelled', 'Request cancelled')
+            log_activity(
+                'design_request', design.pk, request.user, 'cancelled',
+                f'Status changed from {old_status} to {DesignStatus.CANCELLED}',
+                {'old_status': old_status, 'new_status': DesignStatus.CANCELLED},
+            )
             messages.success(request, 'Design request cancelled.')
         return redirect('requests:detail', pk=pk)
 

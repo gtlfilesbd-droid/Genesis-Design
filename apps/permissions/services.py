@@ -21,14 +21,16 @@ ROLE_PERM_FIELDS = {
 }
 
 VERIFICATION_STATUSES = [
+    DesignStatus.VERIFICATION_PENDING_ACK,
     DesignStatus.VERIFICATION_PENDING,
     DesignStatus.VERIFICATION_CORRECTION,
 ]
 
 COMPLIANCE_STATUSES = [
-    DesignStatus.AWAITING_COMPLIANCE,
+    DesignStatus.COMPLIANCE_PENDING_ACK,
     DesignStatus.COMPLIANCE_PENDING,
     DesignStatus.COMPLIANCE_CORRECTION,
+    DesignStatus.AWAITING_COMPLIANCE,
 ]
 
 ROLE_PERMISSION_LABELS = {
@@ -183,6 +185,7 @@ class PermissionService:
             | Q(current_holder=user)
             | Q(assigned_verifier=user)
             | Q(verified_by=user)
+            | Q(assigned_compliance_officer=user)
         ).values_list('project_id', flat=True).distinct()
 
         created_ids = Project.objects.filter(created_by=user).values_list('pk', flat=True)
@@ -237,14 +240,12 @@ class PermissionService:
 
     @staticmethod
     def get_assignable_designers(project):
+        """Active designers and Head of Design who can receive design assignments."""
         return User.objects.filter(
-            Q(role=UserRole.DESIGNER)
-            | Q(role=UserRole.HEAD_OF_DESIGN)
-            | Q(role=UserRole.ADMIN)
-            | Q(extra_permissions__can_assign_designer=True),
+            role__in=(UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN),
             is_active=True,
             status='active',
-        ).distinct()
+        ).order_by('first_name', 'last_name')
 
     @staticmethod
     def get_verifiers(project):

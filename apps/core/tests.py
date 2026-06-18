@@ -67,8 +67,15 @@ class WorkflowTests(TestCase):
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.UNDER_REVIEW)
 
-        transition(self.design, 'send_to_verification', self.hod,
-                   verifier=self.verifier, comments='Ready for verification')
+        transition(
+            self.design, 'send_to_verification', self.hod,
+            verifier=self.verifier,
+            due_date=timezone.now() + timedelta(days=2),
+            comments='Ready for verification',
+        )
+        self.design.refresh_from_db()
+        self.assertEqual(self.design.status, DesignStatus.VERIFICATION_PENDING_ACK)
+        transition(self.design, 'accept_verification', self.verifier)
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.VERIFICATION_PENDING)
 
@@ -76,8 +83,15 @@ class WorkflowTests(TestCase):
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.AWAITING_COMPLIANCE)
 
-        transition(self.design, 'send_to_compliance', self.hod,
-                   compliance_officer=self.compliance, comments='Compliance review')
+        transition(
+            self.design, 'send_to_compliance', self.hod,
+            compliance_officer=self.compliance,
+            due_date=timezone.now() + timedelta(days=2),
+            comments='Compliance review',
+        )
+        self.design.refresh_from_db()
+        self.assertEqual(self.design.status, DesignStatus.COMPLIANCE_PENDING_ACK)
+        transition(self.design, 'accept_compliance', self.compliance)
         self.design.refresh_from_db()
         self.assertEqual(self.design.status, DesignStatus.COMPLIANCE_PENDING)
 

@@ -63,13 +63,18 @@ WORKFLOW_ACTIONS = {
             DesignStatus.SUBMITTED,
             DesignStatus.VERIFICATION_CORRECTION,
         ],
-        'to': DesignStatus.VERIFICATION_PENDING,
+        'to': DesignStatus.VERIFICATION_PENDING_ACK,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
     'accept_design': {
         'from': [DesignStatus.UNDER_REVIEW, DesignStatus.SUBMITTED],
-        'to': DesignStatus.VERIFICATION_PENDING,
+        'to': DesignStatus.VERIFICATION_PENDING_ACK,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
+    },
+    'accept_verification': {
+        'from': [DesignStatus.VERIFICATION_PENDING_ACK],
+        'to': DesignStatus.VERIFICATION_PENDING,
+        'roles': [UserRole.VERIFICATION_TEAM, UserRole.ADMIN],
     },
     'verification_correction': {
         'from': [DesignStatus.VERIFICATION_PENDING],
@@ -86,8 +91,13 @@ WORKFLOW_ACTIONS = {
             DesignStatus.AWAITING_COMPLIANCE,
             DesignStatus.COMPLIANCE_CORRECTION,
         ],
-        'to': DesignStatus.COMPLIANCE_PENDING,
+        'to': DesignStatus.COMPLIANCE_PENDING_ACK,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
+    },
+    'accept_compliance': {
+        'from': [DesignStatus.COMPLIANCE_PENDING_ACK],
+        'to': DesignStatus.COMPLIANCE_PENDING,
+        'roles': [UserRole.COMPLIANCE_TEAM, UserRole.ADMIN],
     },
     'compliance_correction': {
         'from': [DesignStatus.COMPLIANCE_PENDING],
@@ -108,9 +118,11 @@ WORKFLOW_ACTIONS = {
         'from': [
             DesignStatus.UNDER_REVIEW,
             DesignStatus.SUBMITTED,
+            DesignStatus.VERIFICATION_PENDING_ACK,
             DesignStatus.VERIFICATION_PENDING,
             DesignStatus.VERIFICATION_CORRECTION,
             DesignStatus.AWAITING_COMPLIANCE,
+            DesignStatus.COMPLIANCE_PENDING_ACK,
             DesignStatus.COMPLIANCE_PENDING,
             DesignStatus.COMPLIANCE_CORRECTION,
             DesignStatus.APPROVED,
@@ -368,14 +380,26 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
     elif action in ('send_to_verification', 'accept_design'):
         verifier = kwargs.get('verifier')
+        due_date = kwargs.get('due_date')
         if not verifier:
             raise WorkflowError('A verification team member must be selected.')
+        if not due_date:
+            raise WorkflowError('Due date is required when sending to verification.')
         DesignReview.objects.create(
             design=design, reviewer=user,
             action='accept', comments=comments,
         )
         design.assigned_verifier = verifier
+        design.verification_due_date = due_date
+        design.verification_instructions = comments
+        design.verification_assigned_at = timezone.now()
+        design.verification_acknowledged_at = None
         design.current_holder = verifier
+
+    elif action == 'accept_verification':
+        if design.assigned_verifier_id != user.pk:
+            raise WorkflowError('Only the assigned verifier can acknowledge this request.')
+        design.verification_acknowledged_at = timezone.now()
 
     elif action == 'verification_correction':
         design.current_holder = hod or user
@@ -404,10 +428,22 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
     elif action == 'send_to_compliance':
         officer = kwargs.get('compliance_officer')
+        due_date = kwargs.get('due_date')
         if not officer:
             raise WorkflowError('A compliance team member must be selected.')
+        if not due_date:
+            raise WorkflowError('Due date is required when sending to compliance.')
         design.assigned_compliance_officer = officer
+        design.compliance_due_date = due_date
+        design.compliance_instructions = comments
+        design.compliance_assigned_at = timezone.now()
+        design.compliance_acknowledged_at = None
         design.current_holder = officer
+
+    elif action == 'accept_compliance':
+        if design.assigned_compliance_officer_id != user.pk:
+            raise WorkflowError('Only the assigned compliance officer can acknowledge this request.')
+        design.compliance_acknowledged_at = timezone.now()
 
     elif action == 'compliance_correction':
         design.current_holder = hod or user
@@ -468,7 +504,11 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     if action == 'assign' and hod_self_assigned:
         _start_stage(design, 'design', user)
 
-    _start_stage(design, new_status, user)
+    _STAGE_START_SKIP = frozenset({
+        'send_to_verification', 'accept_design', 'send_to_compliance',
+    })
+    if action not in _STAGE_START_SKIP:
+        _start_stage(design, new_status, user)
     update_deadline_status(design)
 
     log_activity(

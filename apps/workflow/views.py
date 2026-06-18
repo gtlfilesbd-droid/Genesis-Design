@@ -17,14 +17,20 @@ INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outli
 
 class AssignDesignerForm(forms.Form):
     designer = forms.ModelChoiceField(
-        queryset=User.objects.filter(role=UserRole.DESIGNER, is_active=True),
+        queryset=User.objects.none(),
         widget=forms.Select(attrs={'class': INPUT}),
+        label='Assign Designer',
     )
     due_date = forms.DateTimeField(
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': INPUT}),
         required=False,
     )
     instructions = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
+
+    def __init__(self, *args, project=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if project is not None:
+            self.fields['designer'].queryset = PermissionService.get_assignable_designers(project)
 
 
 class CommentForm(forms.Form):
@@ -41,10 +47,15 @@ class SendToVerificationForm(forms.Form):
         widget=forms.Select(attrs={'class': INPUT}),
         label='Verification Team Member',
     )
+    due_date = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': INPUT}),
+        required=True,
+        label='Due Date',
+    )
     comments = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
         required=False,
-        label='Message',
+        label='Message / Instructions',
     )
 
     def __init__(self, *args, project=None, **kwargs):
@@ -59,10 +70,15 @@ class SendToComplianceForm(forms.Form):
         widget=forms.Select(attrs={'class': INPUT}),
         label='Compliance Team Member',
     )
+    due_date = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': INPUT}),
+        required=True,
+        label='Due Date',
+    )
     comments = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
-        required=True,
-        label='Message',
+        required=False,
+        label='Message / Instructions',
     )
 
     def __init__(self, *args, project=None, **kwargs):
@@ -79,6 +95,8 @@ ACTION_PERMISSIONS = {
     'request_correction': 'PROJECT_PERM_REVIEW',
     'send_to_verification': 'PROJECT_PERM_REVIEW',
     'accept_design': 'PROJECT_PERM_REVIEW',
+    'accept_verification': 'PROJECT_PERM_VERIFY',
+    'accept_compliance': 'PROJECT_PERM_COMPLIANCE',
     'verification_correction': 'PROJECT_PERM_VERIFY',
     'verify_approved': 'PROJECT_PERM_VERIFY',
     'send_to_compliance': 'PROJECT_PERM_APPROVE',
@@ -91,11 +109,32 @@ ACTION_PERMISSIONS = {
 }
 
 
+def _warn_if_past_target(request, design, due_date):
+    if due_date and design.target_completion_date:
+        due_day = due_date.date() if hasattr(due_date, 'date') else due_date
+        if due_day > design.target_completion_date:
+            messages.warning(
+                request,
+                f'Warning: This due date ({due_day:%d %b %Y}) is after the requester\'s '
+                f'target completion date ({design.target_completion_date:%d %b %Y}).',
+            )
+
+
 def _check_workflow_permission(request, design, action):
     required = ACTION_PERMISSIONS.get(action)
     if not required:
         return True
     project = design.project
+    if action == 'accept_verification':
+        return (
+            design.assigned_verifier_id == request.user.pk
+            and can_run_workflow_action(request.user, project, action, required)
+        )
+    if action == 'accept_compliance':
+        return (
+            design.assigned_compliance_officer_id == request.user.pk
+            and can_run_workflow_action(request.user, project, action, required)
+        )
     if action in ('accept_assignment', 'submit_work', 'resubmit'):
         if action in ('submit_work', 'resubmit'):
             return can_user_submit_work(request.user, design)
@@ -117,7 +156,7 @@ def workflow_action(request, pk, action):
         return redirect('requests:detail', pk=pk)
 
     form_actions = {
-        'assign': AssignDesignerForm,
+        'assign': lambda **kw: AssignDesignerForm(project=design.project, **kw),
         'submit_work': CommentForm,
         'resubmit': CommentForm,
         'request_correction': CommentForm,
@@ -145,12 +184,13 @@ def workflow_action(request, pk, action):
         try:
             kwargs = {}
             if action == 'assign':
-                form = AssignDesignerForm(request.POST)
+                form = AssignDesignerForm(request.POST, project=design.project)
                 if not form.is_valid():
                     return render(request, 'workflow/action_form.html', {
                         'design': design, 'action': action, 'form': form,
                     })
                 kwargs = form.cleaned_data
+                _warn_if_past_target(request, design, kwargs.get('due_date'))
             elif action in ('submit_work', 'resubmit'):
                 form = CommentForm(request.POST)
                 if not form.is_valid():
@@ -169,8 +209,10 @@ def workflow_action(request, pk, action):
                     })
                 kwargs = {
                     'verifier': form.cleaned_data['verifier'],
+                    'due_date': form.cleaned_data['due_date'],
                     'comments': form.cleaned_data['comments'],
                 }
+                _warn_if_past_target(request, design, kwargs['due_date'])
             elif action == 'send_to_compliance':
                 form = SendToComplianceForm(request.POST, project=design.project)
                 if not form.is_valid():
@@ -179,8 +221,10 @@ def workflow_action(request, pk, action):
                     })
                 kwargs = {
                     'compliance_officer': form.cleaned_data['compliance_officer'],
+                    'due_date': form.cleaned_data['due_date'],
                     'comments': form.cleaned_data['comments'],
                 }
+                _warn_if_past_target(request, design, kwargs['due_date'])
             elif action in (
                 'request_correction', 'verification_correction', 'compliance_correction',
                 'verify_approved', 'compliance_approved',
@@ -204,10 +248,10 @@ def assign_designer_view(request, pk):
         return redirect('requests:detail', pk=pk)
     suggested = suggest_designer(design)
     if request.method == 'POST':
-        form = AssignDesignerForm(request.POST)
-        form.fields['designer'].queryset = PermissionService.get_assignable_designers(design.project)
+        form = AssignDesignerForm(request.POST, project=design.project)
         if form.is_valid():
             try:
+                _warn_if_past_target(request, design, form.cleaned_data.get('due_date'))
                 transition(design, 'assign', request.user, request=request, **form.cleaned_data)
                 messages.success(request, 'Designer assigned successfully.')
                 return redirect('requests:detail', pk=pk)
@@ -217,8 +261,7 @@ def assign_designer_view(request, pk):
         initial = {}
         if suggested:
             initial['designer'] = suggested
-        form = AssignDesignerForm(initial=initial)
-        form.fields['designer'].queryset = PermissionService.get_assignable_designers(design.project)
+        form = AssignDesignerForm(initial=initial, project=design.project)
     return render(request, 'workflow/assign.html', {
         'design': design, 'form': form, 'suggested_designer': suggested,
     })

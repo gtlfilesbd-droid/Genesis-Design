@@ -70,3 +70,19 @@ class NotificationServiceTests(TestCase):
         self.assertFalse(
             Notification.objects.filter(user=self.designer, title__contains='Assignment Accepted').exists()
         )
+
+    def test_accept_verification_notifies_hod(self):
+        from apps.accounts.models import UserRole as UR
+        verifier = User.objects.create_user(
+            username='ver', password='pass', role=UR.VERIFICATION_TEAM, employee_id='V1',
+        )
+        self.design.assigned_verifier = verifier
+        self.design.status = DesignStatus.VERIFICATION_PENDING_ACK
+        self.design.save()
+        notify_workflow_transition(self.design, 'accept_verification', verifier)
+        self.assertTrue(
+            Notification.objects.filter(user=self.hod, title__contains='Verification Acknowledged').exists()
+        )
+        self.assertFalse(
+            Notification.objects.filter(user=verifier, title__contains='Verification Acknowledged').exists()
+        )
