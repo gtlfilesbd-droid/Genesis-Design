@@ -102,8 +102,11 @@ def project_detail(request, pk):
         messages.error(request, 'You do not have access to this project.')
         return redirect('projects:list')
 
-    designs = project.design_requests.select_related(
-        'drawing_type', 'requested_by', 'assigned_designer'
+    designs = PermissionService.filter_design_requests(
+        request.user,
+        project.design_requests.select_related(
+            'drawing_type', 'requested_by', 'assigned_designer',
+        ),
     )
     logs = ActivityLog.objects.filter(
         Q(entity_type='project', entity_id=project.pk) |

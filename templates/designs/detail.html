@@ -240,6 +240,9 @@
                 {% endif %}
                 {% if design.status == 'awaiting_compliance' and can_send_to_compliance %}
                 <a href="{% url 'workflow:action' design.pk 'send_to_compliance' %}" class="g-btn-primary w-full block text-center">Send to Compliance</a>
+                {% if can_hod_fast_complete %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'hod_fast_complete' %}" class="mt-2">{% csrf_token %}<button class="g-btn-secondary w-full">Fast-Track Complete</button></form>
+                {% endif %}
                 {% endif %}
                 {% if design.status == 'compliance_pending_acknowledgement' and can_acknowledge_compliance %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'accept_compliance' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge Compliance Review</button></form>
@@ -295,6 +298,19 @@
                     <p class="text-xs text-slate-500">{{ log.user }} · {{ log.created_at|timesince_short }}{% if log.metadata.old_status %} · {{ log.metadata.old_status }} → {{ log.metadata.new_status }}{% endif %}</p>
                 </div>
                 {% empty %}<p class="text-sm text-slate-500">No activity.</p>{% endfor %}
+            </div>
+        </div>
+
+        <div class="g-card p-6">
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Notifications</h2>
+            <div class="space-y-3 max-h-64 overflow-y-auto">
+                {% for n in request_notifications %}
+                <div class="text-sm border-l-2 {% if n.is_read %}border-slate-200{% else %}border-blue-500{% endif %} pl-3">
+                    <p class="{% if not n.is_read %}font-semibold text-slate-900{% else %}font-medium text-slate-700{% endif %}">{{ n.title }}</p>
+                    <p class="text-xs text-slate-600 mt-0.5">{{ n.message }}</p>
+                    <p class="text-xs text-slate-400 mt-1">{{ n.created_at|timesince_short }}</p>
+                </div>
+                {% empty %}<p class="text-sm text-slate-500">No notifications for this request.</p>{% endfor %}
             </div>
         </div>
     </div>

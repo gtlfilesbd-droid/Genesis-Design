@@ -168,6 +168,81 @@ class WorkflowBugfixTests(TestCase):
             ).exists()
         )
 
+    def test_verifier_in_filter_after_awaiting_compliance(self):
+        self.design.status = DesignStatus.UNDER_REVIEW
+        self.design.save()
+        _send_to_verification(self.design, self.hod, self.verifier)
+        transition(self.design, 'verify_approved', self.verifier, comments='OK')
+        self.design.refresh_from_db()
+        self.assertEqual(self.design.status, DesignStatus.AWAITING_COMPLIANCE)
+        visible = PermissionService.filter_design_requests(self.verifier)
+        self.assertIn(self.design, visible)
+
+    def test_verifier_can_view_request_after_verify_approved(self):
+        self.design.status = DesignStatus.UNDER_REVIEW
+        self.design.save()
+        _send_to_verification(self.design, self.hod, self.verifier)
+        transition(self.design, 'verify_approved', self.verifier, comments='OK')
+        self.client.login(username='ver', password='pass')
+        response = self.client.get(reverse('requests:detail', kwargs={'pk': self.design.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'You do not have access to this design request.')
+
+    def test_hod_fast_complete_visible_at_awaiting_compliance(self):
+        self.design.status = DesignStatus.AWAITING_COMPLIANCE
+        self.design.save()
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('requests:detail', kwargs={'pk': self.design.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('workflow:action', kwargs={
+            'pk': self.design.pk, 'action': 'hod_fast_complete',
+        }))
+
+    def test_detail_shows_request_notifications(self):
+        Notification.objects.create(
+            user=self.hod,
+            title='Verification Approved: TEST-001',
+            message='Design has passed verification.',
+            link=f'/requests/{self.design.pk}/',
+        )
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('requests:detail', kwargs={'pk': self.design.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Verification Approved: TEST-001')
+        self.assertContains(response, 'Notifications')
+
+    def test_requester_can_view_own_design_after_verify_approved(self):
+        self.design.status = DesignStatus.UNDER_REVIEW
+        self.design.save()
+        _send_to_verification(self.design, self.hod, self.verifier)
+        transition(self.design, 'verify_approved', self.verifier, comments='OK')
+        self.design.refresh_from_db()
+        self.assertEqual(self.design.status, DesignStatus.AWAITING_COMPLIANCE)
+        visible = PermissionService.filter_design_requests(self.requester)
+        self.assertIn(self.design, visible)
+        self.client.login(username='req', password='pass')
+        response = self.client.get(reverse('requests:detail', kwargs={'pk': self.design.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'You do not have access to this design request.')
+
+    def test_requester_sees_designs_on_owned_project(self):
+        other_requester = User.objects.create_user(
+            username='req2', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R002',
+        )
+        other_design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            priority='medium',
+            requested_by=other_requester,
+            status=DesignStatus.NEW_REQUEST,
+            current_holder=self.hod,
+        )
+        visible = PermissionService.filter_design_requests(self.requester)
+        self.assertIn(other_design, visible)
+        self.client.login(username='req', password='pass')
+        response = self.client.get(reverse('requests:detail', kwargs={'pk': other_design.pk}))
+        self.assertEqual(response.status_code, 200)
+
     def test_full_verification_compliance_chain(self):
         self.design.status = DesignStatus.UNDER_REVIEW
         self.design.assigned_designer = self.designer

@@ -62,14 +62,21 @@ class RoleBasedPermissionTests(TestCase):
         other_user = User.objects.create_user(
             username='other', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R2',
         )
-        other = DesignRequest.objects.create(
+        other_on_owned_project = DesignRequest.objects.create(
             project=self.project, drawing_type=drawing_type, requested_by=other_user,
+        )
+        other_project = Project.objects.create(
+            name='P2', code='P2', client_name='C2', start_date=date.today(), created_by=other_user,
+        )
+        other_on_foreign_project = DesignRequest.objects.create(
+            project=other_project, drawing_type=drawing_type, requested_by=other_user,
         )
         visible = PermissionService.filter_design_requests(
             self.requester, DesignRequest.objects.all(),
         )
         self.assertIn(own, visible)
-        self.assertNotIn(other, visible)
+        self.assertIn(other_on_owned_project, visible)
+        self.assertNotIn(other_on_foreign_project, visible)
 
     def test_extra_permission_grants_verify_to_designer(self):
         designer = User.objects.create_user(

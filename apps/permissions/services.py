@@ -193,6 +193,24 @@ class PermissionService:
         return Project.objects.filter(pk__in=all_ids)
 
     @staticmethod
+    def _design_participation_q(user):
+        """Permanent access for users involved in a design's workflow."""
+        return (
+            Q(requested_by=user)
+            | Q(assigned_designer=user)
+            | Q(current_holder=user)
+            | Q(assigned_verifier=user)
+            | Q(verified_by=user)
+            | Q(assigned_compliance_officer=user)
+            | Q(approved_by_compliance=user)
+        )
+
+    @staticmethod
+    def _requester_design_scope_q(user):
+        """Design requester visibility: own submissions and designs on owned projects."""
+        return Q(requested_by=user) | Q(project__created_by=user)
+
+    @staticmethod
     def filter_design_requests(user, queryset=None):
         if queryset is None:
             queryset = DesignRequest.objects.all()
@@ -201,11 +219,15 @@ class PermissionService:
         if PermissionService._is_admin_or_hod(user):
             return queryset
 
+        participation = PermissionService._design_participation_q(user)
+
         if user.role == UserRole.DESIGN_REQUESTER:
-            return queryset.filter(requested_by=user)
+            return queryset.filter(
+                PermissionService._requester_design_scope_q(user),
+            ).distinct()
 
         if user.role == UserRole.DESIGNER:
-            filters = Q(assigned_designer=user) | Q(current_holder=user)
+            filters = participation
             if PermissionService._extra_flag(user, 'can_verify'):
                 filters |= Q(status__in=VERIFICATION_STATUSES)
             if PermissionService._extra_flag(user, 'can_compliance'):
@@ -214,20 +236,17 @@ class PermissionService:
 
         if user.role == UserRole.VERIFICATION_TEAM or PermissionService._extra_flag(user, 'can_verify'):
             return queryset.filter(
-                Q(status__in=VERIFICATION_STATUSES) | Q(current_holder=user)
+                participation | Q(status__in=VERIFICATION_STATUSES),
             ).distinct()
 
         if user.role == UserRole.COMPLIANCE_TEAM or PermissionService._extra_flag(user, 'can_compliance'):
             return queryset.filter(
-                Q(status__in=COMPLIANCE_STATUSES) | Q(current_holder=user)
+                participation | Q(status__in=COMPLIANCE_STATUSES),
             ).distinct()
 
         visible_project_ids = PermissionService.get_user_projects(user).values_list('pk', flat=True)
         return queryset.filter(
-            Q(requested_by=user)
-            | Q(assigned_designer=user)
-            | Q(current_holder=user)
-            | Q(project_id__in=visible_project_ids)
+            participation | Q(project_id__in=visible_project_ids),
         ).distinct()
 
     @staticmethod

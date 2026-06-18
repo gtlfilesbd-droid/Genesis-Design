@@ -52,6 +52,55 @@ class NotificationServiceTests(TestCase):
             1,
         )
 
+    def test_acknowledge_notifies_project_owner(self):
+        other_submitter = User.objects.create_user(
+            username='sub', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R2',
+        )
+        self.design.requested_by = other_submitter
+        self.design.save(update_fields=['requested_by'])
+        NotificationService.on_request_acknowledged(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Acknowledged').exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(user=other_submitter, title__contains='Acknowledged').exists()
+        )
+
+    def test_acknowledge_via_workflow_transition_integration(self):
+        from apps.workflow.services import transition
+        self.design.status = DesignStatus.NEW_REQUEST
+        self.design.save(update_fields=['status', 'primary_status', 'deadline_missed'])
+        transition(self.design, 'acknowledge', self.hod)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.requester, title__contains='Request Acknowledged',
+            ).exists()
+        )
+
+    def test_verification_approved_notifies_requester(self):
+        NotificationService.on_verification_approved(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Verification Approved').exists()
+        )
+
+    def test_verification_correction_notifies_requester(self):
+        NotificationService.on_verification_correction(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Verification Correction').exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(user=self.hod, title__contains='Verification Correction').exists()
+        )
+
+    def test_compliance_correction_notifies_requester(self):
+        NotificationService.on_compliance_correction(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Compliance Correction').exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(user=self.hod, title__contains='Compliance Correction').exists()
+        )
+
     def test_on_designer_assigned_notifies_designer(self):
         self.design.assigned_designer = self.designer
         NotificationService.on_designer_assigned(self.design)
@@ -69,6 +118,68 @@ class NotificationServiceTests(TestCase):
         )
         self.assertFalse(
             Notification.objects.filter(user=self.designer, title__contains='Assignment Accepted').exists()
+        )
+
+    def test_accept_assignment_notifies_requester(self):
+        self.design.assigned_designer = self.designer
+        self.design.status = DesignStatus.ASSIGNED
+        self.design.save()
+        notify_workflow_transition(self.design, 'accept_assignment', self.designer)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Assignment Accepted').exists()
+        )
+
+    def test_submit_work_notifies_requester(self):
+        self.design.assigned_designer = self.designer
+        self.design.save()
+        notify_workflow_transition(self.design, 'submit_work', self.designer)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Work Submitted').exists()
+        )
+
+    def test_send_to_compliance_notifies_requester(self):
+        compliance = User.objects.create_user(
+            username='cmp', password='pass', role=UserRole.COMPLIANCE_TEAM, employee_id='C1',
+        )
+        self.design.assigned_compliance_officer = compliance
+        self.design.current_holder = compliance
+        self.design.save()
+        NotificationService.on_sent_to_compliance(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Sent to Compliance').exists()
+        )
+
+    def test_completed_notifies_project_owner(self):
+        other_submitter = User.objects.create_user(
+            username='sub', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R2',
+        )
+        self.design.requested_by = other_submitter
+        self.design.assigned_designer = self.designer
+        self.design.save()
+        NotificationService.on_completed(self.design)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Design Completed').exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(user=other_submitter, title__contains='Design Completed').exists()
+        )
+
+    def test_workflow_chain_notifies_requester_at_key_steps(self):
+        from apps.workflow.services import transition
+
+        self.design.status = DesignStatus.NEW_REQUEST
+        self.design.save(update_fields=['status', 'primary_status', 'deadline_missed'])
+        transition(self.design, 'acknowledge', self.hod)
+        transition(self.design, 'assign', self.hod, designer=self.designer)
+        transition(self.design, 'accept_assignment', self.designer)
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Request Acknowledged').exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Designer Assigned').exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(user=self.requester, title__contains='Assignment Accepted').exists()
         )
 
     def test_accept_verification_notifies_hod(self):

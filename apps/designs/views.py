@@ -72,9 +72,14 @@ def design_detail(request, pk):
         return redirect('requests:detail', pk=pk)
 
     from apps.core.models import ActivityLog, CompanySettings
+    from apps.notifications.models import Notification
     logs = ActivityLog.objects.filter(
         entity_type='design_request', entity_id=design.pk
     ).select_related('user')[:50]
+    request_notifications = Notification.objects.filter(
+        user=request.user,
+        link__contains=f'/requests/{design.pk}',
+    ).order_by('-created_at')[:10]
     submissions = design.submissions.select_related('submitted_by', 'reviewed_by')
     reviews = design.reviews.select_related('reviewer')
     verifications = design.verifications.select_related('verifier')
@@ -114,6 +119,7 @@ def design_detail(request, pk):
         'deadline_pct': deadline_pct,
         'progress_steps': progress_steps,
         'progress_cancelled': progress_cancelled,
+        'request_notifications': request_notifications,
         **action_flags,
     })
 
