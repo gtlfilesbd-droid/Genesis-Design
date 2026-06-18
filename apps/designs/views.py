@@ -86,12 +86,10 @@ def design_detail(request, pk):
     compute_delay_attribution(design)
     design.refresh_from_db()
 
-    stage_durations = design.stage_durations.select_related('responsible_user')
-    deadline_pct = 0
-    if design.deadline_start and design.deadline_due:
-        total = (design.deadline_due - design.deadline_start).total_seconds()
-        elapsed = (timezone.now() - design.deadline_start).total_seconds() if total else 0
-        deadline_pct = min(100, round((elapsed / total) * 100)) if total else 0
+    from apps.designs.timer_helpers import get_deadline_timer_data, get_time_breakdown_data
+
+    deadline_timer = get_deadline_timer_data(design)
+    time_breakdown = get_time_breakdown_data(design)
 
     from apps.designs.progress import build_progress_steps
     from apps.workflow.permissions import design_action_flags
@@ -111,8 +109,8 @@ def design_detail(request, pk):
         'file_sharing_policy': company.file_sharing_policy if company else '',
         'comments': comments,
         'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
-        'stage_durations': stage_durations,
-        'deadline_pct': deadline_pct,
+        'deadline_timer': deadline_timer,
+        'time_breakdown': time_breakdown,
         'progress_steps': progress_steps,
         'progress_cancelled': progress_cancelled,
         **action_flags,

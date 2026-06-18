@@ -277,17 +277,49 @@
 
         <div class="g-card p-6">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Deadline Timer</h2>
-            <div class="g-progress mb-2"><div class="g-progress-fill {% if design.deadline_status == 'red' %}!bg-red-500{% elif design.deadline_status == 'yellow' %}!bg-amber-500{% endif %}" style="width: {{ deadline_pct }}%"></div></div>
-            <p class="text-sm text-slate-600">{{ deadline_pct }}% elapsed</p>
-            {% if design.deadline_due %}<p class="text-xs text-slate-500 mt-1">Due: {{ design.deadline_due|date:"d M Y, h:i A" }}</p>{% endif %}
+            {% if deadline_timer %}
+            <div class="g-progress mb-2">
+                <div class="g-progress-fill {% if deadline_timer.bar_color == 'red' %}!bg-red-500{% elif deadline_timer.bar_color == 'amber' %}!bg-amber-500{% else %}!bg-green-500{% endif %}" style="width: {{ deadline_timer.percent_elapsed }}%"></div>
+            </div>
+            <p class="text-sm text-slate-600">{{ deadline_timer.percent_elapsed }}% elapsed</p>
+            <p class="text-xs text-slate-500 mt-1">Due: {{ deadline_timer.due_date|date:"d M Y, h:i A" }}</p>
+            {% if deadline_timer.is_overdue %}
+            <p class="text-xs text-red-600 font-medium mt-1">Overdue by {{ deadline_timer.days_overdue }} day(s)</p>
+            {% else %}
+            <p class="text-xs text-slate-500 mt-1">{{ deadline_timer.days_remaining }} day(s) remaining</p>
+            {% endif %}
+            {% else %}
+            <p class="text-sm text-slate-400">No active deadline for the current stage</p>
+            {% endif %}
         </div>
 
-        {% if design.delay_source %}
         <div class="g-card p-6">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Time Breakdown</h2>
-            <p class="text-sm text-red-600 font-medium">Delay: {{ design.delay_source }} ({{ design.delay_duration_days }} days)</p>
+            {% if time_breakdown.stages %}
+            <div class="space-y-2 text-sm">
+                {% for stage in time_breakdown.stages %}
+                <div class="flex justify-between gap-4">
+                    <span class="text-slate-600">{{ stage.label }}</span>
+                    <span class="font-medium text-slate-900 shrink-0">{{ stage.days }} day(s)</span>
+                </div>
+                {% endfor %}
+                {% if time_breakdown.total_days is not None %}
+                <div class="flex justify-between gap-4 pt-2 mt-2 border-t border-slate-100 font-semibold">
+                    <span class="text-slate-700">Total Elapsed</span>
+                    <span class="text-slate-900 shrink-0">{{ time_breakdown.total_days }} day(s)</span>
+                </div>
+                {% endif %}
+            </div>
+            {% if time_breakdown.slowest_stage %}
+            <p class="text-xs text-amber-600 mt-3">
+                Biggest delay source: {{ time_breakdown.slowest_stage.label }}
+                ({{ time_breakdown.slowest_stage.days }} days)
+            </p>
+            {% endif %}
+            {% else %}
+            <p class="text-sm text-slate-400">No stage timing data yet</p>
+            {% endif %}
         </div>
-        {% endif %}
 
         <div class="g-card p-5 rounded-xl border border-[#E2E8F0] bg-white">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Activity History</h2>
