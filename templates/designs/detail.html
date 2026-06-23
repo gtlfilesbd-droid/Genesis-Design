@@ -276,48 +276,85 @@
         </div>
 
         <div class="g-card p-6">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Deadline Timer</h2>
-            {% if deadline_timer %}
-            <div class="g-progress mb-2">
-                <div class="g-progress-fill {% if deadline_timer.bar_color == 'red' %}!bg-red-500{% elif deadline_timer.bar_color == 'amber' %}!bg-amber-500{% else %}!bg-green-500{% endif %}" style="width: {{ deadline_timer.percent_elapsed }}%"></div>
-            </div>
-            <p class="text-sm text-slate-600">{{ deadline_timer.percent_elapsed }}% elapsed</p>
-            <p class="text-xs text-slate-500 mt-1">Due: {{ deadline_timer.due_date|date:"d M Y, h:i A" }}</p>
-            {% if deadline_timer.is_overdue %}
-            <p class="text-xs text-red-600 font-medium mt-1">Overdue by {{ deadline_timer.days_overdue }} day(s)</p>
-            {% else %}
-            <p class="text-xs text-slate-500 mt-1">{{ deadline_timer.days_remaining }} day(s) remaining</p>
-            {% endif %}
-            {% else %}
-            <p class="text-sm text-slate-400">No active deadline for the current stage</p>
-            {% endif %}
-        </div>
-
-        <div class="g-card p-6">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Time Breakdown</h2>
-            {% if time_breakdown.stages %}
-            <div class="space-y-2 text-sm">
-                {% for stage in time_breakdown.stages %}
-                <div class="flex justify-between gap-4">
-                    <span class="text-slate-600">{{ stage.label }}</span>
-                    <span class="font-medium text-slate-900 shrink-0">{{ stage.days }} day(s)</span>
+            {% if completion_timeline %}
+            <div class="timeline-journey">
+                <div class="timeline-journey-header">
+                    <h4 class="timeline-journey-title">
+                        {% if completion_timeline.is_completed_on_time %}
+                            Drawing completed on time
+                        {% elif completion_timeline.is_overdue %}
+                            Drawing completion — day {{ completion_timeline.total_days }} of {{ completion_timeline.days_allowed }} allowed
+                        {% else %}
+                            Drawing in progress — day {{ completion_timeline.total_days }} of {{ completion_timeline.days_allowed }} allowed
+                        {% endif %}
+                    </h4>
+                    {% if completion_timeline.is_overdue %}
+                    <p class="timeline-journey-subtitle">{{ completion_timeline.days_over }} days over target</p>
+                    {% elif completion_timeline.is_completed_on_time %}
+                    <p class="timeline-journey-subtitle timeline-journey-subtitle--success">Finished within the target window</p>
+                    {% elif completion_timeline.is_completed_late %}
+                    <p class="timeline-journey-subtitle">{{ completion_timeline.days_over }} days over target</p>
+                    {% elif completion_timeline.days_remaining is not None %}
+                    <p class="timeline-journey-subtitle timeline-journey-subtitle--success">On track, {{ completion_timeline.days_remaining }} days remaining</p>
+                    {% endif %}
                 </div>
-                {% endfor %}
-                {% if time_breakdown.total_days is not None %}
-                <div class="flex justify-between gap-4 pt-2 mt-2 border-t border-slate-100 font-semibold">
-                    <span class="text-slate-700">Total Elapsed</span>
-                    <span class="text-slate-900 shrink-0">{{ time_breakdown.total_days }} day(s)</span>
+
+                <div class="timeline-journey-track">
+                    <div class="timeline-bar-shell">
+                        <div class="timeline-bar">
+                            {% for stage in completion_timeline.stages %}
+                            <div class="timeline-segment {{ stage.segment_class }}"
+                                 style="flex-grow: {{ stage.days|default:1 }};"
+                                 title="{{ stage.name }}{% if stage.person %} — {{ stage.person }}{% endif %}">
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if completion_timeline.target_date and completion_timeline.target_marker_position_percent is not None %}
+                        <div class="target-marker" style="left: {{ completion_timeline.target_marker_position_percent }}%;">
+                            <span>Target date</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="timeline-legend-row">
+                        {% for stage in completion_timeline.stages %}
+                        <div class="timeline-legend-col {{ stage.legend_class }}" style="flex-grow: {{ stage.days|default:1 }};">
+                            <div class="timeline-legend-item">
+                                <span class="dot" aria-hidden="true"></span>
+                                <div class="timeline-legend-copy">
+                                    <p class="timeline-legend-name">{{ stage.name }}{% if stage.person %} — {{ stage.person }}{% endif %}</p>
+                                    <p class="timeline-legend-days{% if stage.is_current_delay_source %} timeline-legend-days--delay{% endif %}">
+                                        {{ stage.days }} days{% if stage.is_ongoing and stage.is_current_delay_source %} — still pending, overdue{% elif stage.is_ongoing %} — in progress{% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if completion_timeline.is_overdue and completion_timeline.delay_info %}
+                <div class="timeline-warning-banner">
+                    <p class="timeline-warning-title">Delay source: {{ completion_timeline.delay_info.stage_name }} review</p>
+                    <p class="timeline-warning-detail">
+                        {% if completion_timeline.delay_info.person %}
+                        Waiting on {{ completion_timeline.delay_info.person }} since {{ completion_timeline.delay_info.start|date:"d M" }},
+                        {% endif %}
+                        {{ completion_timeline.days_over }} days past the {{ completion_timeline.target_date|date:"d M" }} target
+                    </p>
+                </div>
+                {% elif completion_timeline.is_completed_late and completion_timeline.delay_info %}
+                <div class="timeline-warning-banner">
+                    <p class="timeline-warning-title">This drawing was completed {{ completion_timeline.days_over }} days late. Delay source: {{ completion_timeline.delay_info.stage_name }} review</p>
+                    {% if completion_timeline.delay_info.person %}
+                    <p class="timeline-warning-detail">Primary delay attributed to {{ completion_timeline.delay_info.person }}</p>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
-            {% if time_breakdown.slowest_stage %}
-            <p class="text-xs text-amber-600 mt-3">
-                Biggest delay source: {{ time_breakdown.slowest_stage.label }}
-                ({{ time_breakdown.slowest_stage.days }} days)
-            </p>
-            {% endif %}
             {% else %}
-            <p class="text-sm text-slate-400">No stage timing data yet</p>
+            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Drawing Completion Timeline</h2>
+            <p class="text-sm text-slate-400">Workflow not started yet</p>
             {% endif %}
         </div>
 

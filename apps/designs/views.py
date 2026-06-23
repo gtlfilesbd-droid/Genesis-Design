@@ -86,10 +86,9 @@ def design_detail(request, pk):
     compute_delay_attribution(design)
     design.refresh_from_db()
 
-    from apps.designs.timer_helpers import get_deadline_timer_data, get_time_breakdown_data
+    from apps.designs.timer_helpers import get_completion_timeline_data
 
-    deadline_timer = get_deadline_timer_data(design)
-    time_breakdown = get_time_breakdown_data(design)
+    completion_timeline = get_completion_timeline_data(design)
 
     from apps.designs.progress import build_progress_steps
     from apps.workflow.permissions import design_action_flags
@@ -109,8 +108,7 @@ def design_detail(request, pk):
         'file_sharing_policy': company.file_sharing_policy if company else '',
         'comments': comments,
         'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
-        'deadline_timer': deadline_timer,
-        'time_breakdown': time_breakdown,
+        'completion_timeline': completion_timeline,
         'progress_steps': progress_steps,
         'progress_cancelled': progress_cancelled,
         **action_flags,
