@@ -58,6 +58,25 @@ def deadline_badge(status):
 
 
 @register.filter
+def proper_title(value):
+    """Title-case labels; keep short leading tokens like RSC uppercase."""
+    if not value:
+        return ''
+    words = str(value).split()
+    result = []
+    for i, word in enumerate(words):
+        clean = ''.join(c for c in word if c.isalnum())
+        if not clean:
+            result.append(word)
+            continue
+        if len(clean) <= 4 and clean.isalpha() and (clean.upper() == clean or i == 0):
+            result.append(clean.upper())
+        else:
+            result.append(word.capitalize())
+    return ' '.join(result)
+
+
+@register.filter
 def initials(user):
     if not user:
         return '?'

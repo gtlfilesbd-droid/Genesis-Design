@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% load genesis_ui %}
 {% block title %}{{ design.design_number }}{% endblock %}
+{% block extra_css %}
+{% load static %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="{% static 'css/lifecycle_card.css' %}">
+{% endblock %}
 {% block content %}
 <div class="mb-6">
     {% if can_view_project %}
@@ -275,90 +280,11 @@
             </div>
         </div>
 
-        <div class="g-card p-6">
-            {% if completion_timeline %}
-            <div class="timeline-journey">
-                <div class="timeline-journey-header">
-                    <h4 class="timeline-journey-title">
-                        {% if completion_timeline.is_completed_on_time %}
-                            Drawing completed on time
-                        {% elif completion_timeline.is_overdue %}
-                            Drawing completion — day {{ completion_timeline.total_days }} of {{ completion_timeline.days_allowed }} allowed
-                        {% else %}
-                            Drawing in progress — day {{ completion_timeline.total_days }} of {{ completion_timeline.days_allowed }} allowed
-                        {% endif %}
-                    </h4>
-                    {% if completion_timeline.is_overdue %}
-                    <p class="timeline-journey-subtitle">{{ completion_timeline.days_over }} days over target</p>
-                    {% elif completion_timeline.is_completed_on_time %}
-                    <p class="timeline-journey-subtitle timeline-journey-subtitle--success">Finished within the target window</p>
-                    {% elif completion_timeline.is_completed_late %}
-                    <p class="timeline-journey-subtitle">{{ completion_timeline.days_over }} days over target</p>
-                    {% elif completion_timeline.days_remaining is not None %}
-                    <p class="timeline-journey-subtitle timeline-journey-subtitle--success">On track, {{ completion_timeline.days_remaining }} days remaining</p>
-                    {% endif %}
-                </div>
+        {% if lifecycle %}
+        {% include 'components/lifecycle_card.html' with request=design lifecycle=lifecycle %}
+        {% endif %}
 
-                <div class="timeline-journey-track">
-                    <div class="timeline-bar-shell">
-                        <div class="timeline-bar">
-                            {% for stage in completion_timeline.stages %}
-                            <div class="timeline-segment {{ stage.segment_class }}"
-                                 style="flex-grow: {{ stage.days|default:1 }};"
-                                 title="{{ stage.name }}{% if stage.person %} — {{ stage.person }}{% endif %}">
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% if completion_timeline.target_date and completion_timeline.target_marker_position_percent is not None %}
-                        <div class="target-marker" style="left: {{ completion_timeline.target_marker_position_percent }}%;">
-                            <span>Target date</span>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="timeline-legend-row">
-                        {% for stage in completion_timeline.stages %}
-                        <div class="timeline-legend-col {{ stage.legend_class }}" style="flex-grow: {{ stage.days|default:1 }};">
-                            <div class="timeline-legend-item">
-                                <span class="dot" aria-hidden="true"></span>
-                                <div class="timeline-legend-copy">
-                                    <p class="timeline-legend-name">{{ stage.name }}{% if stage.person %} — {{ stage.person }}{% endif %}</p>
-                                    <p class="timeline-legend-days{% if stage.is_current_delay_source %} timeline-legend-days--delay{% endif %}">
-                                        {{ stage.days }} days{% if stage.is_ongoing and stage.is_current_delay_source %} — still pending, overdue{% elif stage.is_ongoing %} — in progress{% endif %}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                {% if completion_timeline.is_overdue and completion_timeline.delay_info %}
-                <div class="timeline-warning-banner">
-                    <p class="timeline-warning-title">Delay source: {{ completion_timeline.delay_info.stage_name }} review</p>
-                    <p class="timeline-warning-detail">
-                        {% if completion_timeline.delay_info.person %}
-                        Waiting on {{ completion_timeline.delay_info.person }} since {{ completion_timeline.delay_info.start|date:"d M" }},
-                        {% endif %}
-                        {{ completion_timeline.days_over }} days past the {{ completion_timeline.target_date|date:"d M" }} target
-                    </p>
-                </div>
-                {% elif completion_timeline.is_completed_late and completion_timeline.delay_info %}
-                <div class="timeline-warning-banner">
-                    <p class="timeline-warning-title">This drawing was completed {{ completion_timeline.days_over }} days late. Delay source: {{ completion_timeline.delay_info.stage_name }} review</p>
-                    {% if completion_timeline.delay_info.person %}
-                    <p class="timeline-warning-detail">Primary delay attributed to {{ completion_timeline.delay_info.person }}</p>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
-            {% else %}
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Drawing Completion Timeline</h2>
-            <p class="text-sm text-slate-400">Workflow not started yet</p>
-            {% endif %}
-        </div>
-
-        <div class="g-card p-5 rounded-xl border border-[#E2E8F0] bg-white">
+        <div class="g-card p-5 rounded-xl border border-[#E2E8F0] bg-white" id="activity-log-section">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Activity History</h2>
             {% include 'components/activity_timeline.html' with logs=logs %}
         </div>

@@ -274,6 +274,31 @@ class DesignRequest(models.Model):
             return 'Cancelled'
         return 'Pending'
 
+    @property
+    def requested_at(self):
+        return self.created_at
+
+    @property
+    def acknowledged_at(self):
+        return self.deadline_start
+
+    @property
+    def assigned_at(self):
+        assignment = self.assignments.order_by('assigned_at').first()
+        return assignment.assigned_at if assignment else None
+
+    @property
+    def target_date(self):
+        return self.target_completion_date
+
+    @property
+    def completed_at(self):
+        return self.completion_date
+
+    @property
+    def correction_count(self):
+        return self.revision_count
+
 
 class DesignAssignment(models.Model):
     design = models.ForeignKey(

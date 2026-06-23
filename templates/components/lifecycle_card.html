@@ -1,0 +1,137 @@
+{% load genesis_ui %}
+<div class="lc-wrap">
+<div class="lc-card">
+
+  <div class="lc-top">
+    <div>
+      <p class="lc-title">{{ request.design_number }} — {{ request.drawing_type.name|proper_title }}</p>
+      <p class="lc-sub">{{ request.project.name }} · Requested by {{ request.requested_by.get_full_name }}</p>
+    </div>
+    {% if lifecycle.is_overdue %}
+      <span class="lc-badge lc-badge-danger">{{ lifecycle.days_over_target }} day(s) overdue</span>
+    {% elif lifecycle.is_completed_on_time %}
+      <span class="lc-badge lc-badge-success">Completed on time</span>
+    {% elif request.completed_at %}
+      <span class="lc-badge lc-badge-danger">Completed {{ lifecycle.days_late }}d late</span>
+    {% else %}
+      <span class="lc-badge lc-badge-neutral">On track</span>
+    {% endif %}
+  </div>
+
+  <div class="lc-stats">
+    <div class="lc-stat">
+      <p class="lc-stat-label">Elapsed</p>
+      <p class="lc-stat-val">{{ lifecycle.total_days }}d</p>
+    </div>
+    <div class="lc-stat">
+      <p class="lc-stat-label">Allowed</p>
+      <p class="lc-stat-val">{{ lifecycle.days_allowed }}d</p>
+    </div>
+    <div class="lc-stat">
+      <p class="lc-stat-label">Corrections</p>
+      <p class="lc-stat-val">{{ request.correction_count }}</p>
+    </div>
+    <div class="lc-stat">
+      <p class="lc-stat-label">Current Stage</p>
+      <p class="lc-stat-val lc-stat-val-stage {% if lifecycle.is_overdue %}lc-text-danger{% endif %}">
+        {{ lifecycle.current_stage_label|default:"Completed" }}
+      </p>
+    </div>
+  </div>
+
+  <div class="lc-legend">
+    <span><span class="dot" style="background:#185FA5"></span>Head of Design</span>
+    <span><span class="dot" style="background:#1D9E75"></span>Designer</span>
+    <span><span class="dot" style="background:#BA7517"></span>Verifier</span>
+    <span><span class="dot" style="background:#993556"></span>Compliance</span>
+    <span><span class="dot" style="background:#A32D2D"></span>Delay</span>
+  </div>
+
+  <div class="lc-scroll">
+    <div class="lc-track-wrap">
+      <div class="lc-track">
+        {% for seg in lifecycle.segments %}
+          <div class="seg seg-{{ seg.role }} {% if seg.is_ongoing %}seg-ongoing{% endif %} {% if seg.is_delay %}seg-delay{% endif %}"
+               style="flex-grow: {{ seg.grow }};"
+               title="{{ seg.label }}{% if seg.person %} — {{ seg.person }}{% endif %}">
+            <span class="seg-title">{{ seg.label }}</span>
+            <span class="seg-sub">{% if seg.days is not None %}{{ seg.days }}d{% if seg.note %}, {{ seg.note }}{% endif %}{% endif %}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% if lifecycle.target_marker_percent %}
+        <div class="marker" style="left: {{ lifecycle.target_marker_percent }}%;"></div>
+        <div class="marker-label" style="left: {{ lifecycle.target_marker_percent }}%;">
+          Target · {{ request.target_date|date:"d M" }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="lc-people">
+    {% for p in lifecycle.people %}
+      <span class="person-chip">
+        <span class="avatar" style="background:{{ p.bg }};color:{{ p.fg }};">{{ p.initials }}</span>
+        {{ p.name }} · {{ p.role_label }}
+      </span>
+    {% endfor %}
+  </div>
+
+  <div class="lc-status {% if lifecycle.is_overdue %}lc-status-danger{% elif request.completed_at and lifecycle.is_completed_on_time %}lc-status-success{% else %}lc-status-neutral{% endif %}">
+    <i class="ti {% if lifecycle.is_overdue %}ti-alert-triangle{% elif request.completed_at %}ti-check{% else %}ti-clock{% endif %}" aria-hidden="true"></i>
+    <p>
+      {% if lifecycle.is_overdue %}
+        <strong>Delay source — {{ lifecycle.delay_stage_label }}</strong>
+        <span>Waiting on {{ lifecycle.delay_person }} since {{ lifecycle.delay_since|date:"d M, h:i A" }} — {{ lifecycle.days_over_target }} day(s) past the {{ request.target_date|date:"d M Y" }} target.</span>
+      {% elif request.completed_at and lifecycle.is_completed_on_time %}
+        <strong>Completed on time</strong>
+        <span>Finished within the {{ request.target_date|date:"d M Y" }} target window.</span>
+      {% elif request.completed_at %}
+        <strong>Completed {{ lifecycle.days_late }} day(s) late</strong>
+        <span>Delay source: {{ lifecycle.delay_stage_label }}.</span>
+      {% else %}
+        <strong>Currently with {{ lifecycle.current_stage_label }}</strong>
+        <span>{{ lifecycle.current_person }} — {{ lifecycle.current_elapsed_days }} day(s) so far. Target: {{ request.target_date|date:"d M Y" }}.</span>
+      {% endif %}
+    </p>
+  </div>
+
+  {% if not request.completed_at %}
+  <div class="lc-actions">
+    {% if lifecycle.is_overdue and lifecycle.delay_person_id %}
+      <button type="button" onclick="sendReminderAction({{ request.id }}, {{ lifecycle.delay_person_id }})">
+        <i class="ti ti-bell" aria-hidden="true"></i>Send reminder
+      </button>
+    {% endif %}
+    <a href="#activity-log-section" class="lc-action-link">
+      <button type="button"><i class="ti ti-history" aria-hidden="true"></i>Full history</button>
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+</div>
+
+<script>
+function sendReminderAction(requestId, userId) {
+  const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (!csrfInput) {
+    alert('Could not send reminder. Please refresh the page.');
+    return;
+  }
+  fetch(`/api/requests/${requestId}/send-reminder/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfInput.value,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ target_user_id: userId }),
+  }).then(res => {
+    if (res.ok) {
+      alert('Reminder sent.');
+    } else {
+      alert('Could not send reminder. Please try again.');
+    }
+  });
+}
+</script>

@@ -86,9 +86,9 @@ def design_detail(request, pk):
     compute_delay_attribution(design)
     design.refresh_from_db()
 
-    from apps.designs.timer_helpers import get_completion_timeline_data
+    from apps.designs.lifecycle_timeline import build_lifecycle_data
 
-    completion_timeline = get_completion_timeline_data(design)
+    lifecycle = build_lifecycle_data(design)
 
     from apps.designs.progress import build_progress_steps
     from apps.workflow.permissions import design_action_flags
@@ -108,7 +108,7 @@ def design_detail(request, pk):
         'file_sharing_policy': company.file_sharing_policy if company else '',
         'comments': comments,
         'mentionable_users': User.objects.filter(is_active=True).order_by('first_name')[:20],
-        'completion_timeline': completion_timeline,
+        'lifecycle': lifecycle,
         'progress_steps': progress_steps,
         'progress_cancelled': progress_cancelled,
         **action_flags,

@@ -5,8 +5,11 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET, require_POST
 
+from apps.accounts.models import User
 from apps.designs.models import DesignRequest
 from apps.notifications.models import Notification
+from apps.notifications.services import NotificationService
+from apps.permissions.services import PermissionService
 from apps.workflow.services import WorkflowError, transition
 
 
@@ -32,6 +35,32 @@ def api_workflow_action(request, pk, action):
         })
     except WorkflowError as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+@login_required
+@require_POST
+def api_send_reminder(request, pk):
+    design = get_object_or_404(DesignRequest, pk=pk)
+    if not PermissionService.filter_design_requests(request.user).filter(pk=design.pk).exists():
+        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
+
+    data = _json_body(request)
+    target_user_id = data.get('target_user_id') or request.POST.get('target_user_id')
+    target_user = get_object_or_404(User, pk=target_user_id)
+
+    title = f'Reminder: {design.design_number}'
+    message = (
+        f'Reminder: {design.design_number} ({design.project.name}) '
+        f'is waiting on your action.'
+    )
+    NotificationService.notify(
+        recipient=target_user,
+        notif_type='workflow',
+        title=title,
+        message=message,
+        related_request=design,
+    )
+    return JsonResponse({'status': 'ok'})
 
 
 @login_required
