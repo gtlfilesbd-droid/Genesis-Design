@@ -79,21 +79,72 @@
 
   <div class="lc-status {% if lifecycle.is_overdue %}lc-status-danger{% elif request.completed_at and lifecycle.is_completed_on_time %}lc-status-success{% else %}lc-status-neutral{% endif %}">
     <i class="ti {% if lifecycle.is_overdue %}ti-alert-triangle{% elif request.completed_at %}ti-check{% else %}ti-clock{% endif %}" aria-hidden="true"></i>
-    <p>
+    <div class="lc-status-body">
       {% if lifecycle.is_overdue %}
-        <strong>Delay source — {{ lifecycle.delay_stage_label }}</strong>
-        <span>Waiting on {{ lifecycle.delay_person_display }} since {{ lifecycle.delay_since|date:"d M, h:i A" }} — {{ lifecycle.days_over_target }} day(s) past the {{ request.target_date|date:"d M Y" }} target.</span>
+        <strong class="lc-status-headline">Request overdue</strong>
+        <div class="lc-delay-rows">
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Delayed stage</span>
+            <span class="lc-delay-value">
+              {% if lifecycle.delay_stage_step %}
+                {{ lifecycle.delay_stage_role }} · {{ lifecycle.delay_stage_step }}
+              {% else %}
+                {{ lifecycle.delay_stage_role }}
+              {% endif %}
+            </span>
+          </div>
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Waiting on</span>
+            <span class="lc-delay-value">
+              {{ lifecycle.delay_waiting_on }} · since {{ lifecycle.delay_since|date:"d M, h:i A" }}
+            </span>
+          </div>
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Past target</span>
+            <span class="lc-delay-value">{{ lifecycle.delay_target_summary }}</span>
+          </div>
+        </div>
       {% elif request.completed_at and lifecycle.is_completed_on_time %}
-        <strong>Completed on time</strong>
-        <span>Finished within the {{ request.target_date|date:"d M Y" }} target window.</span>
+        <strong class="lc-status-headline">Completed on time</strong>
+        <p class="lc-status-summary">Finished within the {{ request.target_date|date:"d M Y" }} target window.</p>
       {% elif request.completed_at %}
-        <strong>Completed {{ lifecycle.days_late }} day(s) late</strong>
-        <span>Delay source: {{ lifecycle.delay_stage_label }}.</span>
+        <strong class="lc-status-headline">Completed {{ lifecycle.days_late }} day(s) late</strong>
+        <div class="lc-delay-rows">
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Delay source</span>
+            <span class="lc-delay-value">
+              {% if lifecycle.delay_stage_step %}
+                {{ lifecycle.delay_stage_role }} · {{ lifecycle.delay_stage_step }}
+              {% else %}
+                {{ lifecycle.delay_stage_role|default:lifecycle.delay_stage_label }}
+              {% endif %}
+            </span>
+          </div>
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Days late</span>
+            <span class="lc-delay-value">{{ lifecycle.days_late }} day(s) past {{ request.target_date|date:"d M Y" }}</span>
+          </div>
+        </div>
       {% else %}
-        <strong>Currently with {{ lifecycle.current_stage_label }}</strong>
-        <span>{{ lifecycle.current_person_display }} — {{ lifecycle.current_elapsed_days }} day(s) so far. Target: {{ request.target_date|date:"d M Y" }}.</span>
+        <strong class="lc-status-headline">In progress</strong>
+        <div class="lc-delay-rows">
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Current stage</span>
+            <span class="lc-delay-value">{{ lifecycle.current_stage_label }}</span>
+          </div>
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Assigned to</span>
+            <span class="lc-delay-value">
+              {{ lifecycle.current_waiting_on }} · {{ lifecycle.current_elapsed_days }} day(s) so far
+            </span>
+          </div>
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Target</span>
+            <span class="lc-delay-value">{{ request.target_date|date:"d M Y" }}</span>
+          </div>
+        </div>
       {% endif %}
-    </p>
+    </div>
   </div>
 
   {% if not request.completed_at %}

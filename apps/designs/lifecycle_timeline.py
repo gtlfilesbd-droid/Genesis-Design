@@ -213,6 +213,29 @@ def format_person_display(name, role_label):
     return role_label or name or ''
 
 
+def _split_delay_stage_label(label):
+    if not label:
+        return None, None
+    if ' — ' in label:
+        role, step = label.split(' — ', 1)
+        return role.strip(), step.strip()
+    return label.strip(), None
+
+
+def format_delay_waiting_on(person, role_key):
+    if person:
+        return person
+    return ROLE_LABELS.get(role_key, role_key.replace('_', ' ').title())
+
+
+def format_delay_target_summary(days_over_target, target_date):
+    if days_over_target is None or not target_date:
+        return ''
+    unit = 'day' if days_over_target == 1 else 'days'
+    date_display = target_date.strftime('%d %b %Y')
+    return f'{days_over_target:g} {unit} · deadline {date_display}'
+
+
 def _role_label_for_key(role_key):
     return ROLE_LABELS.get(role_key, role_key.replace('_', ' ').title())
 
@@ -844,6 +867,19 @@ def build_lifecycle_data(design):
     if design.completion_date and not is_completed_on_time and not delay_stage_label:
         delay_stage_label = design.delay_source or 'Unknown stage'
 
+    delay_stage_role, delay_stage_step = _split_delay_stage_label(delay_stage_label)
+    delay_waiting_on = (
+        format_delay_waiting_on(delay_person, current_role_key or 'hod')
+        if is_overdue else None
+    )
+    delay_target_summary = (
+        format_delay_target_summary(days_over_target, design.target_completion_date)
+        if is_overdue else None
+    )
+    current_waiting_on = format_delay_waiting_on(
+        current_person, current_role_key or 'hod',
+    )
+
     target_marker_percent = None
     if design.target_completion_date and design.created_at and segments:
         overall_end = design.completion_date or now_time
@@ -870,9 +906,14 @@ def build_lifecycle_data(design):
         'current_person_display': current_person_display,
         'current_elapsed_days': current_elapsed_days,
         'delay_stage_label': delay_stage_label,
+        'delay_stage_role': delay_stage_role,
+        'delay_stage_step': delay_stage_step,
         'delay_person': delay_person,
         'delay_person_display': delay_person_display,
+        'delay_waiting_on': delay_waiting_on,
+        'delay_target_summary': delay_target_summary,
         'delay_person_id': delay_person_id,
         'delay_since': delay_since,
+        'current_waiting_on': current_waiting_on,
         'target_marker_percent': target_marker_percent,
     }

@@ -7,12 +7,13 @@ from apps.accounts.models import User, UserRole
 from apps.designs.lifecycle_timeline import (
     build_lifecycle_data,
     build_timeline_segments,
+    format_delay_target_summary,
     format_person_display,
     get_current_delay_info,
     get_hod_name_and_id,
     get_lifecycle_timeline_data,
 )
-from apps.designs.models import DesignRequest, DesignStatus, DrawingType
+from apps.designs.models import DesignAssignment, DesignRequest, DesignStatus, DrawingType
 from apps.projects.models import Project
 from apps.workflow.services import transition
 
@@ -190,3 +191,40 @@ class LifecycleTimelineTests(TestCase):
         self.assertIsNotNone(delay)
         self.assertNotEqual(delay['current_person'], 'Admin User')
         self.assertEqual(delay['person_id'], self.hod.id)
+
+    def test_overdue_compliance_ack_delay_banner_fields(self):
+        compliance = User.objects.create_user(
+            username='nadia',
+            password='pass',
+            role=UserRole.COMPLIANCE_TEAM,
+            employee_id='C001',
+            first_name='Nadia',
+            last_name='Compliance',
+        )
+        self.design.status = DesignStatus.COMPLIANCE_PENDING_ACK
+        self.design.deadline_start = timezone.now() - timedelta(days=10)
+        self.design.assigned_compliance_officer = compliance
+        self.design.compliance_assigned_at = timezone.now() - timedelta(days=2)
+        self.design.target_completion_date = date.today() - timedelta(days=1)
+        self.design.save()
+        DesignAssignment.objects.create(
+            design=self.design,
+            designer=self.designer,
+            assigned_by=self.hod,
+            assigned_at=timezone.now() - timedelta(days=9),
+        )
+
+        data = build_lifecycle_data(self.design)
+        self.assertTrue(data['is_overdue'])
+        self.assertEqual(data['delay_stage_role'], 'Compliance')
+        self.assertEqual(data['delay_stage_step'], 'Acknowledgement')
+        self.assertEqual(data['delay_waiting_on'], 'Nadia Compliance')
+        self.assertNotIn('(Compliance)', data['delay_waiting_on'])
+        self.assertIn('deadline', data['delay_target_summary'])
+        self.assertIn('day', data['delay_target_summary'])
+
+        expected_summary = format_delay_target_summary(
+            data['days_over_target'],
+            self.design.target_completion_date,
+        )
+        self.assertEqual(data['delay_target_summary'], expected_summary)
