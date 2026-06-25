@@ -213,6 +213,14 @@ def format_person_display(name, role_label):
     return role_label or name or ''
 
 
+def _resolve_actor_name(person, role_key, hod_name=None):
+    if person:
+        return person
+    if role_key == 'hod' and hod_name:
+        return hod_name
+    return None
+
+
 def _split_delay_stage_label(label):
     if not label:
         return None, None
@@ -939,7 +947,10 @@ def build_lifecycle_data(design):
 
     delay_stage_role, delay_stage_step = _split_delay_stage_label(delay_stage_label)
     delay_waiting_on = (
-        format_delay_waiting_on(delay_person, current_role_key or 'hod')
+        format_delay_waiting_on(
+            _resolve_actor_name(delay_person, current_role_key or 'hod', hod_name),
+            current_role_key or 'hod',
+        )
         if is_overdue else None
     )
     delay_waiting_days = (
@@ -968,7 +979,10 @@ def build_lifecycle_data(design):
             _days_between(progress_since, now_time) if progress_since else None
         )
         progress_assigned_summary = format_assigned_summary(
-            current_person, progress_role_key, progress_since, progress_waiting_days,
+            _resolve_actor_name(current_person, progress_role_key, hod_name),
+            progress_role_key,
+            progress_since,
+            progress_waiting_days,
         )
         progress_target_summary = format_progress_target_summary(
             design.target_completion_date, now_time,

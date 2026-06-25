@@ -279,6 +279,12 @@ class LifecycleTimelineTests(TestCase):
             delta=0.2,
         )
 
+    def test_in_progress_ack_shows_hod_name_before_acknowledge(self):
+        data = build_lifecycle_data(self.design)
+        self.assertEqual(data['current_stage_label'], 'Acknowledgement')
+        self.assertIn('Head Design', data['progress_assigned_summary'])
+        self.assertIn('(Head of Design)', data['progress_assigned_summary'])
+
     def test_in_progress_banner_uses_name_role_and_target_summary(self):
         transition(self.design, 'acknowledge', self.hod)
         transition(
