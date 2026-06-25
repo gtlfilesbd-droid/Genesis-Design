@@ -243,6 +243,44 @@ def format_delay_target_summary(days_over_target, target_date):
     return f'deadline {date_display} {_format_days_count(days_over_target)}'
 
 
+def format_assigned_summary(person, role_key, since_dt, waiting_days):
+    role_label = ROLE_LABELS.get(role_key, role_key.replace('_', ' ').title())
+    name_part = format_person_display(person, role_label) if person else role_label
+    if not since_dt:
+        return name_part
+    since_str = timezone.localtime(since_dt).strftime('%d %b, %I:%M %p')
+    days_part = _format_days_count(waiting_days) if waiting_days is not None else ''
+    return f'{name_part} · since {since_str} {days_part}'.strip()
+
+
+def format_progress_target_summary(target_date, now_time):
+    if not target_date:
+        return ''
+    date_display = target_date.strftime('%d %b %Y')
+    target_end = _target_end_datetime(target_date)
+    if not target_end:
+        return f'deadline {date_display}'
+    remaining = _days_between(now_time, target_end)
+    if remaining is not None and remaining > 0:
+        unit = 'day' if remaining == 1 else 'days'
+        return f'deadline {date_display} ({remaining:g} {unit} left)'
+    return f'deadline {date_display}'
+
+
+def format_completed_finished_summary(completion_date):
+    if not completion_date:
+        return ''
+    local_dt = timezone.localtime(completion_date)
+    return local_dt.strftime('Finished %d %b %Y, %I:%M %p')
+
+
+def format_completed_target_on_time_summary(target_date):
+    if not target_date:
+        return 'Completed on time'
+    date_display = target_date.strftime('%d %b %Y')
+    return f'deadline {date_display} · on time'
+
+
 def _resolve_person_waiting_since(design, role_key, fallback_since=None):
     """
     Waiting on row: when the current actor received the task (assignment/ack).
@@ -917,6 +955,36 @@ def build_lifecycle_data(design):
         current_person, current_role_key or 'hod',
     )
 
+    progress_assigned_summary = None
+    progress_target_summary = None
+    completed_finished_summary = None
+    completed_target_summary = None
+    completed_late_target_summary = None
+
+    if not design.completion_date and not is_overdue:
+        progress_role_key = current_role_key or 'hod'
+        progress_since = _resolve_person_waiting_since(design, progress_role_key, None)
+        progress_waiting_days = (
+            _days_between(progress_since, now_time) if progress_since else None
+        )
+        progress_assigned_summary = format_assigned_summary(
+            current_person, progress_role_key, progress_since, progress_waiting_days,
+        )
+        progress_target_summary = format_progress_target_summary(
+            design.target_completion_date, now_time,
+        )
+
+    if is_completed_on_time:
+        completed_finished_summary = format_completed_finished_summary(design.completion_date)
+        completed_target_summary = format_completed_target_on_time_summary(
+            design.target_completion_date,
+        )
+
+    if design.completion_date and not is_completed_on_time:
+        completed_late_target_summary = format_delay_target_summary(
+            days_late, design.target_completion_date,
+        )
+
     target_marker_percent = None
     if design.target_completion_date and design.created_at and segments:
         overall_end = design.completion_date or now_time
@@ -954,5 +1022,10 @@ def build_lifecycle_data(design):
         'delay_person_id': delay_person_id,
         'delay_since': delay_since,
         'current_waiting_on': current_waiting_on,
+        'progress_assigned_summary': progress_assigned_summary,
+        'progress_target_summary': progress_target_summary,
+        'completed_finished_summary': completed_finished_summary,
+        'completed_target_summary': completed_target_summary,
+        'completed_late_target_summary': completed_late_target_summary,
         'target_marker_percent': target_marker_percent,
     }

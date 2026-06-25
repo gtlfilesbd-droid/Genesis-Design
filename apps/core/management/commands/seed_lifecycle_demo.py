@@ -80,6 +80,9 @@ class Command(BaseCommand):
         DesignAssignment.objects.filter(pk=assignment.pk).update(assigned_at=assigned_at)
         assignment.refresh_from_db()
 
+        from apps.workflow.services import update_deadline_status
+        update_deadline_status(design)
+
         self.stdout.write(self.style.SUCCESS(
             f'Lifecycle demo ready: {design.design_number} (pk={design.pk})\n'
             f'  Waiting on: {designer.get_full_name()} · since {assignment.assigned_at:%d %b, %I:%M %p} (~{person_hold_days} days)\n'

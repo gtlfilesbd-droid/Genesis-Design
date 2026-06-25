@@ -106,7 +106,16 @@
         </div>
       {% elif request.completed_at and lifecycle.is_completed_on_time %}
         <strong class="lc-status-headline">Completed on time</strong>
-        <p class="lc-status-summary">Finished within the {{ request.target_date|date:"d M Y" }} target window.</p>
+        <div class="lc-delay-rows">
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Finished</span>
+            <span class="lc-delay-value">{{ lifecycle.completed_finished_summary }}</span>
+          </div>
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Target</span>
+            <span class="lc-delay-value">{{ lifecycle.completed_target_summary }}</span>
+          </div>
+        </div>
       {% elif request.completed_at %}
         <strong class="lc-status-headline">Completed {{ lifecycle.days_late }} day(s) late</strong>
         <div class="lc-delay-rows">
@@ -121,8 +130,8 @@
             </span>
           </div>
           <div class="lc-delay-row">
-            <span class="lc-delay-label">Days late</span>
-            <span class="lc-delay-value">{{ lifecycle.days_late }} day(s) past {{ request.target_date|date:"d M Y" }}</span>
+            <span class="lc-delay-label">Past target</span>
+            <span class="lc-delay-value">{{ lifecycle.completed_late_target_summary }}</span>
           </div>
         </div>
       {% else %}
@@ -134,13 +143,11 @@
           </div>
           <div class="lc-delay-row">
             <span class="lc-delay-label">Assigned to</span>
-            <span class="lc-delay-value">
-              {{ lifecycle.current_waiting_on }} · {{ lifecycle.current_elapsed_days }} day(s) so far
-            </span>
+            <span class="lc-delay-value">{{ lifecycle.progress_assigned_summary }}</span>
           </div>
           <div class="lc-delay-row">
             <span class="lc-delay-label">Target</span>
-            <span class="lc-delay-value">{{ request.target_date|date:"d M Y" }}</span>
+            <span class="lc-delay-value">{{ lifecycle.progress_target_summary }}</span>
           </div>
         </div>
       {% endif %}

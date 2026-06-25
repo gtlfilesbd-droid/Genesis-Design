@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.utils import timezone
 
@@ -33,6 +33,20 @@ def _add_business_duration(start, days, hours):
 def warning_threshold_ratio(config=None):
     config = config or get_deadline_config()
     return config.default_warning_percent / 100.0
+
+
+def target_completion_end_datetime(target_date):
+    if not target_date:
+        return None
+    return timezone.make_aware(datetime.combine(target_date, time(23, 59, 59)))
+
+
+def is_past_target_completion(design, now=None):
+    target_end = target_completion_end_datetime(design.target_completion_date)
+    if not target_end or design.completion_date:
+        return False
+    now = now or timezone.now()
+    return now > target_end
 
 
 def escalation_thresholds(config=None):

@@ -8,6 +8,7 @@ from apps.designs.lifecycle_timeline import (
     _format_days_count,
     build_lifecycle_data,
     build_timeline_segments,
+    format_completed_target_on_time_summary,
     format_delay_target_summary,
     format_person_display,
     get_current_delay_info,
@@ -277,3 +278,63 @@ class LifecycleTimelineTests(TestCase):
             (timezone.now() - waiting_since).total_seconds() / 86400,
             delta=0.2,
         )
+
+    def test_in_progress_banner_uses_name_role_and_target_summary(self):
+        transition(self.design, 'acknowledge', self.hod)
+        transition(
+            self.design,
+            'assign',
+            self.hod,
+            designer=self.designer,
+            due_date=timezone.now() + timedelta(days=30),
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+        self.design.target_completion_date = date.today() + timedelta(days=10)
+        self.design.save(update_fields=['target_completion_date'])
+
+        data = build_lifecycle_data(self.design)
+        self.assertFalse(data['is_overdue'])
+        self.assertIn('(Designer)', data['progress_assigned_summary'])
+        self.assertIn('since', data['progress_assigned_summary'])
+        self.assertIn('deadline', data['progress_target_summary'])
+        self.assertIn('left', data['progress_target_summary'])
+
+    def test_completed_on_time_banner_stacked_summaries(self):
+        transition(self.design, 'acknowledge', self.hod)
+        self.design.target_completion_date = date.today() + timedelta(days=30)
+        self.design.completion_date = timezone.now()
+        self.design.status = DesignStatus.COMPLETED
+        self.design.save()
+
+        data = build_lifecycle_data(self.design)
+        self.assertTrue(data['is_completed_on_time'])
+        self.assertIn('Finished', data['completed_finished_summary'])
+        self.assertEqual(
+            data['completed_target_summary'],
+            format_completed_target_on_time_summary(self.design.target_completion_date),
+        )
+
+    def test_completed_late_banner_uses_past_target_format(self):
+        transition(self.design, 'acknowledge', self.hod)
+        transition(
+            self.design,
+            'assign',
+            self.hod,
+            designer=self.designer,
+            due_date=timezone.now() + timedelta(days=3),
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+        self.design.target_completion_date = date.today() - timedelta(days=4)
+        self.design.completion_date = timezone.now()
+        self.design.status = DesignStatus.COMPLETED
+        self.design.save()
+
+        data = build_lifecycle_data(self.design)
+        self.assertFalse(data['is_completed_on_time'])
+        self.assertIn('deadline', data['completed_late_target_summary'])
+        self.assertIn('(', data['completed_late_target_summary'])
+        expected = format_delay_target_summary(
+            data['days_late'],
+            self.design.target_completion_date,
+        )
+        self.assertEqual(data['completed_late_target_summary'], expected)

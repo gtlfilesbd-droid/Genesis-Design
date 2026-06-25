@@ -258,13 +258,24 @@ def _start_deadline(design):
 def update_deadline_status(design):
     from apps.notifications.models import NotificationSetting
     from apps.notifications.services import notify_deadline_breach, notify_deadline_warning
-    from apps.workflow.deadline_utils import get_deadline_config, warning_threshold_ratio
+    from apps.workflow.deadline_utils import (
+        get_deadline_config,
+        is_past_target_completion,
+        warning_threshold_ratio,
+    )
 
-    if not design.deadline_due:
-        return
     config = get_deadline_config()
     notif_settings = NotificationSetting.get_solo()
     now = timezone.now()
+    target_breached = is_past_target_completion(design, now)
+
+    if not design.deadline_due:
+        if target_breached:
+            design.deadline_status = DeadlineStatus.RED
+            design.deadline_missed = True
+            design.save(update_fields=['deadline_status', 'deadline_missed'])
+        return
+
     remaining = (design.deadline_due - now).total_seconds()
     total = (
         (design.deadline_due - design.deadline_start).total_seconds()
@@ -272,7 +283,7 @@ def update_deadline_status(design):
     )
     warning_ratio = warning_threshold_ratio(config)
 
-    if remaining <= 0:
+    if target_breached or remaining <= 0:
         design.deadline_status = DeadlineStatus.RED
     elif remaining / total <= warning_ratio:
         design.deadline_status = DeadlineStatus.YELLOW
