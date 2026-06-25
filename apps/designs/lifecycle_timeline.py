@@ -228,12 +228,37 @@ def format_delay_waiting_on(person, role_key):
     return ROLE_LABELS.get(role_key, role_key.replace('_', ' ').title())
 
 
+def _format_days_count(days):
+    if days is None:
+        return ''
+    unit = 'day' if days == 1 else 'days'
+    return f'({days:g} {unit})'
+
+
 def format_delay_target_summary(days_over_target, target_date):
+    """Past target row: always requester target_completion_date + days past total target."""
     if days_over_target is None or not target_date:
         return ''
-    unit = 'day' if days_over_target == 1 else 'days'
     date_display = target_date.strftime('%d %b %Y')
-    return f'{days_over_target:g} {unit} · deadline {date_display}'
+    return f'deadline {date_display} {_format_days_count(days_over_target)}'
+
+
+def _resolve_person_waiting_since(design, role_key, fallback_since=None):
+    """
+    Waiting on row: when the current actor received the task (assignment/ack).
+    Uses workflow timestamps — never requester target_completion_date.
+    """
+    if role_key == 'designer':
+        assignment = design.assignments.order_by('-assigned_at').first()
+        if assignment:
+            return assignment.assigned_at
+    if role_key == 'verifier' and design.verification_assigned_at:
+        return design.verification_acknowledged_at or design.verification_assigned_at
+    if role_key == 'compliance' and design.compliance_assigned_at:
+        return design.compliance_acknowledged_at or design.compliance_assigned_at
+
+    waiting_since, _responsible = _waiting_since_for_status(design)
+    return waiting_since or fallback_since
 
 
 def _role_label_for_key(role_key):
@@ -820,6 +845,13 @@ def build_lifecycle_data(design):
                         seg['is_delay'] = True
                         break
 
+    if is_overdue:
+        person_waiting_since = _resolve_person_waiting_since(
+            design, current_role_key or 'hod', delay_since,
+        )
+        if person_waiting_since:
+            delay_since = person_waiting_since
+
     def _resolve_display(person, role_key, person_id=None):
         role_label = ROLE_LABELS.get(role_key, role_key)
         if person:
@@ -872,6 +904,11 @@ def build_lifecycle_data(design):
         format_delay_waiting_on(delay_person, current_role_key or 'hod')
         if is_overdue else None
     )
+    delay_waiting_days = (
+        _days_between(delay_since, now_time) if is_overdue and delay_since else None
+    )
+    delay_waiting_days_display = _format_days_count(delay_waiting_days) if is_overdue else None
+    # Past target: requester target only — independent of delay_waiting_days (person hold time).
     delay_target_summary = (
         format_delay_target_summary(days_over_target, design.target_completion_date)
         if is_overdue else None
@@ -911,6 +948,8 @@ def build_lifecycle_data(design):
         'delay_person': delay_person,
         'delay_person_display': delay_person_display,
         'delay_waiting_on': delay_waiting_on,
+        'delay_waiting_days': delay_waiting_days,
+        'delay_waiting_days_display': delay_waiting_days_display,
         'delay_target_summary': delay_target_summary,
         'delay_person_id': delay_person_id,
         'delay_since': delay_since,

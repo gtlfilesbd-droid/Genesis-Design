@@ -96,7 +96,7 @@
           <div class="lc-delay-row">
             <span class="lc-delay-label">Waiting on</span>
             <span class="lc-delay-value">
-              {{ lifecycle.delay_waiting_on }} · since {{ lifecycle.delay_since|date:"d M, h:i A" }}
+              {{ lifecycle.delay_waiting_on }} · since {{ lifecycle.delay_since|date:"d M, h:i A" }}{% if lifecycle.delay_waiting_days_display %} {{ lifecycle.delay_waiting_days_display }}{% endif %}
             </span>
           </div>
           <div class="lc-delay-row">

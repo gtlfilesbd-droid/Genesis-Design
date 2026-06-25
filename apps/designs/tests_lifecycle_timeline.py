@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
 from apps.designs.lifecycle_timeline import (
+    _format_days_count,
     build_lifecycle_data,
     build_timeline_segments,
     format_delay_target_summary,
@@ -164,6 +165,10 @@ class LifecycleTimelineTests(TestCase):
         self.assertTrue(data['is_overdue'])
         self.assertNotIn('Admin User', data['delay_person_display'])
         self.assertIn('Head of Design', data['delay_person_display'])
+        self.assertIsNotNone(data['delay_waiting_days'])
+        self.assertGreaterEqual(data['delay_waiting_days'], 0)
+        if data['delay_waiting_days']:
+            self.assertTrue(data['delay_waiting_days_display'].startswith('('))
 
     def test_acknowledged_request_shows_hod_name_with_role(self):
         transition(self.design, 'acknowledge', self.hod)
@@ -220,7 +225,11 @@ class LifecycleTimelineTests(TestCase):
         self.assertEqual(data['delay_stage_step'], 'Acknowledgement')
         self.assertEqual(data['delay_waiting_on'], 'Nadia Compliance')
         self.assertNotIn('(Compliance)', data['delay_waiting_on'])
+        self.assertIsNotNone(data['delay_waiting_days'])
+        self.assertGreater(data['delay_waiting_days'], 0)
+        self.assertEqual(data['delay_waiting_days_display'], _format_days_count(data['delay_waiting_days']))
         self.assertIn('deadline', data['delay_target_summary'])
+        self.assertIn('(', data['delay_target_summary'])
         self.assertIn('day', data['delay_target_summary'])
 
         expected_summary = format_delay_target_summary(
@@ -228,3 +237,43 @@ class LifecycleTimelineTests(TestCase):
             self.design.target_completion_date,
         )
         self.assertEqual(data['delay_target_summary'], expected_summary)
+
+    def test_designer_waiting_days_independent_of_request_past_target(self):
+        transition(self.design, 'acknowledge', self.hod)
+        hod_due = timezone.now() + timedelta(days=30)
+        transition(
+            self.design,
+            'assign',
+            self.hod,
+            designer=self.designer,
+            due_date=hod_due,
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+
+        self.design.target_completion_date = date.today() - timedelta(days=5)
+        self.design.save(update_fields=['target_completion_date'])
+
+        assignment = self.design.assignments.order_by('-assigned_at').first()
+        assigned_at = timezone.now() - timedelta(days=3)
+        DesignAssignment.objects.filter(pk=assignment.pk).update(assigned_at=assigned_at)
+
+        data = build_lifecycle_data(self.design)
+        self.assertTrue(data['is_overdue'])
+        self.assertGreater(data['days_over_target'], 0)
+        self.assertIsNotNone(data['delay_waiting_days'])
+        self.assertGreater(data['delay_waiting_days'], 0)
+        self.assertNotEqual(data['delay_waiting_days'], data['days_over_target'])
+        self.assertEqual(data['delay_waiting_on'], 'Rahim Designer')
+
+        requester_deadline = self.design.target_completion_date.strftime('%d %b %Y')
+        self.assertIn(requester_deadline, data['delay_target_summary'])
+        hod_due_str = hod_due.strftime('%d %b %Y')
+        self.assertNotIn(hod_due_str, data['delay_target_summary'])
+
+        waiting_since = data['delay_since']
+        self.assertIsNotNone(waiting_since)
+        self.assertAlmostEqual(
+            data['delay_waiting_days'],
+            (timezone.now() - waiting_since).total_seconds() / 86400,
+            delta=0.2,
+        )
