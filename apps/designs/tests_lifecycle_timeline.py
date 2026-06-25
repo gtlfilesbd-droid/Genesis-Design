@@ -7,7 +7,9 @@ from apps.accounts.models import User, UserRole
 from apps.designs.lifecycle_timeline import (
     build_lifecycle_data,
     build_timeline_segments,
+    format_person_display,
     get_current_delay_info,
+    get_hod_name_and_id,
     get_lifecycle_timeline_data,
 )
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
@@ -121,3 +123,70 @@ class LifecycleTimelineTests(TestCase):
         data = get_lifecycle_timeline_data(self.design)
         self.assertTrue(data['is_completed_on_time'])
         self.assertIsNone(data['delay_info'])
+
+    def test_admin_user_not_shown_when_hod_exists(self):
+        admin = User.objects.create_user(
+            username='admin',
+            password='pass',
+            role=UserRole.ADMIN,
+            employee_id='A001',
+            first_name='Admin',
+            last_name='User',
+            is_superuser=True,
+        )
+        self.assertIsNotNone(admin)
+
+        data = build_lifecycle_data(self.design)
+        people_names = [p['name'] for p in data['people']]
+        self.assertNotIn('Admin User', people_names)
+        self.assertNotIn('Admin User', data.get('current_person_display', '') or '')
+        self.assertNotIn('Admin User', data.get('delay_person_display', '') or '')
+
+        hod_name, hod_id = get_hod_name_and_id(self.design)
+        self.assertEqual(hod_name, 'Head Design')
+        self.assertEqual(hod_id, self.hod.id)
+
+    def test_overdue_new_request_shows_hod_not_admin(self):
+        User.objects.create_user(
+            username='admin',
+            password='pass',
+            role=UserRole.ADMIN,
+            employee_id='A002',
+            first_name='Admin',
+            last_name='User',
+            is_superuser=True,
+        )
+        self.design.target_completion_date = date.today() - timedelta(days=1)
+        self.design.save(update_fields=['target_completion_date'])
+
+        data = build_lifecycle_data(self.design)
+        self.assertTrue(data['is_overdue'])
+        self.assertNotIn('Admin User', data['delay_person_display'])
+        self.assertIn('Head of Design', data['delay_person_display'])
+
+    def test_acknowledged_request_shows_hod_name_with_role(self):
+        transition(self.design, 'acknowledge', self.hod)
+
+        data = build_lifecycle_data(self.design)
+        expected = format_person_display('Head Design', 'Head of Design')
+        ack_segments = [s for s in data['segments'] if s['label'] == 'Acknowledgement']
+        self.assertTrue(any(s['person'] == 'Head Design' for s in ack_segments))
+        people_names = [p['display_name'] for p in data['people']]
+        self.assertIn(expected, people_names)
+
+    def test_delay_info_resolves_hod_not_admin(self):
+        User.objects.create_user(
+            username='admin',
+            password='pass',
+            role=UserRole.ADMIN,
+            employee_id='A003',
+            first_name='Admin',
+            last_name='User',
+        )
+        self.design.target_completion_date = date.today() - timedelta(days=1)
+        self.design.save(update_fields=['target_completion_date'])
+
+        delay = get_current_delay_info(self.design)
+        self.assertIsNotNone(delay)
+        self.assertNotEqual(delay['current_person'], 'Admin User')
+        self.assertEqual(delay['person_id'], self.hod.id)

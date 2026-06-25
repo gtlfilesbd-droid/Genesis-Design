@@ -2,10 +2,23 @@ from datetime import datetime, time
 
 from django.utils import timezone
 
-from apps.accounts.models import UserRole
+from apps.accounts.models import User, UserRole
 from apps.core.models import ActivityLog
 from apps.designs.models import DesignStatus
 from apps.workflow.services import get_head_of_design
+
+HOD_ACTIONS = (
+    'acknowledge', 'assign', 'request_correction', 'accept_design',
+    'send_to_verification', 'forward_to_designer', 'send_to_compliance',
+    'compliance_approved', 'complete', 'hod_fast_complete', 'start_review',
+)
+
+ROLE_LABELS = {
+    'hod': 'Head of Design',
+    'designer': 'Designer',
+    'verifier': 'Verifier',
+    'compliance': 'Compliance',
+}
 
 HAPPY_PATH_PENDING = [
     ('hod', 'Assign'),
@@ -109,28 +122,104 @@ def _person_name(user):
     return user.get_full_name() or user.username
 
 
-def get_hod_name(design):
-    hod_actions = (
-        'acknowledge', 'assign', 'request_correction', 'accept_design',
-        'send_to_verification', 'forward_to_designer', 'send_to_compliance',
-        'compliance_approved', 'complete', 'hod_fast_complete', 'start_review',
-    )
+def _is_hod_role(user):
+    return bool(user and user.role == UserRole.HEAD_OF_DESIGN)
+
+
+def _is_admin_only_user(user):
+    return bool(user and (user.is_superuser or user.role == UserRole.ADMIN))
+
+
+def _is_valid_hod_actor(user, *, from_activity_log=False):
+    if not user:
+        return False
+    if from_activity_log:
+        return True
+    return _is_hod_role(user)
+
+
+def _latest_hod_activity_user(design):
     log = (
         ActivityLog.objects.filter(
             entity_type='design_request',
             entity_id=design.pk,
-            action__in=hod_actions,
+            action__in=HOD_ACTIONS,
         )
         .select_related('user')
         .order_by('-created_at')
         .first()
     )
-    if log and log.user:
-        return _person_name(log.user)
-    if design.assigned_by:
-        return _person_name(design.assigned_by)
+    if log and log.user and _is_valid_hod_actor(log.user, from_activity_log=True):
+        return log.user
+    return None
+
+
+def _hod_actor_for_action(design, action):
+    log = (
+        ActivityLog.objects.filter(
+            entity_type='design_request',
+            entity_id=design.pk,
+            action=action,
+        )
+        .select_related('user')
+        .order_by('-created_at')
+        .first()
+    )
+    if log and log.user and _is_valid_hod_actor(log.user, from_activity_log=True):
+        return _person_name(log.user), log.user.id
+    return None, None
+
+
+def _role_key_for_status(status):
+    role, _label = STAGE_ROLE_LABELS.get(status, ('hod', ''))
+    return role if role != 'complete' else 'hod'
+
+
+def _is_reminder_target_valid(design, user_id):
+    user = User.objects.filter(pk=user_id).first()
+    if not user:
+        return False
+    if _is_admin_only_user(user):
+        return ActivityLog.objects.filter(
+            entity_type='design_request',
+            entity_id=design.pk,
+            user_id=user_id,
+        ).exists()
+    return True
+
+
+def get_hod_name_and_id(design):
+    actor = _latest_hod_activity_user(design)
+    if actor:
+        return _person_name(actor), actor.id
+
+    holder = design.current_holder
+    if holder and _is_valid_hod_actor(holder) and _is_hod_role(holder):
+        return _person_name(holder), holder.id
+
+    if design.assigned_by and _is_valid_hod_actor(design.assigned_by) and _is_hod_role(design.assigned_by):
+        return _person_name(design.assigned_by), design.assigned_by_id
+
     hod = get_head_of_design()
-    return _person_name(hod) or 'Head of Design'
+    if hod and _is_hod_role(hod):
+        return _person_name(hod), hod.id
+
+    return None, None
+
+
+def format_person_display(name, role_label):
+    if name and role_label:
+        return f'{name} ({role_label})'
+    return role_label or name or ''
+
+
+def _role_label_for_key(role_key):
+    return ROLE_LABELS.get(role_key, role_key.replace('_', ' ').title())
+
+
+def get_hod_name(design):
+    name, _hod_id = get_hod_name_and_id(design)
+    return name or ROLE_LABELS['hod']
 
 
 def _ongoing_stage_duration(design, stage):
@@ -196,6 +285,7 @@ def get_current_delay_info(design):
     days_over_target = _days_between(target_end, now_time) if is_overdue else None
 
     person = _person_name(responsible)
+    person_id = responsible.pk if responsible else None
     if not person:
         status = design.status
         if status in (DesignStatus.NEW_REQUEST, DesignStatus.ACKNOWLEDGED, DesignStatus.ASSIGNED,
@@ -203,13 +293,16 @@ def get_current_delay_info(design):
                       DesignStatus.VERIFICATION_CORRECTION, DesignStatus.AWAITING_COMPLIANCE,
                       DesignStatus.COMPLIANCE_CORRECTION, DesignStatus.FINAL_APPROVAL_PENDING,
                       DesignStatus.APPROVED):
-            person = get_hod_name(design)
+            person, person_id = get_hod_name_and_id(design)
         elif status in (DesignStatus.IN_PROGRESS, DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED):
             person = _person_name(design.assigned_designer)
+            person_id = design.assigned_designer_id
         elif status in (DesignStatus.VERIFICATION_PENDING_ACK, DesignStatus.VERIFICATION_PENDING):
             person = _person_name(design.assigned_verifier)
+            person_id = design.assigned_verifier_id
         elif status in (DesignStatus.COMPLIANCE_PENDING_ACK, DesignStatus.COMPLIANCE_PENDING):
             person = _person_name(design.assigned_compliance_officer)
+            person_id = design.assigned_compliance_officer_id
 
     label = DELAY_STATUS_LABELS.get(design.status, design.get_status_display())
 
@@ -219,6 +312,7 @@ def get_current_delay_info(design):
     return {
         'current_stage_label': label,
         'current_person': person,
+        'person_id': person_id,
         'waiting_since': waiting_since,
         'elapsed_days': elapsed_days,
         'is_overdue': is_overdue,
@@ -465,24 +559,6 @@ def get_initials(full_name):
     return (parts[0][0] + parts[-1][0]).upper()
 
 
-def get_hod_name_and_id(design):
-    from apps.notifications.services import NotificationService
-
-    users = NotificationService._project_users(design.project, 'PROJECT_PERM_ASSIGN')
-    hod = users[0] if users else get_head_of_design()
-    if hod:
-        return hod.get_full_name() or hod.username, hod.id
-    return 'Head of Design', None
-
-
-ROLE_LABELS = {
-    'hod': 'Head of Design',
-    'designer': 'Designer',
-    'verifier': 'Verifier',
-    'compliance': 'Compliance',
-}
-
-
 def _display_stage_label(label):
     mapping = {
         'Ack': 'Acknowledgement',
@@ -492,35 +568,65 @@ def _display_stage_label(label):
     return mapping.get(label, label)
 
 
+def _ack_segment_actor(design, hod_name, hod_id):
+    if not design.deadline_start:
+        return None, None
+    person, person_id = _hod_actor_for_action(design, 'acknowledge')
+    if person:
+        return person, person_id
+    return hod_name, hod_id
+
+
+def _assign_segment_actor(design, hod_name, hod_id):
+    if not design.assigned_at:
+        return None, None
+    person, person_id = _hod_actor_for_action(design, 'assign')
+    if person:
+        return person, person_id
+    if design.assigned_by and _is_hod_role(design.assigned_by):
+        return _person_name(design.assigned_by), design.assigned_by_id
+    return hod_name, hod_id
+
+
+def _add_workflow_person(people, user, role_key):
+    if not user:
+        return
+    name = _person_name(user)
+    if not name or name in people:
+        return
+    if role_key == 'hod' and not _is_valid_hod_actor(user):
+        return
+    role_label = ROLE_LABELS[role_key]
+    palette = {
+        'hod': ('#B5D4F4', '#042C53'),
+        'designer': ('#9FE1CB', '#04342C'),
+        'verifier': ('#FAC775', '#412402'),
+        'compliance': ('#F4C0D1', '#4B1528'),
+    }
+    bg, fg = palette.get(role_key, ('#F1F5F9', '#475569'))
+    people[name] = {
+        'name': name,
+        'initials': get_initials(name),
+        'bg': bg,
+        'fg': fg,
+        'role_label': role_label,
+        'display_name': format_person_display(name, role_label),
+        'user_id': user.pk,
+    }
+
+
 def build_lifecycle_data(design):
     """Build the lifecycle card context object from real workflow timestamps."""
     now_time = timezone.now()
     target_end = _target_end_datetime(design.target_completion_date)
     hod_name, hod_id = get_hod_name_and_id(design)
+    ack_person, ack_id = _ack_segment_actor(design, hod_name, hod_id)
+    assign_person, assign_id = _assign_segment_actor(design, hod_name, hod_id)
 
     segments = []
     people = {}
 
-    def add_person(name, role_key, role_label, user_id=None):
-        if not name or name in people:
-            return
-        palette = {
-            'hod': ('#B5D4F4', '#042C53'),
-            'designer': ('#9FE1CB', '#04342C'),
-            'verifier': ('#FAC775', '#412402'),
-            'compliance': ('#F4C0D1', '#4B1528'),
-        }
-        bg, fg = palette.get(role_key, ('#F1F5F9', '#475569'))
-        people[name] = {
-            'name': name,
-            'initials': get_initials(name),
-            'bg': bg,
-            'fg': fg,
-            'role_label': role_label,
-            'user_id': user_id,
-        }
-
-    def add_segment(label, role, person, start, end, note=None):
+    def add_segment(label, role, person, start, end, note=None, person_id=None):
         if not start:
             return
         is_ongoing = end is None
@@ -529,6 +635,7 @@ def build_lifecycle_data(design):
             'label': label,
             'role': role,
             'person': person,
+            'person_id': person_id,
             'days': days,
             'grow': max(days, 0.3),
             'is_ongoing': is_ongoing,
@@ -538,8 +645,8 @@ def build_lifecycle_data(design):
             'end': end,
         })
 
-    add_segment('Ack', 'hod', hod_name, design.created_at, design.deadline_start)
-    add_segment('Assign', 'hod', hod_name, design.deadline_start, design.assigned_at)
+    add_segment('Ack', 'hod', ack_person, design.created_at, design.deadline_start, person_id=ack_id)
+    add_segment('Assign', 'hod', assign_person, design.deadline_start, design.assigned_at, person_id=assign_id)
 
     revisions = list(design.submissions.order_by('version_number'))
     prev_end = design.assigned_at
@@ -553,18 +660,34 @@ def build_lifecycle_data(design):
             prev_end,
             rev.submitted_at,
             note=note,
+            person_id=rev.submitted_by_id,
         )
-        if designer_name:
-            add_person(designer_name, 'designer', ROLE_LABELS['designer'], rev.submitted_by_id)
+        _add_workflow_person(people, rev.submitted_by, 'designer')
         review_end = _review_end_for_submission(design, rev)
-        add_segment('HOD', 'hod', hod_name, rev.submitted_at, review_end)
+        review_user = _latest_hod_activity_user(design)
+        review_person = _person_name(review_user) if review_user else None
+        review_person_id = review_user.pk if review_user else None
+        add_segment(
+            'HOD',
+            'hod',
+            review_person,
+            rev.submitted_at,
+            review_end,
+            person_id=review_person_id,
+        )
         prev_end = review_end or rev.submitted_at
 
     if not revisions and design.assigned_designer_id and design.assigned_at:
         designer_name = _person_name(design.assigned_designer)
-        add_segment('Designer V1', 'designer', designer_name, design.assigned_at, None)
-        if designer_name:
-            add_person(designer_name, 'designer', ROLE_LABELS['designer'], design.assigned_designer_id)
+        add_segment(
+            'Designer V1',
+            'designer',
+            designer_name,
+            design.assigned_at,
+            None,
+            person_id=design.assigned_designer_id,
+        )
+        _add_workflow_person(people, design.assigned_designer, 'designer')
 
     verification_approved_at = _verification_approved_at(design)
     if design.verification_acknowledged_at:
@@ -575,15 +698,16 @@ def build_lifecycle_data(design):
             verifier_name,
             design.verification_acknowledged_at,
             verification_approved_at,
+            person_id=design.assigned_verifier_id,
         )
-        if verifier_name:
-            add_person(verifier_name, 'verifier', ROLE_LABELS['verifier'], design.assigned_verifier_id)
+        _add_workflow_person(people, design.assigned_verifier, 'verifier')
         add_segment(
             'HOD',
             'hod',
             hod_name,
             verification_approved_at,
             design.compliance_assigned_at,
+            person_id=hod_id,
         )
 
     compliance_approved_at = _compliance_approved_at(design)
@@ -595,20 +719,16 @@ def build_lifecycle_data(design):
             compliance_name,
             design.compliance_acknowledged_at,
             compliance_approved_at,
+            person_id=design.assigned_compliance_officer_id,
         )
-        if compliance_name:
-            add_person(
-                compliance_name,
-                'compliance',
-                ROLE_LABELS['compliance'],
-                design.assigned_compliance_officer_id,
-            )
+        _add_workflow_person(people, design.assigned_compliance_officer, 'compliance')
         add_segment(
             'HOD',
             'hod',
             hod_name,
             compliance_approved_at,
             _approved_at(design),
+            person_id=hod_id,
         )
 
     if design.completion_date:
@@ -616,6 +736,7 @@ def build_lifecycle_data(design):
             'label': 'Completed',
             'role': 'endcap',
             'person': None,
+            'person_id': None,
             'days': None,
             'grow': 0.6,
             'is_ongoing': False,
@@ -625,7 +746,9 @@ def build_lifecycle_data(design):
             'end': None,
         })
 
-    add_person(hod_name, 'hod', ROLE_LABELS['hod'], hod_id)
+    if hod_id:
+        hod_user = User.objects.filter(pk=hod_id).first()
+        _add_workflow_person(people, hod_user, 'hod')
 
     for seg in segments:
         if seg.get('label'):
@@ -641,19 +764,20 @@ def build_lifecycle_data(design):
     current_stage_label = None
     current_person = None
     current_elapsed_days = None
+    current_role_key = None
 
     for seg in segments:
         if seg.get('is_ongoing'):
             current_stage_label = seg['label']
             current_person = seg['person']
+            current_role_key = seg['role']
             current_elapsed_days = seg['days']
             if is_overdue:
                 seg['is_delay'] = True
                 delay_stage_label = seg['label']
                 delay_person = seg['person']
                 delay_since = seg['start']
-                person_obj = people.get(seg['person']) if seg['person'] else None
-                delay_person_id = person_obj['user_id'] if person_obj else None
+                delay_person_id = seg.get('person_id')
             break
 
     if not current_stage_label and not design.completion_date:
@@ -662,22 +786,36 @@ def build_lifecycle_data(design):
             current_stage_label = delay_info['current_stage_label']
             current_person = delay_info['current_person']
             current_elapsed_days = delay_info['elapsed_days']
+            current_role_key = _role_key_for_status(design.status)
             if is_overdue:
                 delay_stage_label = delay_info['current_stage_label']
                 delay_person = delay_info['current_person']
                 delay_since = delay_info['waiting_since']
+                delay_person_id = delay_info.get('person_id')
                 for seg in reversed(segments):
                     if seg.get('is_ongoing'):
                         seg['is_delay'] = True
                         break
-                if delay_person:
-                    person_obj = people.get(delay_person)
-                    if not person_obj and design.assigned_designer:
-                        delay_person_id = design.assigned_designer_id
-                    elif person_obj:
-                        delay_person_id = person_obj['user_id']
-                    elif hod_id:
-                        delay_person_id = hod_id
+
+    def _resolve_display(person, role_key, person_id=None):
+        role_label = ROLE_LABELS.get(role_key, role_key)
+        if person:
+            return format_person_display(person, role_label), person_id
+        if role_key == 'hod' and hod_name:
+            return format_person_display(hod_name, role_label), hod_id
+        return role_label, person_id
+
+    current_person_display, _ = _resolve_display(
+        current_person, current_role_key or 'hod',
+    )
+    delay_person_display, delay_person_id = _resolve_display(
+        delay_person,
+        current_role_key or 'hod',
+        delay_person_id,
+    )
+
+    if delay_person_id and not _is_reminder_target_valid(design, delay_person_id):
+        delay_person_id = None
 
     total_days = None
     if design.created_at:
@@ -729,9 +867,11 @@ def build_lifecycle_data(design):
         'days_late': days_late,
         'current_stage_label': current_stage_label,
         'current_person': current_person,
+        'current_person_display': current_person_display,
         'current_elapsed_days': current_elapsed_days,
         'delay_stage_label': delay_stage_label,
         'delay_person': delay_person,
+        'delay_person_display': delay_person_display,
         'delay_person_id': delay_person_id,
         'delay_since': delay_since,
         'target_marker_percent': target_marker_percent,

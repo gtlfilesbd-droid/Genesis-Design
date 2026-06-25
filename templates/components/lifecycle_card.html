@@ -72,7 +72,7 @@
     {% for p in lifecycle.people %}
       <span class="person-chip">
         <span class="avatar" style="background:{{ p.bg }};color:{{ p.fg }};">{{ p.initials }}</span>
-        {{ p.name }} · {{ p.role_label }}
+        {{ p.display_name }}
       </span>
     {% endfor %}
   </div>
@@ -82,7 +82,7 @@
     <p>
       {% if lifecycle.is_overdue %}
         <strong>Delay source — {{ lifecycle.delay_stage_label }}</strong>
-        <span>Waiting on {{ lifecycle.delay_person }} since {{ lifecycle.delay_since|date:"d M, h:i A" }} — {{ lifecycle.days_over_target }} day(s) past the {{ request.target_date|date:"d M Y" }} target.</span>
+        <span>Waiting on {{ lifecycle.delay_person_display }} since {{ lifecycle.delay_since|date:"d M, h:i A" }} — {{ lifecycle.days_over_target }} day(s) past the {{ request.target_date|date:"d M Y" }} target.</span>
       {% elif request.completed_at and lifecycle.is_completed_on_time %}
         <strong>Completed on time</strong>
         <span>Finished within the {{ request.target_date|date:"d M Y" }} target window.</span>
@@ -91,7 +91,7 @@
         <span>Delay source: {{ lifecycle.delay_stage_label }}.</span>
       {% else %}
         <strong>Currently with {{ lifecycle.current_stage_label }}</strong>
-        <span>{{ lifecycle.current_person }} — {{ lifecycle.current_elapsed_days }} day(s) so far. Target: {{ request.target_date|date:"d M Y" }}.</span>
+        <span>{{ lifecycle.current_person_display }} — {{ lifecycle.current_elapsed_days }} day(s) so far. Target: {{ request.target_date|date:"d M Y" }}.</span>
       {% endif %}
     </p>
   </div>
