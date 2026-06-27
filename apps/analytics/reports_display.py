@@ -173,6 +173,30 @@ def _health_tone(score):
     return _rate_tone(score)
 
 
+def _build_risk_project_row(project, tier):
+    health = getattr(project, 'display_health', getattr(project, 'health_score', 0))
+    tone = _health_tone(health)
+    colors = TONE_COLORS[tone]
+    if tier == 'high':
+        health_label = 'Critical'
+        accent_color = TONE_COLORS['bad']['text']
+        row_bg = TONE_COLORS['bad']['bg']
+    else:
+        health_label = 'At risk'
+        accent_color = TONE_COLORS['medium']['text']
+        row_bg = TONE_COLORS['medium']['bg']
+    return {
+        'project': project,
+        'health': health,
+        'health_label': health_label,
+        'health_color': colors['text'],
+        'bar_color': colors['fill'],
+        'bar_percent': min(float(health), 100),
+        'accent_color': accent_color,
+        'row_bg': row_bg,
+    }
+
+
 def build_executive_context(raw):
     portfolio_health = raw.get('portfolio_health', 0)
     completion_rate = raw.get('completion_rate', 0)
@@ -181,19 +205,56 @@ def build_executive_context(raw):
     portfolio_tone = TONE_COLORS[_health_tone(portfolio_health)]
     completion_tone = TONE_COLORS[_rate_tone(completion_rate)]
     on_track_tone = TONE_COLORS[_rate_tone(on_track_rate)]
+    overdue_drawings = raw.get('overdue_drawings', 0)
+    at_risk_projects = raw.get('at_risk_projects', 0)
 
-    critical_projects = []
-    for project in raw.get('critical_projects', []):
-        health = getattr(project, 'display_health', getattr(project, 'health_score', 0))
-        tone = _health_tone(health)
-        colors = TONE_COLORS[tone]
-        critical_projects.append({
-            'project': project,
-            'health': health,
-            'health_color': colors['text'],
-            'bar_color': colors['fill'],
-            'bar_percent': min(float(health), 100),
-        })
+    active_projects = raw.get('active_projects', raw.get('critical_projects', []))
+    high_risk_projects = sorted(
+        [_build_risk_project_row(p, 'high') for p in active_projects
+         if getattr(p, 'display_health', getattr(p, 'health_score', 0)) < 50],
+        key=lambda row: row['health'],
+    )
+    moderate_risk_projects = sorted(
+        [_build_risk_project_row(p, 'moderate') for p in active_projects
+         if 50 <= getattr(p, 'display_health', getattr(p, 'health_score', 0)) < 70],
+        key=lambda row: row['health'],
+    )
+    critical_projects = high_risk_projects
+
+    risk_summary = [
+        {
+            'label': 'At risk',
+            'value': at_risk_projects,
+            'icon': 'ti-alert-triangle',
+            'icon_bg': '#FEF2F2',
+            'icon_fg': '#DC2626',
+            'value_color': '#DC2626' if at_risk_projects else None,
+        },
+        {
+            'label': 'On-track rate',
+            'value': on_track_rate,
+            'unit': '%',
+            'icon': 'ti-chart-line',
+            'icon_bg': on_track_tone['bg'],
+            'icon_fg': on_track_tone['text'],
+            'value_color': on_track_tone['text'],
+        },
+        {
+            'label': 'Overdue drawings',
+            'value': overdue_drawings,
+            'icon': 'ti-clock',
+            'icon_bg': '#FFFBEB',
+            'icon_fg': '#D97706',
+            'value_color': '#DC2626' if overdue_drawings else None,
+        },
+    ]
+
+    design_team_count = raw.get('design_team_count', 0)
+    verification_team_count = raw.get('verification_team_count', 0)
+    team_chips = [
+        {'icon': 'ti-users', 'label': f'{design_team_count} designers'},
+        {'icon': 'ti-shield', 'label': f'{verification_team_count} verifiers'},
+    ]
 
     top_performers = []
     for entry in raw.get('top_performers', []):
@@ -233,6 +294,19 @@ def build_executive_context(raw):
                     'detail': f"{item['pending_count']} pending",
                 }
                 for item in bottlenecks.get('slow_verifiers', [])
+            ],
+        },
+        {
+            'title': 'Slow compliance',
+            'icon': 'ti-scale',
+            'tone': 'medium',
+            'count': len(bottlenecks.get('slow_compliance', [])),
+            'items': [
+                {
+                    'label': item['user'].get_full_name(),
+                    'detail': f"{item['pending_count']} pending",
+                }
+                for item in bottlenecks.get('slow_compliance', [])
             ],
         },
         {
@@ -305,11 +379,15 @@ def build_executive_context(raw):
 
     return {
         'summary': summary,
-        'at_risk_projects': raw.get('at_risk_projects', 0),
+        'at_risk_projects': at_risk_projects,
         'on_track_rate': on_track_rate,
         'on_track_color': on_track_tone['text'],
-        'design_team_count': raw.get('design_team_count', 0),
-        'verification_team_count': raw.get('verification_team_count', 0),
+        'design_team_count': design_team_count,
+        'verification_team_count': verification_team_count,
+        'risk_summary': risk_summary,
+        'team_chips': team_chips,
+        'high_risk_projects': high_risk_projects,
+        'moderate_risk_projects': moderate_risk_projects,
         'critical_projects': critical_projects,
         'top_performers': top_performers,
         'bottleneck_cards': bottleneck_cards,

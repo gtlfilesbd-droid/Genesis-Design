@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -11,6 +11,7 @@ from apps.analytics.reports_display import (
     build_leaderboard_context,
     build_workload_context,
 )
+from apps.analytics.views import detect_bottlenecks
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.projects.models import Project, ProjectStatus
@@ -81,13 +82,14 @@ class ExecutiveDisplayTests(TestCase):
             'on_track_rate': 75.0,
             'portfolio_health': 82.0,
             'at_risk_projects': 1,
-            'critical_projects': [SimpleNamespace(
+            'active_projects': [SimpleNamespace(
                 code='P1', client_name='Client', display_health=42,
             )],
             'top_performers': [{'user': SimpleNamespace(get_full_name=lambda: 'A'), 'score': 88}],
             'bottlenecks': {
                 'slow_designers': [{'user': SimpleNamespace(get_full_name=lambda: 'D'), 'overdue_count': 3}],
                 'slow_verifiers': [],
+                'slow_compliance': [],
                 'stalled_projects': [{'project': project, 'health': 40}],
             },
             'design_team_count': 3,
@@ -96,8 +98,107 @@ class ExecutiveDisplayTests(TestCase):
         context = build_executive_context(raw)
 
         self.assertEqual(len(context['summary']), 6)
-        self.assertEqual(len(context['bottleneck_cards']), 3)
+        self.assertEqual(len(context['bottleneck_cards']), 4)
+        self.assertEqual(len(context['high_risk_projects']), 1)
         self.assertEqual(context['critical_projects'][0]['health'], 42)
+        self.assertEqual(len(context['risk_summary']), 3)
+        self.assertEqual(len(context['team_chips']), 2)
+
+    def test_build_executive_context_splits_risk_tiers(self):
+        raw = {
+            'total_projects': 3,
+            'total_drawings': 0,
+            'pending_drawings': 0,
+            'overdue_drawings': 0,
+            'completion_rate': 0,
+            'on_track_rate': 100,
+            'portfolio_health': 60,
+            'at_risk_projects': 2,
+            'active_projects': [
+                SimpleNamespace(code='HIGH', client_name='A', display_health=45),
+                SimpleNamespace(code='MOD', client_name='B', display_health=60),
+                SimpleNamespace(code='OK', client_name='C', display_health=80),
+            ],
+            'top_performers': [],
+            'bottlenecks': {
+                'slow_designers': [], 'slow_verifiers': [], 'slow_compliance': [], 'stalled_projects': [],
+            },
+            'design_team_count': 2,
+            'verification_team_count': 1,
+        }
+        context = build_executive_context(raw)
+
+        self.assertEqual(len(context['high_risk_projects']), 1)
+        self.assertEqual(context['high_risk_projects'][0]['project'].code, 'HIGH')
+        self.assertEqual(context['high_risk_projects'][0]['health_label'], 'Critical')
+        self.assertEqual(len(context['moderate_risk_projects']), 1)
+        self.assertEqual(context['moderate_risk_projects'][0]['project'].code, 'MOD')
+        self.assertEqual(context['moderate_risk_projects'][0]['health_label'], 'At risk')
+
+    def test_executive_context_has_four_bottleneck_cards(self):
+        raw = {
+            'total_projects': 0,
+            'total_drawings': 0,
+            'pending_drawings': 0,
+            'overdue_drawings': 0,
+            'completion_rate': 0,
+            'on_track_rate': 0,
+            'portfolio_health': 0,
+            'at_risk_projects': 0,
+            'active_projects': [],
+            'top_performers': [],
+            'bottlenecks': {
+                'slow_designers': [],
+                'slow_verifiers': [],
+                'slow_compliance': [
+                    {'user': SimpleNamespace(get_full_name=lambda: 'Compliance Officer'), 'pending_count': 2},
+                ],
+                'stalled_projects': [],
+            },
+            'design_team_count': 0,
+            'verification_team_count': 0,
+        }
+        context = build_executive_context(raw)
+        titles = [card['title'] for card in context['bottleneck_cards']]
+        self.assertIn('Slow compliance', titles)
+        self.assertEqual(len(context['bottleneck_cards']), 4)
+
+
+class BottleneckDetectionTests(TestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(
+            username='req', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R1',
+        )
+        self.compliance = User.objects.create_user(
+            username='cmp', password='pass', role=UserRole.COMPLIANCE_TEAM, employee_id='C1',
+        )
+        self.project = Project.objects.create(
+            name='P', code='P1', client_name='C', start_date=date.today(), created_by=self.requester,
+        )
+        self.drawing_type = DrawingType.objects.create(
+            name='Initial Drawing', code_prefix='ID', allowed_days=3,
+        )
+
+    def test_detect_bottlenecks_includes_slow_compliance(self):
+        from django.utils import timezone
+
+        design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            assigned_compliance_officer=self.compliance,
+            current_holder=self.compliance,
+            status=DesignStatus.COMPLIANCE_PENDING,
+        )
+        DesignRequest.objects.filter(pk=design.pk).update(
+            updated_at=timezone.now() - timedelta(days=4),
+        )
+
+        bottlenecks = detect_bottlenecks()
+
+        self.assertEqual(len(bottlenecks['slow_compliance']), 1)
+        self.assertEqual(bottlenecks['slow_compliance'][0]['user'], self.compliance)
+        self.assertEqual(bottlenecks['slow_compliance'][0]['pending_count'], 1)
 
 
 class ExecutiveHealthViewTests(TestCase):
@@ -124,6 +225,15 @@ class ExecutiveHealthViewTests(TestCase):
         mock_save.assert_not_called()
         self.assertContains(response, 'Portfolio health')
         self.assertContains(response, 'Bottleneck detection')
+
+    def test_executive_risk_panel_renders_tiers(self):
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('analytics:executive'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'High risk')
+        self.assertContains(response, 'Moderate risk')
+        self.assertContains(response, 'At risk')
+        self.assertContains(response, 'On-track rate')
 
 
 class ReportsViewTests(TestCase):

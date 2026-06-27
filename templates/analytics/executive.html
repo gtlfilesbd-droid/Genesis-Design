@@ -35,30 +35,54 @@
   <div class="report-two-col">
     <div class="report-card report-panel">
       <h2>Risk indicators</h2>
-      <p class="text-sm mb-3">
-        Projects at risk (health &lt; 70):
-        <strong class="text-amber-600">{{ report_context.at_risk_projects }}</strong>
-      </p>
-      <p class="text-sm text-slate-500 mb-2">
-        On-track rate: <strong style="color:{{ report_context.on_track_color }};">{{ report_context.on_track_rate }}%</strong>
-      </p>
-      <p class="text-sm text-slate-500 mb-4">
-        Design team: {{ report_context.design_team_count }} · Verification: {{ report_context.verification_team_count }}
-      </p>
-      <p class="report-section-label">High risk projects</p>
-      {% for item in report_context.critical_projects %}
-      <div class="risk-list-item">
-        <span>{{ item.project.code }} — {{ item.project.client_name }}</span>
-        <div class="health-bar-wrap">
-          <div class="capacity-bar">
-            <div class="capacity-bar-fill" style="width:{{ item.bar_percent }}%;background:{{ item.bar_color }};"></div>
+
+      <div class="risk-summary-grid">
+        {% for stat in report_context.risk_summary %}
+        <div class="risk-summary-card">
+          <div class="report-stat-icon" style="background:{{ stat.icon_bg }};">
+            <i class="ti {{ stat.icon }}" style="color:{{ stat.icon_fg }};"></i>
+          </div>
+          <div>
+            <p class="report-stat-label">{{ stat.label }}</p>
+            <p class="report-stat-value" style="font-size:20px;{% if stat.value_color %}color:{{ stat.value_color }};{% endif %}">
+              {{ stat.value }}{% if stat.unit %}{{ stat.unit }}{% endif %}
+            </p>
           </div>
         </div>
-        <strong style="color:{{ item.health_color }};">{{ item.health }}</strong>
+        {% endfor %}
       </div>
-      {% empty %}
-      <p class="text-sm text-slate-500">None</p>
-      {% endfor %}
+
+      <div class="team-chips">
+        {% for chip in report_context.team_chips %}
+        <span class="team-chip">
+          <i class="ti {{ chip.icon }}"></i> {{ chip.label }}
+        </span>
+        {% endfor %}
+      </div>
+
+      <div class="risk-tier-section">
+        <div class="risk-tier-header">
+          <p class="report-section-label" style="margin:0;">High risk</p>
+          <span class="risk-tier-count" style="background:#FEF2F2;color:#DC2626;">{{ report_context.high_risk_projects|length }}</span>
+        </div>
+        {% for row in report_context.high_risk_projects %}
+        {% include 'components/report_risk_project_row.html' with row=row %}
+        {% empty %}
+        <p class="risk-tier-empty"><i class="ti ti-circle-check"></i> No projects in this tier</p>
+        {% endfor %}
+      </div>
+
+      <div class="risk-tier-section">
+        <div class="risk-tier-header">
+          <p class="report-section-label" style="margin:0;">Moderate risk</p>
+          <span class="risk-tier-count" style="background:#FFFBEB;color:#D97706;">{{ report_context.moderate_risk_projects|length }}</span>
+        </div>
+        {% for row in report_context.moderate_risk_projects %}
+        {% include 'components/report_risk_project_row.html' with row=row %}
+        {% empty %}
+        <p class="risk-tier-empty"><i class="ti ti-circle-check"></i> No projects in this tier</p>
+        {% endfor %}
+      </div>
     </div>
 
     <div class="report-card report-panel">

@@ -256,6 +256,16 @@ def detect_bottlenecks():
         if pending >= 1:
             slow_verifiers.append({'user': v, 'pending_count': pending})
 
+    slow_compliance = []
+    for c in User.objects.filter(role=UserRole.COMPLIANCE_TEAM, is_active=True):
+        pending = DesignRequest.objects.filter(
+            current_holder=c,
+            status=DesignStatus.COMPLIANCE_PENDING,
+            updated_at__lt=now - timedelta(days=3),
+        ).count()
+        if pending >= 1:
+            slow_compliance.append({'user': c, 'pending_count': pending})
+
     stalled_projects = []
     for p in Project.objects.filter(status=ProjectStatus.ACTIVE):
         health = compute_project_health(p)
@@ -265,6 +275,7 @@ def detect_bottlenecks():
     return {
         'slow_designers': slow_designers,
         'slow_verifiers': slow_verifiers,
+        'slow_compliance': slow_compliance,
         'stalled_projects': stalled_projects,
     }
 
@@ -405,10 +416,6 @@ def executive_dashboard(request):
     )
 
     at_risk_projects = sum(1 for p in active_projects if p.display_health < 70)
-    critical_projects = sorted(
-        [p for p in active_projects if p.display_health < 50],
-        key=lambda p: p.display_health,
-    )
 
     bottlenecks = detect_bottlenecks()
     leaderboard_top = get_leaderboard()[:5]
@@ -423,7 +430,7 @@ def executive_dashboard(request):
         'on_track_rate': on_track_rate,
         'portfolio_health': portfolio_health,
         'at_risk_projects': at_risk_projects,
-        'critical_projects': critical_projects,
+        'active_projects': active_projects,
         'top_performers': leaderboard_top,
         'bottlenecks': bottlenecks,
         'design_team_count': PermissionService.get_design_team_members().count(),

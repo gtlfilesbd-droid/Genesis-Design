@@ -1,0 +1,14 @@
+<div class="risk-project-row" style="background:{{ row.row_bg }};border-left-color:{{ row.accent_color }};">
+  <div class="risk-project-info">
+    <div class="risk-project-code">{{ row.project.code }}</div>
+    <div class="risk-project-client">{{ row.project.client_name }}</div>
+  </div>
+  <div class="risk-health-bar-wrap">
+    <div class="capacity-bar">
+      <div class="capacity-bar-fill" style="width:{{ row.bar_percent }}%;background:{{ row.bar_color }};"></div>
+    </div>
+  </div>
+  <span class="risk-health-pill" style="color:{{ row.health_color }};background:{{ row.row_bg }};border-color:{{ row.accent_color }};">
+    {{ row.health }}
+  </span>
+</div>
