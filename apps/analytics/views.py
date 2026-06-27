@@ -66,6 +66,24 @@ def compute_verification_kpis(verifier):
     }
 
 
+def compute_compliance_kpis(officer):
+    reviewed = DesignRequest.objects.filter(
+        Q(approved_by_compliance=officer) | Q(assigned_compliance_officer=officer),
+    ).distinct()
+    total = reviewed.count()
+    approved = reviewed.filter(
+        status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
+    ).count()
+    corrections = reviewed.filter(status=DesignStatus.COMPLIANCE_CORRECTION).count()
+
+    return {
+        'total_reviewed': total,
+        'approved': approved,
+        'accuracy_rate': round((approved / total * 100) if total else 0, 1),
+        'correction_rate': round((corrections / total * 100) if total else 0, 1),
+    }
+
+
 def compute_project_health(project):
     designs = project.design_requests.all()
     total = designs.count()
@@ -197,6 +215,8 @@ def kpi_dashboard(request):
         kpis = compute_hod_kpis(user)
     elif user.role == UserRole.VERIFICATION_TEAM:
         kpis = compute_verification_kpis(user)
+    elif user.role == UserRole.COMPLIANCE_TEAM:
+        kpis = compute_compliance_kpis(user)
 
     return render(request, 'analytics/kpi.html', {'kpis': kpis})
 
