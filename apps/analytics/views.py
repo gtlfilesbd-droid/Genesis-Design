@@ -383,9 +383,17 @@ def smart_search(request):
         designs = designs.filter(created_at__date__gte=date_from)
     if date_to:
         designs = designs.filter(created_at__date__lte=date_to)
+    if request.GET.get('overdue'):
+        terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+        designs = designs.filter(
+            due_date__lt=timezone.now(),
+        ).exclude(status__in=terminal)
 
+    result_count = designs.count()
     return render(request, 'analytics/search.html', {
         'designs': designs[:100],
+        'result_count': result_count,
+        'results_truncated': result_count > 100,
         'drawing_types': DrawingType.objects.filter(is_active=True),
         'designers': PermissionService.get_design_team_members(),
         'statuses': DesignStatus.choices,
