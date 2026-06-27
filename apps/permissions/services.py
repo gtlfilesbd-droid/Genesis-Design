@@ -193,6 +193,20 @@ class PermissionService:
         return Project.objects.filter(pk__in=all_ids)
 
     @staticmethod
+    def get_search_filter_projects(user):
+        if not user or not user.is_authenticated:
+            return Project.objects.none()
+        if (
+            PermissionService._is_admin_or_hod(user)
+            or PermissionService.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS')
+        ):
+            return Project.objects.order_by('name')
+        project_ids = PermissionService.filter_design_requests(
+            user, DesignRequest.objects.all()
+        ).values_list('project_id', flat=True).distinct()
+        return Project.objects.filter(pk__in=project_ids).order_by('name')
+
+    @staticmethod
     def _design_participation_q(user):
         """Permanent access for users involved in a design's workflow."""
         return (

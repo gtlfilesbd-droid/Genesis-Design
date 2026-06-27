@@ -6,6 +6,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from apps.permissions.decorators import require_global_permission
+from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus, DeadlineStatus
 from apps.projects.models import Project, ProjectStatus
@@ -142,10 +143,14 @@ def detect_bottlenecks():
 @login_required
 def smart_search(request):
     from apps.designs.models import DrawingType
-    designs = DesignRequest.objects.select_related('project', 'drawing_type', 'assigned_designer')
+    designs = PermissionService.filter_design_requests(
+        request.user,
+        DesignRequest.objects.select_related('project', 'drawing_type', 'assigned_designer'),
+    )
 
     q = request.GET.get('q', '')
     drawing_type = request.GET.get('drawing_type')
+    project = request.GET.get('project')
     status = request.GET.get('status')
     priority = request.GET.get('priority')
     designer = request.GET.get('designer')
@@ -160,6 +165,8 @@ def smart_search(request):
         )
     if drawing_type:
         designs = designs.filter(drawing_type_id=drawing_type)
+    if project:
+        designs = designs.filter(project_id=project)
     if status:
         designs = designs.filter(status=status)
     if priority:
@@ -176,6 +183,7 @@ def smart_search(request):
         'drawing_types': DrawingType.objects.filter(is_active=True),
         'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
         'statuses': DesignStatus.choices,
+        'projects': PermissionService.get_search_filter_projects(request.user)[:50],
     })
 
 
