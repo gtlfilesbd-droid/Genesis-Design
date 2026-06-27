@@ -316,11 +316,12 @@ class PermissionService:
         if PermissionService.has_global_permission(user, 'VIS_PERM_DASHBOARD'):
             items.append('dashboard')
         items.append('projects')
-        if PermissionService._can_see_design_requests(user):
-            items.append('design_requests')
         if PermissionService._has_my_tasks(user):
             items.append('my_tasks')
-        if PermissionService._can_see_design_library(user):
+        if (
+            PermissionService._can_see_design_requests(user)
+            or PermissionService._can_see_design_library(user)
+        ):
             items.append('design_library')
         if PermissionService.has_global_permission(user, 'VIS_PERM_WORKFLOW_BOARD'):
             items.append('workflow')
@@ -330,7 +331,7 @@ class PermissionService:
             items.append('team')
         if PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL'):
             items.append('settings')
-        items.extend(['profile', 'kpi', 'search'])
+        items.extend(['profile', 'kpi'])
         if PermissionService.has_global_permission(user, 'VIS_PERM_NOTIFICATIONS'):
             items.append('notifications')
         return items
@@ -431,14 +432,6 @@ class PermissionService:
                 'path_prefix': '/projects',
                 'section': 'main',
             },
-            'design_requests': {
-                'label': 'Design Requests',
-                'url': reverse('requests:list'),
-                'icon': 'file-plus',
-                'routes': ['requests:list', 'requests:detail'],
-                'path_prefix': '/requests',
-                'section': 'main',
-            },
             'my_tasks': {
                 'label': 'My Tasks',
                 'url': reverse('my_tasks:list'),
@@ -449,10 +442,10 @@ class PermissionService:
             },
             'design_library': {
                 'label': 'Design Library',
-                'url': reverse('designs:library'),
+                'url': reverse('analytics:search'),
                 'icon': 'library',
-                'routes': ['designs:library'],
-                'path_prefix': '/designs/library',
+                'routes': ['analytics:search'],
+                'path_prefix': '/analytics/search',
                 'section': 'main',
             },
             'workflow': {
@@ -531,14 +524,6 @@ class PermissionService:
                 'icon': 'trending-up',
                 'routes': ['analytics:kpi'],
                 'path_prefix': '/analytics/kpi',
-                'section': 'account',
-            },
-            'search': {
-                'label': 'Search',
-                'url': reverse('analytics:search'),
-                'icon': 'search',
-                'routes': ['analytics:search'],
-                'path_prefix': '/analytics/search',
                 'section': 'account',
             },
             'notifications': {

@@ -37,6 +37,8 @@ def _build_breadcrumbs(request):
     elif parts[0] == 'designs':
         if parts[-1] == 'library':
             crumbs.append({'label': 'Design Library', 'url': None})
+    elif parts[0] == 'analytics' and len(parts) > 1 and parts[1] == 'search':
+        crumbs.append({'label': 'Design Library', 'url': None})
     elif parts[0] == 'workflow':
         crumbs.append({'label': 'Workflow Board', 'url': None})
     elif parts[0] == 'reports':
