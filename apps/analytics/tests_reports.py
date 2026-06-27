@@ -102,7 +102,7 @@ class ExecutiveDisplayTests(TestCase):
         self.assertEqual(len(context['high_risk_projects']), 1)
         self.assertEqual(context['critical_projects'][0]['health'], 42)
         self.assertEqual(len(context['risk_summary']), 3)
-        self.assertEqual(len(context['team_chips']), 2)
+        self.assertEqual(len(context['team_chips']), 3)
 
     def test_build_executive_context_splits_risk_tiers(self):
         raw = {

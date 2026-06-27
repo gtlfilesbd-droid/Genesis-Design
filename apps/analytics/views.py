@@ -437,6 +437,9 @@ def executive_dashboard(request):
         'verification_team_count': User.objects.filter(
             role=UserRole.VERIFICATION_TEAM, is_active=True
         ).count(),
+        'compliance_team_count': User.objects.filter(
+            role=UserRole.COMPLIANCE_TEAM, is_active=True
+        ).count(),
     }
     report_context = build_executive_context(raw_context)
     return render(request, 'analytics/executive.html', {'report_context': report_context})

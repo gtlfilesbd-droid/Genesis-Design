@@ -251,9 +251,11 @@ def build_executive_context(raw):
 
     design_team_count = raw.get('design_team_count', 0)
     verification_team_count = raw.get('verification_team_count', 0)
+    compliance_team_count = raw.get('compliance_team_count', 0)
     team_chips = [
         {'icon': 'ti-users', 'label': f'{design_team_count} designers'},
         {'icon': 'ti-shield', 'label': f'{verification_team_count} verifiers'},
+        {'icon': 'ti-scale', 'label': f'{compliance_team_count} compliance'},
     ]
 
     top_performers = []
