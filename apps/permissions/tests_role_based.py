@@ -103,3 +103,29 @@ class RoleBasedPermissionTests(TestCase):
         labels = [p['label'] for p in profile['role_permissions']]
         self.assertIn('Assign Designers', labels)
         self.assertIn('Review Designs', labels)
+
+
+class SidebarAccessTests(TestCase):
+    def setUp(self):
+        ensure_role_permissions()
+        self.hod = User.objects.create_user(
+            username='hod', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H1',
+        )
+        self.admin = User.objects.create_user(
+            username='admin', password='pass', role=UserRole.ADMIN, employee_id='A1',
+        )
+
+    def test_hod_sidebar_excludes_team_and_settings(self):
+        items = PermissionService.get_user_sidebar_items(self.hod)
+        self.assertNotIn('team', items)
+        self.assertNotIn('settings', items)
+
+    def test_hod_denied_team_and_manage_users_permissions(self):
+        self.assertFalse(PermissionService.has_global_permission(self.hod, 'VIS_PERM_TEAM_PAGE'))
+        self.assertFalse(PermissionService.has_global_permission(self.hod, 'PERM_MANAGE_USERS'))
+        self.assertFalse(PermissionService.has_global_permission(self.hod, 'PERM_ADMIN_PANEL'))
+
+    def test_admin_sidebar_includes_team_and_settings(self):
+        items = PermissionService.get_user_sidebar_items(self.admin)
+        self.assertIn('team', items)
+        self.assertIn('settings', items)

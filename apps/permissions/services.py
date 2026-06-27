@@ -110,10 +110,13 @@ class PermissionService:
             )
 
         if permission_code == 'VIS_PERM_TEAM_PAGE':
-            return (
-                PermissionService._matrix_flag(user, 'can_manage_users')
-                or user.role == UserRole.HEAD_OF_DESIGN
-            )
+            return user.role == UserRole.ADMIN
+
+        if permission_code == 'PERM_ADMIN_PANEL':
+            return user.role == UserRole.ADMIN
+
+        if permission_code == 'PERM_MANAGE_USERS':
+            return user.role == UserRole.ADMIN
 
         if permission_code == 'VIS_PERM_USER_PROFILES':
             return (
