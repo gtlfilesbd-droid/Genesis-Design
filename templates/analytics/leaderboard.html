@@ -50,10 +50,17 @@
       </div>
       <div>
         <p class="report-stat-label">Period</p>
-        <p class="report-stat-value" style="font-size:18px;text-transform:capitalize;">{{ report_context.period }}</p>
+        <p class="report-stat-value" style="font-size:18px;">{{ report_context.period_label }}</p>
       </div>
     </div>
   </div>
+
+  <div class="period-switcher">
+    <a href="?period=monthly" class="period-tab{% if report_context.period == 'monthly' %} active{% endif %}">Monthly</a>
+    <a href="?period=yearly" class="period-tab{% if report_context.period == 'yearly' %} active{% endif %}">Yearly</a>
+    <a href="?period=all_time" class="period-tab{% if report_context.period == 'all_time' %} active{% endif %}">All time</a>
+  </div>
+  <p class="ranking-footnote">{{ report_context.ranking_footnote }}{% if report_context.excluded_count %} ({{ report_context.excluded_count }} designer{{ report_context.excluded_count|pluralize }} below minimum){% endif %}</p>
 
   {% if report_context.podium %}
   <div class="rank-podium">

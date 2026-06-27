@@ -11,7 +11,11 @@ from apps.analytics.reports_display import (
     build_leaderboard_context,
     build_workload_context,
 )
-from apps.analytics.views import detect_bottlenecks
+from apps.analytics.views import (
+    compute_leaderboard_kpis,
+    detect_bottlenecks,
+    get_leaderboard,
+)
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.projects.models import Project, ProjectStatus
@@ -281,6 +285,119 @@ class ReportsViewTests(TestCase):
         self.assertNotContains(response, '🥈')
         self.assertNotContains(response, '🥉')
 
+    def test_leaderboard_period_query_param(self):
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('analytics:leaderboard'), {'period': 'yearly'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Yearly')
+        self.assertContains(response, 'Rankings include designers with 3+ completions')
+
+
+class LeaderboardFairnessTests(TestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(
+            username='reqlb', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RL1',
+        )
+        self.hod = User.objects.create_user(
+            username='hodlb', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='HL1',
+        )
+        self.busy = User.objects.create_user(
+            username='busy', password='pass', role=UserRole.DESIGNER, employee_id='BL1',
+        )
+        self.light = User.objects.create_user(
+            username='light', password='pass', role=UserRole.DESIGNER, employee_id='LL1',
+        )
+        self.project = Project.objects.create(
+            name='P', code='PLB', client_name='C', start_date=date.today(), created_by=self.requester,
+        )
+        self.drawing_type = DrawingType.objects.create(
+            name='Initial Drawing', code_prefix='ID', allowed_days=3,
+        )
+
+    def _create_completed(self, designer, when=None):
+        from django.utils import timezone
+        from apps.designs.models import DesignAssignment
+
+        when = when or timezone.now()
+        design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            assigned_designer=designer,
+            status=DesignStatus.COMPLETED,
+            completion_date=when,
+            due_date=when + timedelta(days=1),
+        )
+        DesignAssignment.objects.create(
+            design=design, designer=designer, assigned_by=self.hod,
+        )
+        return design
+
+    def test_leaderboard_excludes_low_volume(self):
+        for _ in range(2):
+            self._create_completed(self.busy)
+        data = get_leaderboard('monthly')
+        ranked_ids = [r['user'].pk for r in data['rankings']]
+        self.assertNotIn(self.busy.pk, ranked_ids)
+        self.assertGreaterEqual(data['excluded_count'], 1)
+
+    def test_leaderboard_busy_designer_qualifies_in_period(self):
+        from django.utils import timezone
+
+        now = timezone.now()
+        for _ in range(12):
+            self._create_completed(self.busy, when=now)
+        for _ in range(8):
+            design = DesignRequest.objects.create(
+                project=self.project,
+                drawing_type=self.drawing_type,
+                requested_by=self.requester,
+                assigned_designer=self.busy,
+                status=DesignStatus.IN_PROGRESS,
+            )
+            from apps.designs.models import DesignAssignment
+            DesignAssignment.objects.create(
+                design=design, designer=self.busy, assigned_by=self.hod,
+            )
+        for _ in range(3):
+            self._create_completed(self.light, when=now)
+
+        busy_kpis = compute_leaderboard_kpis(self.busy, 'monthly')
+        self.assertEqual(busy_kpis['total_completed'], 12)
+        self.assertEqual(busy_kpis['total_assigned'], 20)
+
+        data = get_leaderboard('monthly')
+        ranked_ids = [r['user'].pk for r in data['rankings']]
+        self.assertIn(self.busy.pk, ranked_ids)
+        self.assertIn(self.light.pk, ranked_ids)
+
+    def test_leaderboard_monthly_filters_old_completions(self):
+        from django.utils import timezone
+
+        month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        old = month_start - timedelta(days=5)
+        self._create_completed(self.busy, when=old)
+        kpis = compute_leaderboard_kpis(self.busy, 'monthly')
+        self.assertEqual(kpis['total_completed'], 0)
+
+
+class WorkloadHodTests(TestCase):
+    def setUp(self):
+        ensure_role_permissions()
+        self.client = Client()
+        self.hod = User.objects.create_user(
+            username='hod2', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H2',
+        )
+        self.requester = User.objects.create_user(
+            username='req2', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R2',
+        )
+        self.project = Project.objects.create(
+            name='P', code='P2', client_name='C', start_date=date.today(), created_by=self.requester,
+        )
+        self.drawing_type = DrawingType.objects.create(
+            name='Initial Drawing', code_prefix='ID', allowed_days=3,
+        )
+
     def test_workload_includes_hod(self):
         DesignRequest.objects.create(
             project=self.project,
@@ -289,7 +406,7 @@ class ReportsViewTests(TestCase):
             assigned_designer=self.hod,
             status=DesignStatus.IN_PROGRESS,
         )
-        self.client.login(username='hod', password='pass')
+        self.client.login(username='hod2', password='pass')
         response = self.client.get(reverse('analytics:workload'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.hod.get_full_name())

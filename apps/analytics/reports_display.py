@@ -6,6 +6,13 @@ TONE_COLORS = {
 }
 
 
+PERIOD_LABELS = {
+    'monthly': 'Monthly',
+    'yearly': 'Yearly',
+    'all_time': 'All time',
+}
+
+
 def _rate_tone(value, inverted=False):
     try:
         numeric = float(value)
@@ -97,7 +104,14 @@ def build_workload_context(designers):
     return {'summary': summary, 'rows': rows}
 
 
-def build_leaderboard_context(rankings, period='monthly'):
+def build_leaderboard_context(
+    rankings,
+    period='monthly',
+    excluded_count=0,
+    min_completions_required=3,
+):
+    if period not in PERIOD_LABELS:
+        period = 'monthly'
     ranking_list = list(rankings)
     scores = [r['score'] for r in ranking_list]
     avg_score = round(sum(scores) / len(scores), 1) if scores else 0
@@ -159,6 +173,13 @@ def build_leaderboard_context(rankings, period='monthly'):
 
     return {
         'period': period,
+        'period_label': PERIOD_LABELS[period],
+        'excluded_count': excluded_count,
+        'min_completions_required': min_completions_required,
+        'ranking_footnote': (
+            f'Rankings include designers with {min_completions_required}+ completions '
+            f'in this period.'
+        ),
         'summary': {
             'designers_ranked': len(ranking_list),
             'avg_score': avg_score,

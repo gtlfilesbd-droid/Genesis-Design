@@ -217,11 +217,66 @@ def compute_project_health(project):
     return score
 
 
+LEADERBOARD_MIN_COMPLETIONS = 3
+
+
+def _normalize_period(period):
+    if period in ('all-time', 'all_time', 'all'):
+        return 'all_time'
+    if period == 'yearly':
+        return 'yearly'
+    return 'monthly'
+
+
+def _period_start(period):
+    period = _normalize_period(period)
+    now = timezone.now()
+    if period == 'yearly':
+        return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    if period == 'monthly':
+        return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return None
+
+
+def compute_leaderboard_kpis(designer, period='monthly'):
+    period = _normalize_period(period)
+    period_start = _period_start(period)
+    designs = DesignRequest.objects.filter(assigned_designer=designer)
+    if period_start:
+        designs = designs.filter(
+            Q(completion_date__gte=period_start) |
+            Q(assignments__assigned_at__gte=period_start),
+        ).distinct()
+
+    assigned = designs.count()
+    completed_qs = designs.filter(status=DesignStatus.COMPLETED)
+    if period_start:
+        completed_qs = completed_qs.filter(completion_date__gte=period_start)
+    completed = completed_qs.count()
+    on_time = completed_qs.filter(completion_date__lte=F('due_date')).count()
+    corrections = designs.filter(revision_count__gt=0).count()
+    first_time = completed - corrections if completed > corrections else 0
+
+    return {
+        'total_assigned': assigned,
+        'total_completed': completed,
+        'on_time_rate': round((on_time / completed * 100) if completed else 0, 1),
+        'total_corrections': corrections,
+        'first_time_approval_rate': round((first_time / completed * 100) if completed else 0, 1),
+        'completion_rate': round((completed / assigned * 100) if assigned else 0, 1),
+    }
+
+
 def get_leaderboard(period='monthly'):
+    period = _normalize_period(period)
     designers = PermissionService.get_design_team_members()
     rankings = []
+    excluded_count = 0
     for d in designers:
-        kpis = compute_designer_kpis(d)
+        kpis = compute_leaderboard_kpis(d, period)
+        if kpis['total_completed'] < LEADERBOARD_MIN_COMPLETIONS:
+            excluded_count += 1
+            continue
         score = (
             kpis['completion_rate'] * 0.4 +
             kpis['on_time_rate'] * 0.3 +
@@ -232,7 +287,12 @@ def get_leaderboard(period='monthly'):
             'score': round(score, 1),
             'kpis': kpis,
         })
-    return sorted(rankings, key=lambda x: x['score'], reverse=True)
+    return {
+        'rankings': sorted(rankings, key=lambda x: x['score'], reverse=True),
+        'excluded_count': excluded_count,
+        'min_completions_required': LEADERBOARD_MIN_COMPLETIONS,
+        'period': period,
+    }
 
 
 def detect_bottlenecks():
@@ -359,8 +419,13 @@ def leaderboard(request):
     from .reports_display import build_leaderboard_context
 
     period = request.GET.get('period', 'monthly')
-    rankings = get_leaderboard(period=period)
-    report_context = build_leaderboard_context(rankings, period=period)
+    leaderboard_data = get_leaderboard(period=period)
+    report_context = build_leaderboard_context(
+        leaderboard_data['rankings'],
+        period=leaderboard_data['period'],
+        excluded_count=leaderboard_data['excluded_count'],
+        min_completions_required=leaderboard_data['min_completions_required'],
+    )
     return render(request, 'analytics/leaderboard.html', {'report_context': report_context})
 
 
@@ -418,7 +483,7 @@ def executive_dashboard(request):
     at_risk_projects = sum(1 for p in active_projects if p.display_health < 70)
 
     bottlenecks = detect_bottlenecks()
-    leaderboard_top = get_leaderboard()[:5]
+    leaderboard_top = get_leaderboard()['rankings'][:5]
 
     raw_context = {
         'total_projects': projects.count(),

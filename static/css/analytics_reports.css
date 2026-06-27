@@ -203,3 +203,13 @@
 
 .report-link { font-size: 13px; color: #1D4ED8; text-decoration: none; font-weight: 500; }
 .report-link:hover { text-decoration: underline; }
+
+.period-switcher { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.period-tab {
+  font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--kpi-border); color: #64748B; text-decoration: none;
+  background: #fff;
+}
+.period-tab:hover { background: #F8FAFC; color: #0F172A; }
+.period-tab.active { background: #EFF6FF; border-color: #93C5FD; color: #1D4ED8; font-weight: 600; }
+.ranking-footnote { font-size: 12px; color: var(--kpi-muted); margin: 0 0 24px; }
