@@ -1,0 +1,7 @@
+<div class="metric-bar-row">
+  <span class="metric-bar-label">{{ label }}</span>
+  <div class="metric-bar-track" style="flex:1;">
+    <div class="metric-bar-fill" style="width:{{ bar_percent }}%;background:{{ fill_color }};"></div>
+  </div>
+  <span class="metric-bar-value">{{ value }}{{ unit|default:"%" }}</span>
+</div>

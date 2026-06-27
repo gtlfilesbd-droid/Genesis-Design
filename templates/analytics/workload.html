@@ -1,29 +1,87 @@
 {% extends "base.html" %}
-{% load genesis_ui %}
+{% load static genesis_ui %}
+
 {% block title %}Workload{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="{% static 'css/analytics_reports.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">Designer Workload</h1>
-    <p class="text-sm text-slate-500 mt-1">Balance assignments across the design team</p>
-</div>
-<div class="g-card overflow-hidden">
-    <table class="g-table w-full">
-        <thead><tr><th>Designer</th><th>Active Workload</th><th>Status</th><th>Recommendation</th></tr></thead>
-        <tbody>
-        {% for d in designers %}
-        <tr class="{% if forloop.first %}bg-green-50/50{% endif %}">
-            <td class="font-medium">{{ d.get_full_name }}</td>
-            <td>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
-                    {% if d.workload > 5 %}bg-red-100 text-red-700{% elif d.workload > 2 %}bg-amber-100 text-amber-700{% else %}bg-green-100 text-green-700{% endif %}">
-                    {{ d.workload }} tasks
-                </span>
-            </td>
-            <td>{% if d.workload > 5 %}Overloaded{% elif d.workload > 2 %}Busy{% else %}Available{% endif %}</td>
-            <td>{% if forloop.first %}<span class="text-green-700 font-semibold text-sm">Suggested for next assignment</span>{% else %}—{% endif %}</td>
+<div class="report-wrap">
+
+  <div class="report-top">
+    <p class="report-eyebrow">Team analytics</p>
+    <h1 class="report-h1">Designer Workload</h1>
+    <p class="report-subtitle">Balance assignments across the design team</p>
+  </div>
+
+  <div class="report-summary-grid">
+    {% for stat in report_context.summary %}
+    <div class="report-stat-card">
+      <div class="report-stat-icon" style="background:{{ stat.icon_bg }};">
+        <i class="ti {{ stat.icon }}" style="color:{{ stat.icon_fg }};"></i>
+      </div>
+      <div>
+        <p class="report-stat-label">{{ stat.label }}</p>
+        <p class="report-stat-value">{{ stat.value }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <p class="report-section-label">Team capacity</p>
+  <div class="report-card report-table-wrap">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Designer</th>
+          <th>Tasks</th>
+          <th>Capacity</th>
+          <th>Status</th>
+          <th></th>
         </tr>
+      </thead>
+      <tbody>
+        {% for row in report_context.rows %}
+        <tr class="{% if row.is_danger %}danger-row{% elif row.is_suggested %}suggested-row{% endif %}">
+          <td>
+            <div class="designer-cell">
+              {% render_user_avatar row.user size_class='w-9 h-9' %}
+              <div>
+                <div class="designer-name">{{ row.user.get_full_name }}</div>
+                {% if row.overdue %}
+                <div class="designer-sub">{{ row.overdue }} overdue</div>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          <td>
+            <span class="font-semibold text-sm">{{ row.workload }}</span>
+            <span class="text-slate-500 text-xs"> active</span>
+          </td>
+          <td style="min-width:140px;">
+            <div class="capacity-bar">
+              <div class="capacity-bar-fill" style="width:{{ row.bar_percent }}%;background:{{ row.bar_color }};"></div>
+            </div>
+          </td>
+          <td>
+            <span class="status-pill" style="color:{{ row.status_color }};background:{{ row.status_bg }};">
+              {{ row.status }}
+            </span>
+          </td>
+          <td>
+            {% if row.is_suggested %}
+            <span class="suggested-badge"><i class="ti ti-star" style="font-size:12px;"></i> Suggested next</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-slate-500 py-12">No designers found.</td></tr>
         {% endfor %}
-        </tbody>
+      </tbody>
     </table>
+  </div>
+
 </div>
 {% endblock %}

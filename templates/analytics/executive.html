@@ -1,58 +1,112 @@
 {% extends "base.html" %}
+{% load static genesis_ui %}
+
 {% block title %}Executive Dashboard{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="{% static 'css/analytics_reports.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">Executive Dashboard</h1>
-    <p class="text-sm text-slate-500 mt-1">Real-time overview for management</p>
-</div>
+<div class="report-wrap">
 
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' %}
-    {% include 'components/stat_card.html' with label='Total Drawings' value=total_drawings icon='file-text' %}
-    {% include 'components/stat_card.html' with label='Pending' value=pending_drawings icon='clock' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=overdue_drawings icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_drawings %}
-</div>
+  <div class="report-top">
+    <p class="report-eyebrow">Management overview</p>
+    <h1 class="report-h1">Executive Dashboard</h1>
+    <p class="report-subtitle">Real-time portfolio snapshot for leadership</p>
+  </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <div class="g-card p-6">
-        <h2 class="font-semibold text-slate-900 mb-4">Risk Indicators</h2>
-        <p class="text-sm mb-4">Projects at risk (health &lt; 70): <strong class="text-amber-600">{{ at_risk_projects }}</strong></p>
-        <p class="text-sm text-slate-500 mb-4">Design team: {{ design_team_count }} · Verification: {{ verification_team_count }}</p>
-        <h3 class="text-xs font-semibold uppercase text-slate-500 mb-2">High Risk Projects</h3>
-        <ul class="space-y-2">
-            {% for p in critical_projects %}
-            <li class="flex justify-between text-sm p-2 rounded bg-red-50 text-red-800"><span>{{ p.code }} — {{ p.client_name }}</span><span>Health: {{ p.health_score }}</span></li>
-            {% empty %}<li class="text-sm text-slate-500">None</li>{% endfor %}
-        </ul>
+  <div class="report-summary-grid" style="grid-template-columns:repeat(3,1fr);">
+    {% for stat in report_context.summary %}
+    <div class="report-stat-card">
+      <div class="report-stat-icon" style="background:{{ stat.icon_bg }};">
+        <i class="ti {{ stat.icon }}" style="color:{{ stat.icon_fg }};"></i>
+      </div>
+      <div>
+        <p class="report-stat-label">{{ stat.label }}</p>
+        <p class="report-stat-value{% if stat.is_danger %} danger{% endif %}"{% if stat.value_color %} style="color:{{ stat.value_color }};"{% endif %}>
+          {{ stat.value }}{% if stat.unit %}{{ stat.unit }}{% endif %}
+        </p>
+      </div>
     </div>
-    <div class="g-card p-6">
-        <h2 class="font-semibold text-slate-900 mb-4">Top Performers</h2>
-        <ul class="space-y-3">
-            {% for r in top_performers %}
-            <li class="flex items-center justify-between p-3 rounded-lg bg-slate-50">
-                <span class="font-medium text-sm">{{ r.user.get_full_name }}</span>
-                <span class="text-primary font-bold">{{ r.score }}</span>
-            </li>
-            {% empty %}<li class="text-sm text-slate-500">No data</li>{% endfor %}
-        </ul>
-    </div>
-</div>
+    {% endfor %}
+  </div>
 
-<div class="g-card p-6">
-    <h2 class="font-semibold text-slate-900 mb-4">Bottleneck Detection</h2>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-        <div>
-            <h3 class="text-xs font-semibold uppercase text-red-600 mb-3">Slow Designers</h3>
-            {% for b in bottlenecks.slow_designers %}<p class="mb-2">{{ b.user.get_full_name }} — {{ b.overdue_count }} overdue</p>{% empty %}<p class="text-slate-500">None</p>{% endfor %}
+  <div class="report-two-col">
+    <div class="report-card report-panel">
+      <h2>Risk indicators</h2>
+      <p class="text-sm mb-3">
+        Projects at risk (health &lt; 70):
+        <strong class="text-amber-600">{{ report_context.at_risk_projects }}</strong>
+      </p>
+      <p class="text-sm text-slate-500 mb-2">
+        On-track rate: <strong style="color:{{ report_context.on_track_color }};">{{ report_context.on_track_rate }}%</strong>
+      </p>
+      <p class="text-sm text-slate-500 mb-4">
+        Design team: {{ report_context.design_team_count }} · Verification: {{ report_context.verification_team_count }}
+      </p>
+      <p class="report-section-label">High risk projects</p>
+      {% for item in report_context.critical_projects %}
+      <div class="risk-list-item">
+        <span>{{ item.project.code }} — {{ item.project.client_name }}</span>
+        <div class="health-bar-wrap">
+          <div class="capacity-bar">
+            <div class="capacity-bar-fill" style="width:{{ item.bar_percent }}%;background:{{ item.bar_color }};"></div>
+          </div>
         </div>
-        <div>
-            <h3 class="text-xs font-semibold uppercase text-amber-600 mb-3">Slow Verifiers</h3>
-            {% for b in bottlenecks.slow_verifiers %}<p class="mb-2">{{ b.user.get_full_name }} — {{ b.pending_count }} pending</p>{% empty %}<p class="text-slate-500">None</p>{% endfor %}
-        </div>
-        <div>
-            <h3 class="text-xs font-semibold uppercase text-red-600 mb-3">Stalled Projects</h3>
-            {% for b in bottlenecks.stalled_projects %}<p class="mb-2">{{ b.project.code }} — Health: {{ b.health }}</p>{% empty %}<p class="text-slate-500">None</p>{% endfor %}
-        </div>
+        <strong style="color:{{ item.health_color }};">{{ item.health }}</strong>
+      </div>
+      {% empty %}
+      <p class="text-sm text-slate-500">None</p>
+      {% endfor %}
     </div>
+
+    <div class="report-card report-panel">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="mb-0">Top performers</h2>
+        <a href="{% url 'analytics:leaderboard' %}" class="report-link">View leaderboard →</a>
+      </div>
+      {% for performer in report_context.top_performers %}
+      <div class="performer-row">
+        <div class="designer-cell">
+          {% render_user_avatar performer.user size_class='w-8 h-8' %}
+          <span class="designer-name">{{ performer.user.get_full_name }}</span>
+        </div>
+        <div class="performer-bar-wrap">
+          <div class="capacity-bar">
+            <div class="capacity-bar-fill" style="width:{{ performer.bar_percent }}%;background:{{ performer.bar_color }};"></div>
+          </div>
+        </div>
+        <span class="font-bold" style="color:{{ performer.score_color }};">{{ performer.score }}</span>
+      </div>
+      {% empty %}
+      <p class="text-sm text-slate-500">No data</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <p class="report-section-label">Bottleneck detection</p>
+  <div class="bottleneck-grid">
+    {% for card in report_context.bottleneck_cards %}
+    <div class="bottleneck-card">
+      <div class="bottleneck-header">
+        <div class="bottleneck-icon" style="background:{{ card.icon_bg }};">
+          <i class="ti {{ card.icon }}" style="color:{{ card.tone_color }};"></i>
+        </div>
+        <span class="bottleneck-title">{{ card.title }}</span>
+      </div>
+      <div class="bottleneck-count" style="color:{{ card.tone_color }};">{{ card.count }}</div>
+      {% for item in card.items %}
+      <div class="bottleneck-item">
+        <span>{{ item.label }}</span>
+        <span class="text-slate-500">{{ item.detail }}</span>
+      </div>
+      {% empty %}
+      <p class="bottleneck-empty">None detected</p>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
 </div>
 {% endblock %}

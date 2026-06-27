@@ -343,54 +343,93 @@ def kpi_dashboard(request):
 @login_required
 @require_global_permission('PERM_VIEW_REPORTS')
 def leaderboard(request):
-    rankings = get_leaderboard()
-    return render(request, 'analytics/leaderboard.html', {'rankings': rankings})
+    from .reports_display import build_leaderboard_context
+
+    period = request.GET.get('period', 'monthly')
+    rankings = get_leaderboard(period=period)
+    report_context = build_leaderboard_context(rankings, period=period)
+    return render(request, 'analytics/leaderboard.html', {'report_context': report_context})
 
 
 @login_required
 @require_global_permission('PERM_VIEW_REPORTS')
 def workload_view(request):
+    from .reports_display import build_workload_context
+
+    now = timezone.now()
     active_statuses = [
         DesignStatus.ASSIGNED, DesignStatus.IN_PROGRESS,
         DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED,
     ]
+    terminal_statuses = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
     designers = User.objects.filter(
         role=UserRole.DESIGNER, is_active=True
     ).annotate(
-        workload=Count('assigned_designs', filter=Q(assigned_designs__status__in=active_statuses))
+        workload=Count('assigned_designs', filter=Q(assigned_designs__status__in=active_statuses)),
+        overdue=Count(
+            'assigned_designs',
+            filter=Q(assigned_designs__due_date__lt=now)
+            & ~Q(assigned_designs__status__in=terminal_statuses),
+        ),
     ).order_by('workload')
-    return render(request, 'analytics/workload.html', {'designers': designers})
+    report_context = build_workload_context(designers)
+    return render(request, 'analytics/workload.html', {'report_context': report_context})
 
 
 @login_required
 @require_global_permission('PERM_VIEW_REPORTS')
 def executive_dashboard(request):
+    from .reports_display import build_executive_context
+
     now = timezone.now()
     projects = Project.objects.all()
     designs = DesignRequest.objects.all()
+    terminal_statuses = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
 
-    for p in projects.filter(status=ProjectStatus.ACTIVE):
-        p.health_score = compute_project_health(p)
-        p.save(update_fields=['health_score'])
+    active_projects = list(projects.filter(status=ProjectStatus.ACTIVE))
+    for p in active_projects:
+        p.display_health = compute_project_health(p)
+
+    total_drawings = designs.count()
+    completed_drawings = designs.filter(status=DesignStatus.COMPLETED).count()
+    pending_drawings = designs.exclude(status__in=terminal_statuses).count()
+    overdue_drawings = designs.filter(
+        due_date__lt=now,
+    ).exclude(status__in=terminal_statuses).count()
+    active_pipeline = pending_drawings or 1
+    completion_rate = round(completed_drawings / total_drawings * 100, 1) if total_drawings else 0
+    on_track_rate = round(100 - (overdue_drawings / active_pipeline * 100), 1)
+    portfolio_health = (
+        round(sum(p.display_health for p in active_projects) / len(active_projects), 1)
+        if active_projects else 0
+    )
+
+    at_risk_projects = sum(1 for p in active_projects if p.display_health < 70)
+    critical_projects = sorted(
+        [p for p in active_projects if p.display_health < 50],
+        key=lambda p: p.display_health,
+    )
 
     bottlenecks = detect_bottlenecks()
     leaderboard_top = get_leaderboard()[:5]
 
-    return render(request, 'analytics/executive.html', {
+    raw_context = {
         'total_projects': projects.count(),
-        'total_drawings': designs.count(),
-        'pending_drawings': designs.exclude(
-            status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
-        ).count(),
-        'overdue_drawings': designs.filter(
-            due_date__lt=now
-        ).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count(),
-        'at_risk_projects': projects.filter(health_score__lt=70).count(),
-        'critical_projects': projects.filter(health_score__lt=50),
+        'total_drawings': total_drawings,
+        'completed_drawings': completed_drawings,
+        'pending_drawings': pending_drawings,
+        'overdue_drawings': overdue_drawings,
+        'completion_rate': completion_rate,
+        'on_track_rate': on_track_rate,
+        'portfolio_health': portfolio_health,
+        'at_risk_projects': at_risk_projects,
+        'critical_projects': critical_projects,
         'top_performers': leaderboard_top,
         'bottlenecks': bottlenecks,
         'design_team_count': User.objects.filter(role=UserRole.DESIGNER, is_active=True).count(),
         'verification_team_count': User.objects.filter(
             role=UserRole.VERIFICATION_TEAM, is_active=True
         ).count(),
-    })
+    }
+    report_context = build_executive_context(raw_context)
+    return render(request, 'analytics/executive.html', {'report_context': report_context})

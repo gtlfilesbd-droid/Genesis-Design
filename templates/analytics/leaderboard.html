@@ -1,30 +1,120 @@
 {% extends "base.html" %}
-{% load genesis_ui %}
+{% load static genesis_ui %}
+
 {% block title %}Leaderboard{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="{% static 'css/analytics_reports.css' %}">
+{% endblock %}
+
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">Employee Leaderboard</h1>
-    <p class="text-sm text-slate-500 mt-1">Top performers ranked by completion, speed, and quality</p>
-</div>
-<div class="g-card overflow-hidden">
-    <table class="g-table w-full">
-        <thead><tr><th>Rank</th><th>Designer</th><th>Score</th><th>Completion</th><th>On-Time</th><th>First-Time Approval</th></tr></thead>
-        <tbody>
-        {% for r in rankings %}
-        <tr class="{% if forloop.counter <= 3 %}bg-amber-50/50{% endif %}">
-            <td>
-                {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}#{{ forloop.counter }}{% endif %}
-            </td>
-            <td class="font-medium">{{ r.user.get_full_name }}</td>
-            <td class="font-bold text-primary">{{ r.score }}</td>
-            <td>{{ r.kpis.completion_rate }}%</td>
-            <td>{{ r.kpis.on_time_rate }}%</td>
-            <td>{{ r.kpis.first_time_approval_rate }}%</td>
+<div class="report-wrap">
+
+  <div class="report-top">
+    <p class="report-eyebrow">Performance rankings</p>
+    <h1 class="report-h1">Employee Leaderboard</h1>
+    <p class="report-subtitle">Top performers ranked by completion, speed, and quality</p>
+  </div>
+
+  <div class="report-summary-grid">
+    <div class="report-stat-card">
+      <div class="report-stat-icon" style="background:#EFF6FF;">
+        <i class="ti ti-users" style="color:#1D4ED8;"></i>
+      </div>
+      <div>
+        <p class="report-stat-label">Designers ranked</p>
+        <p class="report-stat-value">{{ report_context.summary.designers_ranked }}</p>
+      </div>
+    </div>
+    <div class="report-stat-card">
+      <div class="report-stat-icon" style="background:#FFFBEB;">
+        <i class="ti ti-chart-bar" style="color:#D97706;"></i>
+      </div>
+      <div>
+        <p class="report-stat-label">Average score</p>
+        <p class="report-stat-value">{{ report_context.summary.avg_score }}</p>
+      </div>
+    </div>
+    <div class="report-stat-card">
+      <div class="report-stat-icon" style="background:#F0FDF4;">
+        <i class="ti ti-trophy" style="color:#16A34A;"></i>
+      </div>
+      <div>
+        <p class="report-stat-label">Top score</p>
+        <p class="report-stat-value">{{ report_context.summary.top_score }}</p>
+      </div>
+    </div>
+    <div class="report-stat-card">
+      <div class="report-stat-icon" style="background:#F8FAFC;">
+        <i class="ti ti-calendar" style="color:#64748B;"></i>
+      </div>
+      <div>
+        <p class="report-stat-label">Period</p>
+        <p class="report-stat-value" style="font-size:18px;text-transform:capitalize;">{{ report_context.period }}</p>
+      </div>
+    </div>
+  </div>
+
+  {% if report_context.podium %}
+  <div class="rank-podium">
+    {% for entry in report_context.podium %}
+    <div class="podium-card {{ entry.rank_class }}">
+      {% include 'components/report_rank_badge.html' with rank=entry.rank rank_class=entry.rank_class %}
+      <div class="mt-3 mb-1">{% render_user_avatar entry.user size_class='w-10 h-10' %}</div>
+      <div class="designer-name">{{ entry.user.get_full_name }}</div>
+      <div class="podium-score" style="color:{{ entry.score_color }};">{{ entry.score }}</div>
+      <div class="podium-meta">{{ entry.completion_rate }}% completion</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="report-section-label">Full rankings</p>
+  <div class="report-card report-table-wrap">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Designer</th>
+          <th>Score</th>
+          <th>Metrics</th>
+          <th>Corrections</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in report_context.rows %}
+        <tr>
+          <td>{% include 'components/report_rank_badge.html' with rank=row.rank rank_class=row.rank_class %}</td>
+          <td>
+            <div class="designer-cell">
+              {% render_user_avatar row.user size_class='w-8 h-8' %}
+              <span class="designer-name">{{ row.user.get_full_name }}</span>
+            </div>
+          </td>
+          <td>
+            <span class="text-xl font-bold" style="color:{{ row.score_color }};">{{ row.score }}</span>
+          </td>
+          <td>
+            <div class="metric-bars">
+              {% for metric in row.metrics %}
+              {% include 'components/report_metric_bar.html' with label=metric.label value=metric.value unit=metric.unit bar_percent=metric.bar_percent fill_color=metric.fill_color %}
+              {% endfor %}
+            </div>
+          </td>
+          <td>
+            {% if row.has_corrections %}
+            <span class="corrections-stat">{{ row.corrections }}</span>
+            {% else %}
+            <span class="text-slate-400 text-sm">0</span>
+            {% endif %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="text-center text-slate-500 py-12">No ranking data.</td></tr>
+        <tr><td colspan="5" class="text-center text-slate-500 py-12">No ranking data.</td></tr>
         {% endfor %}
-        </tbody>
+      </tbody>
     </table>
+  </div>
+
 </div>
 {% endblock %}
