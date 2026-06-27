@@ -62,9 +62,10 @@
         </div>
         <div>
             <label class="block text-xs font-semibold text-slate-500 mb-1">Deadline</label>
-            <select name="overdue" class="g-input w-auto min-w-[160px]">
+            <select name="deadline" class="g-input w-auto min-w-[160px]">
                 <option value="">All deadlines</option>
-                <option value="1" {% if request.GET.overdue == '1' %}selected{% endif %}>Overdue only</option>
+                <option value="running" {% if request.GET.deadline == 'running' or request.GET.running == '1' %}selected{% endif %}>Running only</option>
+                <option value="overdue" {% if request.GET.deadline == 'overdue' or request.GET.overdue == '1' %}selected{% endif %}>Overdue only</option>
             </select>
         </div>
     </div>

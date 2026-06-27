@@ -218,8 +218,12 @@ def design_request_list(request):
     if request.GET.get('mine'):
         designs = designs.filter(assigned_designer=request.user)
 
+    designs = designs.order_by('-created_at')
+    result_count = designs.count()
     return render(request, 'requests/list.html', {
-        'designs': designs.order_by('-created_at')[:100],
+        'designs': designs[:100],
+        'result_count': result_count,
+        'results_truncated': result_count > 100,
         'statuses': DesignStatus.choices,
         'projects': PermissionService.get_user_projects(request.user)[:50],
     })

@@ -383,8 +383,16 @@ def smart_search(request):
         designs = designs.filter(created_at__date__gte=date_from)
     if date_to:
         designs = designs.filter(created_at__date__lte=date_to)
-    if request.GET.get('overdue'):
-        terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+
+    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+    deadline = request.GET.get('deadline')
+    if request.GET.get('overdue') and not deadline:
+        deadline = 'overdue'
+    elif request.GET.get('running') and not deadline:
+        deadline = 'running'
+    if deadline == 'running':
+        designs = designs.exclude(status__in=terminal)
+    elif deadline == 'overdue':
         designs = designs.filter(
             due_date__lt=timezone.now(),
         ).exclude(status__in=terminal)

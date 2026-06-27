@@ -49,7 +49,37 @@ class DesignLibrarySearchTests(TestCase):
         self.client.login(username='hodsearch', password='pass')
         response = self.client.get(reverse('analytics:search'))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Running only')
         self.assertContains(response, 'Overdue only')
+
+    def test_running_filter_excludes_completed(self):
+        active = self._create_design(status=DesignStatus.IN_PROGRESS)
+        self._create_design(
+            designer=self.other_designer,
+            status=DesignStatus.COMPLETED,
+        )
+
+        self.client.login(username='hodsearch', password='pass')
+        response = self.client.get(reverse('analytics:search'), {'deadline': 'running'})
+        self.assertEqual(response.status_code, 200)
+        designs = list(response.context['designs'])
+        self.assertEqual(len(designs), 1)
+        self.assertEqual(designs[0].pk, active.pk)
+
+    def test_legacy_overdue_param_still_works(self):
+        active_overdue = self._create_design(status=DesignStatus.IN_PROGRESS)
+        self._create_design(
+            designer=self.other_designer,
+            status=DesignStatus.IN_PROGRESS,
+            due_date=timezone.now() + timedelta(days=3),
+        )
+
+        self.client.login(username='hodsearch', password='pass')
+        response = self.client.get(reverse('analytics:search'), {'overdue': '1'})
+        self.assertEqual(response.status_code, 200)
+        designs = list(response.context['designs'])
+        self.assertEqual(len(designs), 1)
+        self.assertEqual(designs[0].pk, active_overdue.pk)
 
     def test_overdue_filter_returns_only_active_overdue_designs(self):
         active_overdue = self._create_design(status=DesignStatus.IN_PROGRESS)

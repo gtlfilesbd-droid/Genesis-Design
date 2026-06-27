@@ -27,6 +27,18 @@
     <button type="submit" class="g-btn-secondary">Filter</button>
 </form>
 
+<div class="flex items-center justify-between mb-3 px-1">
+    <p class="text-sm text-slate-500">
+        {% if result_count == 0 %}
+            No records found
+        {% elif results_truncated %}
+            Showing 100 of {{ result_count }} records
+        {% else %}
+            {{ result_count }} record{{ result_count|pluralize }} found
+        {% endif %}
+    </p>
+</div>
+
 <div class="g-card overflow-x-auto">
     <table class="g-table w-full">
         <thead>
