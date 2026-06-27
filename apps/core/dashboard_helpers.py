@@ -54,7 +54,6 @@ def get_dashboard_stats(user):
         'running_designs': running,
         'overdue_designs': overdue,
         'completed_month': completed_month,
-        'deadline_missed': designs.filter(deadline_status='red').exclude(status__in=terminal).count(),
         'trend_active': f'{active_projects} active',
         'trend_running': f'{running} in progress',
         'trend_overdue': 'Action required' if overdue else 'On track',

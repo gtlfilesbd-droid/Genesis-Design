@@ -176,7 +176,6 @@ def hod_dashboard(request):
             ],
         ).count(),
         'waiting_approval': designs.filter(status=DesignStatus.FINAL_APPROVAL_PENDING).count(),
-        'overdue_designs': designs.filter(due_date__lt=timezone.now()).count(),
         'work_queue': designs.select_related(
             'assigned_designer', 'assigned_verifier', 'assigned_compliance_officer',
         ).order_by('-priority', 'due_date')[:25],
