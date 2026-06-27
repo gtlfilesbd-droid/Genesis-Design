@@ -59,7 +59,7 @@ class RequesterKpiTests(TestCase):
             name='Initial Drawing', code_prefix='ID', allowed_days=3,
         )
 
-    def test_compute_requester_kpis_counts_projects_and_requests(self):
+    def test_compute_requester_kpis_counts_requests(self):
         DesignRequest.objects.create(
             project=self.project,
             drawing_type=self.drawing_type,
@@ -73,18 +73,10 @@ class RequesterKpiTests(TestCase):
             status=DesignStatus.COMPLETED,
         )
 
-        Project.objects.create(
-            name='Done', code='P2', client_name='C2',
-            start_date=date.today(), created_by=self.requester,
-            status=ProjectStatus.COMPLETED,
-        )
-
         kpis = compute_requester_kpis(self.requester)
 
-        self.assertEqual(kpis['total_projects'], 2)
-        self.assertEqual(kpis['active_projects'], 1)
-        self.assertEqual(kpis['completed_projects'], 1)
         self.assertEqual(kpis['total_requests'], 2)
         self.assertEqual(kpis['pending_requests'], 1)
         self.assertEqual(kpis['completed_requests'], 1)
         self.assertEqual(kpis['completion_rate'], 50.0)
+        self.assertNotIn('total_projects', kpis)

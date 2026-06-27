@@ -91,13 +91,8 @@ def compute_requester_kpis(requester):
     pending = requests.exclude(
         status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED],
     ).count()
-    projects = PermissionService.get_user_projects(requester)
 
     return {
-        'total_projects': projects.count(),
-        'active_projects': projects.filter(status=ProjectStatus.ACTIVE).count(),
-        'completed_projects': projects.filter(status=ProjectStatus.COMPLETED).count(),
-        'cancelled_projects': projects.filter(status=ProjectStatus.CANCELLED).count(),
         'total_requests': total_requests,
         'completed_requests': completed,
         'pending_requests': pending,
