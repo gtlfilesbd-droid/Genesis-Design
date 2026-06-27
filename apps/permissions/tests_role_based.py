@@ -129,3 +129,23 @@ class SidebarAccessTests(TestCase):
         items = PermissionService.get_user_sidebar_items(self.admin)
         self.assertIn('team', items)
         self.assertIn('settings', items)
+
+
+class DesignTeamMembersTests(TestCase):
+    def setUp(self):
+        self.hod = User.objects.create_user(
+            username='hod', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H1',
+        )
+        self.designer = User.objects.create_user(
+            username='des', password='pass', role=UserRole.DESIGNER, employee_id='D1',
+        )
+        self.requester = User.objects.create_user(
+            username='req', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R1',
+        )
+
+    def test_get_design_team_members_includes_hod(self):
+        members = PermissionService.get_design_team_members()
+        member_ids = set(members.values_list('pk', flat=True))
+        self.assertIn(self.hod.pk, member_ids)
+        self.assertIn(self.designer.pk, member_ids)
+        self.assertNotIn(self.requester.pk, member_ids)

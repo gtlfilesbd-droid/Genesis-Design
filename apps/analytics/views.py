@@ -218,7 +218,7 @@ def compute_project_health(project):
 
 
 def get_leaderboard(period='monthly'):
-    designers = User.objects.filter(role=UserRole.DESIGNER, is_active=True)
+    designers = PermissionService.get_design_team_members()
     rankings = []
     for d in designers:
         kpis = compute_designer_kpis(d)
@@ -238,7 +238,7 @@ def get_leaderboard(period='monthly'):
 def detect_bottlenecks():
     now = timezone.now()
     slow_designers = []
-    for d in User.objects.filter(role=UserRole.DESIGNER, is_active=True):
+    for d in PermissionService.get_design_team_members():
         overdue = DesignRequest.objects.filter(
             assigned_designer=d,
             due_date__lt=now,
@@ -310,7 +310,7 @@ def smart_search(request):
     return render(request, 'analytics/search.html', {
         'designs': designs[:100],
         'drawing_types': DrawingType.objects.filter(is_active=True),
-        'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
+        'designers': PermissionService.get_design_team_members(),
         'statuses': DesignStatus.choices,
         'projects': PermissionService.get_search_filter_projects(request.user)[:50],
     })
@@ -325,7 +325,9 @@ def kpi_dashboard(request):
     if user.role == UserRole.DESIGNER:
         kpis = compute_designer_kpis(user)
     elif user.role == UserRole.HEAD_OF_DESIGN:
-        kpis = compute_hod_kpis(user)
+        team_kpis = compute_hod_kpis(user)
+        personal = compute_designer_kpis(user)
+        kpis = {**team_kpis, **{f'my_{k}': v for k, v in personal.items()}}
     elif user.role == UserRole.VERIFICATION_TEAM:
         kpis = compute_verification_kpis(user)
     elif user.role == UserRole.COMPLIANCE_TEAM:
@@ -362,9 +364,7 @@ def workload_view(request):
         DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED,
     ]
     terminal_statuses = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
-    designers = User.objects.filter(
-        role=UserRole.DESIGNER, is_active=True
-    ).annotate(
+    designers = PermissionService.get_design_team_members().annotate(
         workload=Count('assigned_designs', filter=Q(assigned_designs__status__in=active_statuses)),
         overdue=Count(
             'assigned_designs',
@@ -426,7 +426,7 @@ def executive_dashboard(request):
         'critical_projects': critical_projects,
         'top_performers': leaderboard_top,
         'bottlenecks': bottlenecks,
-        'design_team_count': User.objects.filter(role=UserRole.DESIGNER, is_active=True).count(),
+        'design_team_count': PermissionService.get_design_team_members().count(),
         'verification_team_count': User.objects.filter(
             role=UserRole.VERIFICATION_TEAM, is_active=True
         ).count(),

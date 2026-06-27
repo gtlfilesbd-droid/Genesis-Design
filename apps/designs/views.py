@@ -176,7 +176,7 @@ def design_library(request):
     return render(request, 'designs/library.html', {
         'designs': designs[:100],
         'drawing_types': DrawingType.objects.filter(is_active=True),
-        'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
+        'designers': PermissionService.get_design_team_members(),
     })
 
 

@@ -9,13 +9,14 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from apps.permissions.decorators import require_global_permission
+from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
 
 
 def _designer_performance_data(designer_id=None, project_id=None):
-    designers = User.objects.filter(role=UserRole.DESIGNER, is_active=True)
+    designers = PermissionService.get_design_team_members()
     if designer_id:
         designers = designers.filter(pk=designer_id)
     rows = []
@@ -91,7 +92,7 @@ def reports_index(request):
         'deadline_data': _deadline_compliance_data(),
         'delay_data': delay_data,
         'project_data': project_rows,
-        'designers': User.objects.filter(role=UserRole.DESIGNER, is_active=True),
+        'designers': PermissionService.get_design_team_members(),
         'projects': Project.objects.all(),
         'designer_filter': designer_filter,
         'project_filter': project_filter,

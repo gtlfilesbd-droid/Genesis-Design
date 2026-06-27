@@ -275,13 +275,18 @@ class PermissionService:
         return PermissionService.has_project_permission(user, project, 'PROJECT_PERM_VERIFY')
 
     @staticmethod
-    def get_assignable_designers(project):
-        """Active designers and Head of Design who can receive design assignments."""
+    def get_design_team_members():
+        """Active designers and Head of Design who produce design work."""
         return User.objects.filter(
             role__in=(UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN),
             is_active=True,
             status='active',
         ).order_by('first_name', 'last_name')
+
+    @staticmethod
+    def get_assignable_designers(project):
+        """Active designers and Head of Design who can receive design assignments."""
+        return PermissionService.get_design_team_members()
 
     @staticmethod
     def get_verifiers(project):

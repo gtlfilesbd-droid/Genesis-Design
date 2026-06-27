@@ -2,18 +2,23 @@ from apps.accounts.models import UserRole
 
 INVERTED_RATE_KEYS = frozenset({
     'late_rate', 'correction_rate', 'overdue_percentage', 'overdue_rate',
+    'my_late_rate',
 })
 
 NEUTRAL_RATE_KEYS = {
     'avg_completion_days': ('d', lambda v: min(float(v) * 10, 100)),
     'fastest_days': ('d', lambda v: min(float(v) * 10, 100)),
     'slowest_days': ('d', lambda v: min(float(v) * 10, 100)),
+    'my_avg_completion_days': ('d', lambda v: min(float(v) * 10, 100)),
+    'my_fastest_days': ('d', lambda v: min(float(v) * 10, 100)),
+    'my_slowest_days': ('d', lambda v: min(float(v) * 10, 100)),
     'avg_verification_hours': ('h', lambda v: min(float(v) * 5, 100)),
     'avg_review_hours': ('h', lambda v: min(float(v) * 5, 100)),
 }
 
 DANGER_STAT_KEYS = frozenset({
     'total_corrections', 'overdue', 'overdue_requests', 'corrections_sent',
+    'my_total_corrections', 'my_overdue',
 })
 
 TONE_COLORS = {
@@ -150,6 +155,14 @@ def _headline_context(role, kpis):
             f'{completed} of {assigned} assigned designs completed and accepted this period{suffix}'
         )
     if role == UserRole.HEAD_OF_DESIGN:
+        my_assigned = kpis.get('my_total_assigned', 0)
+        if my_assigned:
+            my_completed = kpis.get('my_total_completed', 0)
+            team_overdue = kpis.get('overdue', 0)
+            return (
+                f'{my_completed} of {my_assigned} assigned designs completed'
+                f' · {team_overdue} overdue in the active pipeline'
+            )
         approved = kpis.get('approved', 0)
         managed = kpis.get('total_managed', 0)
         overdue = kpis.get('overdue', 0)
@@ -250,6 +263,40 @@ ROLE_KPI_LAYOUT = {
         'headline_key': 'overdue_percentage',
         'headline_label': 'Overdue rate',
         'sections': [
+            {
+                'title': 'My design work',
+                'cards': [
+                    _layout_stat_card('my_total_assigned', 'Assigned', 'clipboard-list'),
+                    _layout_stat_card(
+                        'my_total_completed', 'Completed', 'check-circle',
+                        icon_bg='bg-green-50', icon_color='text-green-600',
+                    ),
+                    _layout_stat_card(
+                        'my_total_corrections', 'Corrections', 'rotate-ccw',
+                        icon_bg='bg-orange-50', icon_color='text-orange-600',
+                    ),
+                ],
+            },
+            {
+                'title': 'My workload',
+                'cards': [
+                    _layout_stat_card('my_in_progress', 'In progress', 'loader'),
+                    _layout_stat_card('my_overdue', 'Overdue', 'alert-triangle', danger=True),
+                    _layout_stat_card('my_monthly_output', 'Monthly output', 'calendar-stats'),
+                    _layout_stat_card('my_yearly_output', 'Yearly output', 'calendar'),
+                ],
+            },
+            {
+                'title': 'My performance',
+                'cards': [
+                    _layout_rate_card('my_on_time_rate', 'On-time rate'),
+                    _layout_rate_card('my_late_rate', 'Late rate', danger=True),
+                    _layout_rate_card('my_first_time_approval_rate', 'First-time approval'),
+                    _layout_rate_card('my_avg_completion_days', 'Avg. completion time'),
+                    _layout_rate_card('my_fastest_days', 'Fastest completion'),
+                    _layout_rate_card('my_slowest_days', 'Slowest completion'),
+                ],
+            },
             {
                 'title': 'Volume',
                 'cards': [

@@ -170,3 +170,16 @@ class ReportsViewTests(TestCase):
         self.assertNotContains(response, '🥇')
         self.assertNotContains(response, '🥈')
         self.assertNotContains(response, '🥉')
+
+    def test_workload_includes_hod(self):
+        DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            assigned_designer=self.hod,
+            status=DesignStatus.IN_PROGRESS,
+        )
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('analytics:workload'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.hod.get_full_name())

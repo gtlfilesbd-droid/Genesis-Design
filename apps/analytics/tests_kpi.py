@@ -185,6 +185,32 @@ class HodKpiComputeTests(TestCase):
         self.assertIn('approval_rate', kpis)
         self.assertIn('active_pipeline', kpis)
 
+    def test_hod_kpi_includes_personal_design_metrics(self):
+        DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            assigned_designer=self.hod,
+            status=DesignStatus.IN_PROGRESS,
+        )
+        team_kpis = compute_hod_kpis(self.hod)
+        personal = compute_designer_kpis(self.hod)
+        kpis = {**team_kpis, **{f'my_{k}': v for k, v in personal.items()}}
+
+        self.assertEqual(kpis['my_total_assigned'], 1)
+        self.assertIn('my_in_progress', kpis)
+        self.assertIn('active_pipeline', kpis)
+
+    def test_hod_kpi_page_shows_my_design_work_section(self):
+        team_kpis = compute_hod_kpis(self.hod)
+        personal = compute_designer_kpis(self.hod)
+        kpis = {**team_kpis, **{f'my_{k}': v for k, v in personal.items()}}
+        context = build_kpi_page_context(UserRole.HEAD_OF_DESIGN, kpis)
+
+        section_titles = [section['label'] for section in context['sections']]
+        self.assertIn('My design work', section_titles)
+        self.assertIn('Volume', section_titles)
+
 
 class VerificationKpiComputeTests(TestCase):
     def setUp(self):
