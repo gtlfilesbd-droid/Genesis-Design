@@ -84,6 +84,27 @@ def compute_compliance_kpis(officer):
     }
 
 
+def compute_requester_kpis(requester):
+    requests = DesignRequest.objects.filter(requested_by=requester)
+    total_requests = requests.count()
+    completed = requests.filter(status=DesignStatus.COMPLETED).count()
+    pending = requests.exclude(
+        status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED],
+    ).count()
+    projects = PermissionService.get_user_projects(requester)
+
+    return {
+        'total_projects': projects.count(),
+        'active_projects': projects.filter(status=ProjectStatus.ACTIVE).count(),
+        'completed_projects': projects.filter(status=ProjectStatus.COMPLETED).count(),
+        'cancelled_projects': projects.filter(status=ProjectStatus.CANCELLED).count(),
+        'total_requests': total_requests,
+        'completed_requests': completed,
+        'pending_requests': pending,
+        'completion_rate': round((completed / total_requests * 100) if total_requests else 0, 1),
+    }
+
+
 def compute_project_health(project):
     designs = project.design_requests.all()
     total = designs.count()
@@ -217,6 +238,8 @@ def kpi_dashboard(request):
         kpis = compute_verification_kpis(user)
     elif user.role == UserRole.COMPLIANCE_TEAM:
         kpis = compute_compliance_kpis(user)
+    elif user.role == UserRole.DESIGN_REQUESTER:
+        kpis = compute_requester_kpis(user)
 
     return render(request, 'analytics/kpi.html', {'kpis': kpis})
 
