@@ -331,6 +331,10 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .grid-3--quad {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .grid-2 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -352,12 +356,16 @@
 }
 
 @media (min-width: 1024px) {
-  .grid-3:not(.grid-3--triple) {
+  .grid-3:not(.grid-3--triple):not(.grid-3--quad) {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 
   .grid-3--triple {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .grid-3--quad {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .hero {

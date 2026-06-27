@@ -25,13 +25,23 @@ def compute_designer_kpis(designer):
     corrections = designs.filter(revision_count__gt=0).count()
     first_time = completed - corrections if completed > corrections else 0
 
+    now = timezone.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+
     durations = []
+    fastest = None
+    slowest = None
     for design in completed_qs.filter(completion_date__isnull=False).select_related('project'):
         assignment = design.assignments.order_by('assigned_at').first()
         if assignment and design.completion_date:
-            durations.append(
-                (design.completion_date - assignment.assigned_at).total_seconds() / 86400
-            )
+            days = (design.completion_date - assignment.assigned_at).total_seconds() / 86400
+            durations.append(days)
+            if fastest is None or days < fastest:
+                fastest = days
+            if slowest is None or days > slowest:
+                slowest = days
     avg_completion_days = round(sum(durations) / len(durations), 1) if durations else None
 
     return {
@@ -43,6 +53,14 @@ def compute_designer_kpis(designer):
         'first_time_approval_rate': round((first_time / completed * 100) if completed else 0, 1),
         'completion_rate': round((completed / assigned * 100) if assigned else 0, 1),
         'avg_completion_days': avg_completion_days,
+        'in_progress': designs.filter(status=DesignStatus.IN_PROGRESS).count(),
+        'overdue': designs.filter(
+            due_date__lt=now,
+        ).exclude(status__in=terminal).count(),
+        'monthly_output': completed_qs.filter(completion_date__gte=month_start).count(),
+        'yearly_output': completed_qs.filter(completion_date__gte=year_start).count(),
+        'fastest_days': round(fastest, 1) if fastest is not None else None,
+        'slowest_days': round(slowest, 1) if slowest is not None else None,
     }
 
 
@@ -51,33 +69,79 @@ def compute_hod_kpis(hod):
     managed = designs.count()
     approved = designs.filter(status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED]).count()
     corrections = designs.filter(revision_count__gt=0).count()
-    overdue = designs.filter(
-        due_date__lt=timezone.now()
-    ).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count()
+    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+    active = designs.exclude(status__in=terminal)
+    overdue = active.filter(due_date__lt=timezone.now()).count()
 
     return {
         'total_managed': managed,
         'approved': approved,
+        'active_pipeline': active.count(),
+        'overdue': overdue,
+        'cancelled': designs.filter(status=DesignStatus.CANCELLED).count(),
+        'with_designer': active.filter(
+            status__in=[
+                DesignStatus.ASSIGNED, DesignStatus.IN_PROGRESS,
+                DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED,
+            ],
+        ).count(),
+        'waiting_review': active.filter(status=DesignStatus.UNDER_REVIEW).count(),
+        'waiting_verification': active.filter(
+            status__in=[
+                DesignStatus.VERIFICATION_PENDING_ACK,
+                DesignStatus.VERIFICATION_PENDING,
+                DesignStatus.VERIFICATION_CORRECTION,
+            ],
+        ).count(),
+        'waiting_compliance': active.filter(
+            status__in=[
+                DesignStatus.AWAITING_COMPLIANCE,
+                DesignStatus.COMPLIANCE_PENDING_ACK,
+                DesignStatus.COMPLIANCE_PENDING,
+                DesignStatus.COMPLIANCE_CORRECTION,
+            ],
+        ).count(),
+        'waiting_approval': active.filter(status=DesignStatus.FINAL_APPROVAL_PENDING).count(),
+        'approval_rate': round((approved / managed * 100) if managed else 0, 1),
         'correction_rate': round((corrections / managed * 100) if managed else 0, 1),
         'overdue_percentage': round((overdue / managed * 100) if managed else 0, 1),
     }
 
 
 def compute_verification_kpis(verifier):
-    verified = DesignRequest.objects.filter(verified_by=verifier)
-    total = verified.count()
-    approved = verified.filter(status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED]).count()
-    corrections = verified.filter(revision_count__gt=0).count()
+    from apps.core.dashboard_helpers import _avg_stage_hours
+
+    reviewed = DesignRequest.objects.filter(
+        Q(verified_by=verifier) | Q(assigned_verifier=verifier),
+    ).distinct()
+    total = reviewed.count()
+    approved = reviewed.filter(
+        status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED, DesignStatus.AWAITING_COMPLIANCE],
+    ).count()
+    corrections = reviewed.filter(revision_count__gt=0).count()
+    pending = DesignRequest.objects.filter(
+        Q(assigned_verifier=verifier) | Q(verified_by=verifier),
+        status__in=[
+            DesignStatus.VERIFICATION_PENDING_ACK,
+            DesignStatus.VERIFICATION_PENDING,
+        ],
+    ).distinct().count()
+    corrections_sent = reviewed.filter(status=DesignStatus.VERIFICATION_CORRECTION).count()
 
     return {
         'total_verified': total,
         'approved': approved,
+        'pending': pending,
+        'corrections_sent': corrections_sent,
         'accuracy_rate': round((approved / total * 100) if total else 0, 1),
         'correction_rate': round((corrections / total * 100) if total else 0, 1),
+        'avg_verification_hours': _avg_stage_hours(DesignStatus.VERIFICATION_PENDING),
     }
 
 
 def compute_compliance_kpis(officer):
+    from apps.core.dashboard_helpers import _avg_stage_hours
+
     reviewed = DesignRequest.objects.filter(
         Q(approved_by_compliance=officer) | Q(assigned_compliance_officer=officer),
     ).distinct()
@@ -86,12 +150,23 @@ def compute_compliance_kpis(officer):
         status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
     ).count()
     corrections = reviewed.filter(status=DesignStatus.COMPLIANCE_CORRECTION).count()
+    pending = DesignRequest.objects.filter(
+        Q(assigned_compliance_officer=officer) | Q(approved_by_compliance=officer),
+        status__in=[
+            DesignStatus.COMPLIANCE_PENDING_ACK,
+            DesignStatus.COMPLIANCE_PENDING,
+        ],
+    ).distinct().count()
+    corrections_sent = reviewed.filter(status=DesignStatus.COMPLIANCE_CORRECTION).count()
 
     return {
         'total_reviewed': total,
         'approved': approved,
+        'pending': pending,
+        'corrections_sent': corrections_sent,
         'accuracy_rate': round((approved / total * 100) if total else 0, 1),
         'correction_rate': round((corrections / total * 100) if total else 0, 1),
+        'avg_review_hours': _avg_stage_hours(DesignStatus.COMPLIANCE_PENDING),
     }
 
 
@@ -99,15 +174,24 @@ def compute_requester_kpis(requester):
     requests = DesignRequest.objects.filter(requested_by=requester)
     total_requests = requests.count()
     completed = requests.filter(status=DesignStatus.COMPLETED).count()
-    pending = requests.exclude(
-        status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED],
-    ).count()
+    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+    active = requests.exclude(status__in=terminal)
+    in_progress = active.count()
+    pending = in_progress
+    overdue_requests = active.filter(due_date__lt=timezone.now()).count()
 
     return {
         'total_requests': total_requests,
         'completed_requests': completed,
+        'in_progress': in_progress,
         'pending_requests': pending,
+        'cancelled_requests': requests.filter(status=DesignStatus.CANCELLED).count(),
+        'overdue_requests': overdue_requests,
+        'approved_requests': requests.filter(
+            status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
+        ).count(),
         'completion_rate': round((completed / total_requests * 100) if total_requests else 0, 1),
+        'overdue_rate': round((overdue_requests / in_progress * 100) if in_progress else 0, 1),
     }
 
 

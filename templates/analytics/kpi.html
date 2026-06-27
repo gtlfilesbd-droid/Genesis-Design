@@ -40,7 +40,7 @@
       <p class="section-label">{{ section.label }}</p>
 
       {% if section.type == "volume" %}
-        <div class="grid-3{% if section.cards|length == 3 %} grid-3--triple{% endif %}">
+        <div class="grid-3{% if section.cards|length == 3 %} grid-3--triple{% elif section.cards|length >= 4 %} grid-3--quad{% endif %}">
           {% for card in section.cards %}
             <div class="stat-card {% if card.is_danger %}is-danger{% endif %}">
               <div class="stat-icon" style="background: {{ card.icon_bg }}; color: {{ card.icon_fg }};">

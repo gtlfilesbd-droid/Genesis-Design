@@ -1,6 +1,20 @@
 from apps.accounts.models import UserRole
 
-INVERTED_RATE_KEYS = frozenset({'late_rate', 'correction_rate', 'overdue_percentage'})
+INVERTED_RATE_KEYS = frozenset({
+    'late_rate', 'correction_rate', 'overdue_percentage', 'overdue_rate',
+})
+
+NEUTRAL_RATE_KEYS = {
+    'avg_completion_days': ('d', lambda v: min(float(v) * 10, 100)),
+    'fastest_days': ('d', lambda v: min(float(v) * 10, 100)),
+    'slowest_days': ('d', lambda v: min(float(v) * 10, 100)),
+    'avg_verification_hours': ('h', lambda v: min(float(v) * 5, 100)),
+    'avg_review_hours': ('h', lambda v: min(float(v) * 5, 100)),
+}
+
+DANGER_STAT_KEYS = frozenset({
+    'total_corrections', 'overdue', 'overdue_requests', 'corrections_sent',
+})
 
 TONE_COLORS = {
     'good': {'text': '#3B6D11', 'fill': '#639922'},
@@ -19,6 +33,17 @@ ICON_MAP = {
     'verified': {'icon': 'ti-shield-check', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
     'reviewed': {'icon': 'ti-list-check', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
     'managed': {'icon': 'ti-layers-linked', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
+    'running': {'icon': 'ti-loader', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
+    'overdue': {'icon': 'ti-alert-triangle', 'bg': '#FEF2F2', 'fg': '#DC2626'},
+    'cancelled': {'icon': 'ti-x', 'bg': '#F1F5F9', 'fg': '#475569'},
+    'monthly': {'icon': 'ti-calendar-stats', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
+    'yearly': {'icon': 'ti-calendar', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
+    'pipeline': {'icon': 'ti-arrows-right', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
+    'review': {'icon': 'ti-eye', 'bg': '#EFF6FF', 'fg': '#1D4ED8'},
+    'verification': {'icon': 'ti-shield', 'bg': '#F5F3FF', 'fg': '#7C3AED'},
+    'compliance': {'icon': 'ti-scale', 'bg': '#F5F3FF', 'fg': '#7C3AED'},
+    'approval': {'icon': 'ti-stamp', 'bg': '#ECFEFF', 'fg': '#0891B2'},
+    'active': {'icon': 'ti-activity', 'bg': '#FFFBEB', 'fg': '#D97706'},
 }
 
 STAT_KEY_TO_ICON = {
@@ -32,6 +57,21 @@ STAT_KEY_TO_ICON = {
     'total_verified': 'verified',
     'total_reviewed': 'reviewed',
     'approved': 'approved',
+    'in_progress': 'running',
+    'overdue': 'overdue',
+    'monthly_output': 'monthly',
+    'yearly_output': 'yearly',
+    'active_pipeline': 'pipeline',
+    'cancelled': 'cancelled',
+    'with_designer': 'running',
+    'waiting_review': 'review',
+    'waiting_verification': 'verification',
+    'waiting_compliance': 'compliance',
+    'waiting_approval': 'approval',
+    'pending': 'pending',
+    'corrections_sent': 'corrections',
+    'cancelled_requests': 'cancelled',
+    'overdue_requests': 'overdue',
 }
 
 RING_CIRCUMFERENCE = 251.3
@@ -104,26 +144,44 @@ def _headline_context(role, kpis):
     if role == UserRole.DESIGNER:
         completed = kpis.get('total_completed', 0)
         assigned = kpis.get('total_assigned', 0)
+        overdue = kpis.get('overdue', 0)
+        suffix = f' · {overdue} currently overdue' if overdue else ''
         return (
-            f'{completed} of {assigned} assigned designs completed and accepted this period'
+            f'{completed} of {assigned} assigned designs completed and accepted this period{suffix}'
         )
     if role == UserRole.HEAD_OF_DESIGN:
         approved = kpis.get('approved', 0)
         managed = kpis.get('total_managed', 0)
-        return f'{approved} of {managed} designs approved across the team'
+        overdue = kpis.get('overdue', 0)
+        return (
+            f'{approved} of {managed} designs approved · {overdue} overdue in the active pipeline'
+        )
     if role == UserRole.VERIFICATION_TEAM:
         approved = kpis.get('approved', 0)
         total = kpis.get('total_verified', 0)
-        return f'{approved} of {total} verified designs passed review'
+        pending = kpis.get('pending', 0)
+        return f'{approved} of {total} verified designs passed review · {pending} pending now'
     if role == UserRole.COMPLIANCE_TEAM:
         approved = kpis.get('approved', 0)
         total = kpis.get('total_reviewed', 0)
-        return f'{approved} of {total} reviewed designs approved for compliance'
+        pending = kpis.get('pending', 0)
+        return f'{approved} of {total} reviewed designs approved · {pending} pending now'
     if role == UserRole.DESIGN_REQUESTER:
         completed = kpis.get('completed_requests', 0)
         total = kpis.get('total_requests', 0)
-        return f'{completed} of {total} submitted requests completed this period'
+        overdue = kpis.get('overdue_requests', 0)
+        suffix = f' · {overdue} overdue' if overdue else ''
+        return f'{completed} of {total} submitted requests completed this period{suffix}'
     return ''
+
+
+def _stat_is_danger(key, value):
+    if key not in DANGER_STAT_KEYS:
+        return False
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _layout_stat_card(key, label, icon, icon_bg='bg-blue-50', icon_color='text-blue-600', danger=False):
@@ -167,12 +225,23 @@ ROLE_KPI_LAYOUT = {
                 ],
             },
             {
+                'title': 'Workload',
+                'cards': [
+                    _layout_stat_card('in_progress', 'In progress', 'loader'),
+                    _layout_stat_card('overdue', 'Overdue', 'alert-triangle', danger=True),
+                    _layout_stat_card('monthly_output', 'Monthly output', 'calendar-stats'),
+                    _layout_stat_card('yearly_output', 'Yearly output', 'calendar'),
+                ],
+            },
+            {
                 'title': 'Performance and quality',
                 'cards': [
                     _layout_rate_card('on_time_rate', 'On-time rate'),
                     _layout_rate_card('late_rate', 'Late rate', danger=True),
                     _layout_rate_card('first_time_approval_rate', 'First-time approval'),
                     _layout_rate_card('avg_completion_days', 'Avg. completion time'),
+                    _layout_rate_card('fastest_days', 'Fastest completion'),
+                    _layout_rate_card('slowest_days', 'Slowest completion'),
                 ],
             },
         ],
@@ -189,11 +258,24 @@ ROLE_KPI_LAYOUT = {
                         'approved', 'Approved', 'check-circle',
                         icon_bg='bg-green-50', icon_color='text-green-600',
                     ),
+                    _layout_stat_card('active_pipeline', 'Active pipeline', 'activity'),
+                    _layout_stat_card('overdue', 'Overdue', 'alert-triangle', danger=True),
+                ],
+            },
+            {
+                'title': 'Pipeline',
+                'cards': [
+                    _layout_stat_card('with_designer', 'With designer', 'pen-tool'),
+                    _layout_stat_card('waiting_review', 'Waiting review', 'eye'),
+                    _layout_stat_card('waiting_verification', 'Waiting verification', 'shield'),
+                    _layout_stat_card('waiting_compliance', 'Waiting compliance', 'scale'),
+                    _layout_stat_card('waiting_approval', 'Waiting approval', 'stamp'),
                 ],
             },
             {
                 'title': 'Team health',
                 'cards': [
+                    _layout_rate_card('approval_rate', 'Approval rate'),
                     _layout_rate_card('correction_rate', 'Correction rate'),
                     _layout_rate_card('overdue_percentage', 'Overdue rate', danger=True),
                 ],
@@ -212,6 +294,8 @@ ROLE_KPI_LAYOUT = {
                         'approved', 'Approved', 'check-circle',
                         icon_bg='bg-green-50', icon_color='text-green-600',
                     ),
+                    _layout_stat_card('pending', 'Pending', 'clock'),
+                    _layout_stat_card('corrections_sent', 'Corrections sent', 'rotate-ccw', danger=True),
                 ],
             },
             {
@@ -219,6 +303,7 @@ ROLE_KPI_LAYOUT = {
                 'cards': [
                     _layout_rate_card('accuracy_rate', 'Accuracy rate'),
                     _layout_rate_card('correction_rate', 'Correction rate', danger=True),
+                    _layout_rate_card('avg_verification_hours', 'Avg. verification time'),
                 ],
             },
         ],
@@ -235,6 +320,8 @@ ROLE_KPI_LAYOUT = {
                         'approved', 'Approved', 'check-circle',
                         icon_bg='bg-green-50', icon_color='text-green-600',
                     ),
+                    _layout_stat_card('pending', 'Pending', 'clock'),
+                    _layout_stat_card('corrections_sent', 'Corrections sent', 'rotate-ccw', danger=True),
                 ],
             },
             {
@@ -242,6 +329,7 @@ ROLE_KPI_LAYOUT = {
                 'cards': [
                     _layout_rate_card('accuracy_rate', 'Accuracy rate'),
                     _layout_rate_card('correction_rate', 'Correction rate', danger=True),
+                    _layout_rate_card('avg_review_hours', 'Avg. review time'),
                 ],
             },
         ],
@@ -258,6 +346,7 @@ ROLE_KPI_LAYOUT = {
                         'completed_requests', 'Completed', 'check-circle',
                         icon_bg='bg-green-50', icon_color='text-green-600',
                     ),
+                    _layout_stat_card('in_progress', 'In progress', 'loader'),
                     _layout_stat_card(
                         'pending_requests', 'Pending', 'clock',
                         icon_bg='bg-amber-50', icon_color='text-amber-600',
@@ -265,9 +354,16 @@ ROLE_KPI_LAYOUT = {
                 ],
             },
             {
+                'title': 'Status',
+                'cards': [
+                    _layout_stat_card('cancelled_requests', 'Cancelled', 'x-circle'),
+                    _layout_stat_card('overdue_requests', 'Overdue', 'alert-triangle', danger=True),
+                ],
+            },
+            {
                 'title': 'Performance and quality',
                 'cards': [
-                    _layout_rate_card('completion_rate', 'Completion rate'),
+                    _layout_rate_card('overdue_rate', 'Overdue rate', danger=True),
                 ],
             },
         ],
@@ -312,18 +408,21 @@ def build_kpi_page_context(role, kpis):
             value = kpis[key]
             if card_def['type'] == 'stat':
                 section_type = 'volume'
-                is_danger = key == 'total_corrections' and float(value) > 0
-                cards.append(_build_stat_card(key, card_def['label'], value, is_danger=is_danger))
+                cards.append(_build_stat_card(
+                    key, card_def['label'], value,
+                    is_danger=_stat_is_danger(key, value),
+                ))
             else:
                 section_type = 'rate'
-                if key == 'avg_completion_days':
-                    if value is None or not value:
+                if key in NEUTRAL_RATE_KEYS:
+                    if value is None:
                         continue
+                    unit, fill_fn = NEUTRAL_RATE_KEYS[key]
                     cards.append(_build_rate_card(
                         card_def['label'],
                         value,
-                        unit='d',
-                        fill_percent=min(float(value) * 10, 100),
+                        unit=unit,
+                        fill_percent=fill_fn(value),
                         neutral=True,
                     ))
                 else:
