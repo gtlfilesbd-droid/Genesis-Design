@@ -270,26 +270,32 @@ def compute_leaderboard_kpis(designer, period='monthly'):
 def get_leaderboard(period='monthly'):
     period = _normalize_period(period)
     designers = PermissionService.get_design_team_members()
-    rankings = []
-    excluded_count = 0
+    qualified = []
+    unqualified = []
     for d in designers:
         kpis = compute_leaderboard_kpis(d, period)
-        if kpis['total_completed'] < LEADERBOARD_MIN_COMPLETIONS:
-            excluded_count += 1
-            continue
         score = (
             kpis['completion_rate'] * 0.4 +
             kpis['on_time_rate'] * 0.3 +
             kpis['first_time_approval_rate'] * 0.3
         )
-        rankings.append({
+        entry = {
             'user': d,
             'score': round(score, 1),
             'kpis': kpis,
-        })
+            'is_qualified': kpis['total_completed'] >= LEADERBOARD_MIN_COMPLETIONS,
+        }
+        if entry['is_qualified']:
+            qualified.append(entry)
+        else:
+            unqualified.append(entry)
+
+    qualified.sort(key=lambda x: x['score'], reverse=True)
+    unqualified.sort(key=lambda x: x['kpis']['total_completed'], reverse=True)
+
     return {
-        'rankings': sorted(rankings, key=lambda x: x['score'], reverse=True),
-        'excluded_count': excluded_count,
+        'rankings': qualified + unqualified,
+        'below_minimum_count': len(unqualified),
         'min_completions_required': LEADERBOARD_MIN_COMPLETIONS,
         'period': period,
     }
@@ -423,7 +429,7 @@ def leaderboard(request):
     report_context = build_leaderboard_context(
         leaderboard_data['rankings'],
         period=leaderboard_data['period'],
-        excluded_count=leaderboard_data['excluded_count'],
+        below_minimum_count=leaderboard_data['below_minimum_count'],
         min_completions_required=leaderboard_data['min_completions_required'],
     )
     return render(request, 'analytics/leaderboard.html', {'report_context': report_context})

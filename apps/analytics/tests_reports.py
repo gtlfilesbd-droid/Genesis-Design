@@ -18,6 +18,7 @@ from apps.analytics.views import (
 )
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
+from apps.permissions.services import PermissionService
 from apps.projects.models import Project, ProjectStatus
 
 
@@ -48,30 +49,35 @@ class LeaderboardDisplayTests(TestCase):
         user3 = SimpleNamespace(get_full_name=lambda: 'Carol')
         user4 = SimpleNamespace(get_full_name=lambda: 'Dan')
         rankings = [
-            {'user': user1, 'score': 92.0, 'kpis': {
+            {'user': user1, 'score': 92.0, 'is_qualified': True, 'kpis': {
                 'completion_rate': 95, 'on_time_rate': 90, 'first_time_approval_rate': 88,
                 'total_corrections': 0, 'total_completed': 10,
             }},
-            {'user': user2, 'score': 75.0, 'kpis': {
+            {'user': user2, 'score': 75.0, 'is_qualified': True, 'kpis': {
                 'completion_rate': 80, 'on_time_rate': 70, 'first_time_approval_rate': 72,
                 'total_corrections': 2, 'total_completed': 8,
             }},
-            {'user': user3, 'score': 60.0, 'kpis': {
+            {'user': user3, 'score': 60.0, 'is_qualified': True, 'kpis': {
                 'completion_rate': 65, 'on_time_rate': 55, 'first_time_approval_rate': 58,
                 'total_corrections': 0, 'total_completed': 5,
             }},
-            {'user': user4, 'score': 40.0, 'kpis': {
+            {'user': user4, 'score': 40.0, 'is_qualified': False, 'kpis': {
                 'completion_rate': 45, 'on_time_rate': 35, 'first_time_approval_rate': 38,
-                'total_corrections': 1, 'total_completed': 3,
+                'total_corrections': 1, 'total_completed': 2,
             }},
         ]
-        context = build_leaderboard_context(rankings, period='monthly')
+        context = build_leaderboard_context(rankings, period='monthly', below_minimum_count=1)
 
         self.assertEqual(len(context['podium']), 3)
         self.assertEqual(context['podium'][0]['rank'], 1)
+        self.assertEqual(context['podium'][0]['podium_icon'], 'ti-trophy')
+        self.assertTrue(context['podium'][0]['is_qualified'])
         self.assertEqual(context['summary']['top_score'], 92.0)
         self.assertEqual(context['rows'][0]['score_color'], '#3B6D11')
         self.assertTrue(context['rows'][1]['has_corrections'])
+        self.assertFalse(context['rows'][3]['is_qualified'])
+        self.assertEqual(context['rows'][3]['rank_class'], 'rank-unqualified')
+        self.assertTrue(context['rows'][3]['show_tier_divider'])
 
 
 class ExecutiveDisplayTests(TestCase):
@@ -281,16 +287,17 @@ class ReportsViewTests(TestCase):
         response = self.client.get(reverse('analytics:leaderboard'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Full rankings')
-        self.assertNotContains(response, '🥇')
-        self.assertNotContains(response, '🥈')
-        self.assertNotContains(response, '🥉')
+        self.assertContains(response, 'rank-podium')
+        self.assertContains(response, 'ti-trophy')
+        self.assertContains(response, 'rank-medal')
+        self.assertContains(response, '🥇')
+        self.assertContains(response, '🥈')
 
     def test_leaderboard_period_query_param(self):
         self.client.login(username='hod', password='pass')
         response = self.client.get(reverse('analytics:leaderboard'), {'period': 'yearly'})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Yearly')
-        self.assertContains(response, 'Rankings include designers with 3+ completions')
 
 
 class LeaderboardFairnessTests(TestCase):
@@ -333,13 +340,38 @@ class LeaderboardFairnessTests(TestCase):
         )
         return design
 
-    def test_leaderboard_excludes_low_volume(self):
+    def test_leaderboard_shows_low_volume_at_bottom(self):
+        for _ in range(2):
+            self._create_completed(self.busy)
+        for _ in range(3):
+            self._create_completed(self.light)
+        data = get_leaderboard('monthly')
+        ranked_ids = [r['user'].pk for r in data['rankings']]
+        self.assertIn(self.busy.pk, ranked_ids)
+        self.assertGreaterEqual(data['below_minimum_count'], 1)
+        busy_entry = next(r for r in data['rankings'] if r['user'].pk == self.busy.pk)
+        self.assertFalse(busy_entry['is_qualified'])
+        self.assertIn(self.light.pk, ranked_ids)
+        self.assertGreater(ranked_ids.index(self.busy.pk), ranked_ids.index(self.light.pk))
+
+    def test_leaderboard_all_designers_have_rank(self):
+        for _ in range(3):
+            self._create_completed(self.light)
         for _ in range(2):
             self._create_completed(self.busy)
         data = get_leaderboard('monthly')
+        team_ids = {u.pk for u in PermissionService.get_design_team_members()}
         ranked_ids = [r['user'].pk for r in data['rankings']]
-        self.assertNotIn(self.busy.pk, ranked_ids)
-        self.assertGreaterEqual(data['excluded_count'], 1)
+        self.assertEqual(len(ranked_ids), len(team_ids))
+        self.assertEqual(set(ranked_ids), team_ids)
+        ranks = list(range(1, len(ranked_ids) + 1))
+        context = build_leaderboard_context(
+            data['rankings'],
+            period=data['period'],
+            below_minimum_count=data['below_minimum_count'],
+            min_completions_required=data['min_completions_required'],
+        )
+        self.assertEqual([row['rank'] for row in context['rows']], ranks)
 
     def test_leaderboard_busy_designer_qualifies_in_period(self):
         from django.utils import timezone

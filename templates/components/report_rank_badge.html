@@ -1,1 +1,1 @@
-<span class="rank-badge {{ rank_class }}">{% if rank <= 3 %}{{ rank }}{% else %}#{{ rank }}{% endif %}</span>
+<span class="rank-badge {{ rank_class }}{% if rank <= 3 %} rank-medal{% endif %}">{% if rank == 1 %}🥇{% elif rank == 2 %}🥈{% elif rank == 3 %}🥉{% else %}#{{ rank }}{% endif %}</span>
