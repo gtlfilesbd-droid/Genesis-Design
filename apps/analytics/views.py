@@ -223,6 +223,8 @@ def smart_search(request):
 
 @login_required
 def kpi_dashboard(request):
+    from .kpi_display import build_kpi_page_context
+
     user = request.user
     kpis = {}
     if user.role == UserRole.DESIGNER:
@@ -236,7 +238,9 @@ def kpi_dashboard(request):
     elif user.role == UserRole.DESIGN_REQUESTER:
         kpis = compute_requester_kpis(user)
 
-    return render(request, 'analytics/kpi.html', {'kpis': kpis})
+    context = build_kpi_page_context(user.role, kpis)
+    context['role_display'] = user.get_role_display()
+    return render(request, 'analytics/kpi.html', context)
 
 
 @login_required

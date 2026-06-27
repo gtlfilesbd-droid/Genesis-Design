@@ -3,7 +3,8 @@ from datetime import date
 from django.test import TestCase
 
 from apps.accounts.models import User, UserRole
-from apps.analytics.views import compute_compliance_kpis, compute_requester_kpis
+from apps.analytics.kpi_display import build_kpi_page_context
+from apps.analytics.views import compute_compliance_kpis, compute_designer_kpis, compute_requester_kpis
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.projects.models import Project, ProjectStatus
 
@@ -80,3 +81,42 @@ class RequesterKpiTests(TestCase):
         self.assertEqual(kpis['completed_requests'], 1)
         self.assertEqual(kpis['completion_rate'], 50.0)
         self.assertNotIn('total_projects', kpis)
+
+
+class KpiDisplayTests(TestCase):
+    def test_build_kpi_page_context_requester_has_sections(self):
+        kpis = {
+            'total_requests': 4,
+            'completed_requests': 2,
+            'pending_requests': 2,
+            'completion_rate': 50.0,
+        }
+        context = build_kpi_page_context(UserRole.DESIGN_REQUESTER, kpis)
+
+        self.assertTrue(context['has_kpis'])
+        self.assertEqual(context['headline']['label'], 'Completion Rate')
+        self.assertEqual(len(context['sections']), 2)
+        labels = [card['label'] for section in context['sections'] for card in section['cards']]
+        self.assertIn('Total Requests', labels)
+        self.assertIn('Completion Rate', labels)
+        self.assertNotIn('total_requests', labels)
+
+    def test_build_kpi_page_context_designer_includes_rate_cards(self):
+        kpis = compute_designer_kpis(User.objects.create_user(
+            username='des', password='pass', role=UserRole.DESIGNER, employee_id='D1',
+        ))
+        context = build_kpi_page_context(UserRole.DESIGNER, kpis)
+
+        self.assertTrue(context['has_kpis'])
+        rate_cards = [
+            card for section in context['sections'] for card in section['cards']
+            if card['type'] == 'rate'
+        ]
+        self.assertGreaterEqual(len(rate_cards), 3)
+        self.assertEqual(rate_cards[0]['label'], 'On-Time Rate')
+        self.assertIn('tone_class', rate_cards[0])
+
+    def test_build_kpi_page_context_empty_for_admin(self):
+        context = build_kpi_page_context(UserRole.ADMIN, {})
+        self.assertFalse(context['has_kpis'])
+        self.assertIsNone(context['headline'])

@@ -1,23 +1,62 @@
 {% extends "base.html" %}
+{% load genesis_ui %}
 {% block title %}My KPIs{% endblock %}
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">My KPIs</h1>
-    <p class="text-sm text-slate-500 mt-1">Performance metrics for your role</p>
+<div class="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+    <div>
+        <h1 class="text-[28px] font-bold text-slate-900">My KPIs</h1>
+        <p class="text-sm text-slate-500 mt-1">Performance overview for your role</p>
+    </div>
+    {% if role_display %}
+    <span class="inline-flex items-center self-start px-3 py-1 rounded-full text-sm font-semibold bg-primary/10 text-primary">
+        {{ role_display }}
+    </span>
+    {% endif %}
 </div>
-{% if kpis %}
-<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-    {% for key, value in kpis.items %}
-    <div class="g-stat-card">
-        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ key|cut:"_"|title }}</span>
-        <div class="text-3xl font-bold text-slate-900 mt-3">{{ value }}{% if "rate" in key %}%{% endif %}</div>
+
+{% if has_kpis %}
+    {% if headline %}
+    <div class="g-card p-6 mb-8 {% if headline.danger %}border-l-4 border-l-red-500{% endif %}">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ headline.label }}</p>
+                <p class="text-4xl font-bold mt-2 {{ headline.tone_class }}">{{ headline.value }}{{ headline.suffix }}</p>
+            </div>
+            <div class="w-full sm:max-w-md">
+                <div class="g-progress h-2">
+                    <div class="g-progress-fill" style="width: {{ headline.value }}%; background: {{ headline.progress_color }};"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% for section in sections %}
+    <div class="mb-8">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">{{ section.title }}</h2>
+        <div class="grid grid-cols-1 {% if section.has_rates %}sm:grid-cols-2{% else %}sm:grid-cols-2 lg:grid-cols-3{% endif %} gap-5">
+            {% for card in section.cards %}
+                {% if card.type == 'stat' %}
+                    {% include 'components/stat_card.html' with label=card.label value=card.value icon=card.icon icon_bg=card.icon_bg icon_color=card.icon_color danger=card.danger %}
+                {% else %}
+                    {% include 'components/kpi_rate_card.html' with label=card.label value=card.value tone_class=card.tone_class progress_color=card.progress_color danger=card.danger %}
+                {% endif %}
+            {% endfor %}
+        </div>
     </div>
     {% endfor %}
-</div>
 {% else %}
-<div class="g-card p-12 text-center text-slate-500">
-    <i data-lucide="bar-chart-2" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i>
-    <p>KPI data is available for Designer, Head of Design, Verification, Compliance, and Design Requester roles.</p>
+<div class="g-card p-12 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+        <i data-lucide="bar-chart-2" class="w-8 h-8 text-slate-400"></i>
+    </div>
+    <h2 class="text-lg font-semibold text-slate-900 mb-2">No KPI metrics for your role</h2>
+    <p class="text-sm text-slate-500 max-w-md mx-auto mb-6">
+        KPI dashboards are available for Designer, Head of Design, Verification, Compliance, and Design Requester roles.
+    </p>
+    <a href="{% url 'accounts:dashboard' %}" class="g-btn-primary inline-flex items-center gap-2">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Go to Dashboard
+    </a>
 </div>
 {% endif %}
 {% endblock %}

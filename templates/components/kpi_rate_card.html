@@ -1,0 +1,12 @@
+<div class="g-stat-card {% if danger %}danger{% endif %}">
+    <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ label }}</span>
+        <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center">
+            <i data-lucide="percent" class="w-4 h-4 text-slate-500"></i>
+        </div>
+    </div>
+    <div class="text-3xl font-bold {{ tone_class|default:'text-slate-900' }}">{{ value }}%</div>
+    <div class="g-progress mt-4">
+        <div class="g-progress-fill" style="width: {{ value }}%; background: {{ progress_color|default:'var(--primary-light)' }};"></div>
+    </div>
+</div>
