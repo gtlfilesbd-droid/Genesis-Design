@@ -15,7 +15,8 @@ from apps.projects.models import Project, ProjectStatus
 def compute_designer_kpis(designer):
     designs = DesignRequest.objects.filter(assigned_designer=designer)
     assigned = designs.count()
-    completed = designs.filter(status=DesignStatus.COMPLETED).count()
+    completed_qs = designs.filter(status=DesignStatus.COMPLETED)
+    completed = completed_qs.count()
     on_time = designs.filter(
         status=DesignStatus.COMPLETED,
         completion_date__lte=F('due_date'),
@@ -23,6 +24,15 @@ def compute_designer_kpis(designer):
     late = completed - on_time
     corrections = designs.filter(revision_count__gt=0).count()
     first_time = completed - corrections if completed > corrections else 0
+
+    durations = []
+    for design in completed_qs.filter(completion_date__isnull=False).select_related('project'):
+        assignment = design.assignments.order_by('assigned_at').first()
+        if assignment and design.completion_date:
+            durations.append(
+                (design.completion_date - assignment.assigned_at).total_seconds() / 86400
+            )
+    avg_completion_days = round(sum(durations) / len(durations), 1) if durations else None
 
     return {
         'total_assigned': assigned,
@@ -32,6 +42,7 @@ def compute_designer_kpis(designer):
         'total_corrections': corrections,
         'first_time_approval_rate': round((first_time / completed * 100) if completed else 0, 1),
         'completion_rate': round((completed / assigned * 100) if assigned else 0, 1),
+        'avg_completion_days': avg_completion_days,
     }
 
 
@@ -239,8 +250,10 @@ def kpi_dashboard(request):
         kpis = compute_requester_kpis(user)
 
     context = build_kpi_page_context(user.role, kpis)
-    context['role_display'] = user.get_role_display()
-    return render(request, 'analytics/kpi.html', context)
+    return render(request, 'analytics/kpi.html', {
+        'kpi_context': context,
+        'role_display': user.get_role_display(),
+    })
 
 
 @login_required

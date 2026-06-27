@@ -3,7 +3,7 @@ from datetime import date
 from django.test import TestCase
 
 from apps.accounts.models import User, UserRole
-from apps.analytics.kpi_display import build_kpi_page_context
+from apps.analytics.kpi_display import TONE_COLORS, _build_headline, build_kpi_page_context
 from apps.analytics.views import compute_compliance_kpis, compute_designer_kpis, compute_requester_kpis
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.projects.models import Project, ProjectStatus
@@ -94,11 +94,11 @@ class KpiDisplayTests(TestCase):
         context = build_kpi_page_context(UserRole.DESIGN_REQUESTER, kpis)
 
         self.assertTrue(context['has_kpis'])
-        self.assertEqual(context['headline']['label'], 'Completion Rate')
+        self.assertEqual(context['headline']['label'], 'Completion rate')
         self.assertEqual(len(context['sections']), 2)
         labels = [card['label'] for section in context['sections'] for card in section['cards']]
-        self.assertIn('Total Requests', labels)
-        self.assertIn('Completion Rate', labels)
+        self.assertIn('Total requests', labels)
+        self.assertIn('Completion rate', labels)
         self.assertNotIn('total_requests', labels)
 
     def test_build_kpi_page_context_designer_includes_rate_cards(self):
@@ -108,15 +108,46 @@ class KpiDisplayTests(TestCase):
         context = build_kpi_page_context(UserRole.DESIGNER, kpis)
 
         self.assertTrue(context['has_kpis'])
-        rate_cards = [
-            card for section in context['sections'] for card in section['cards']
-            if card['type'] == 'rate'
+        rate_section = next(s for s in context['sections'] if s['type'] == 'rate')
+        rate_labels = [card['label'] for card in rate_section['cards']]
+        self.assertGreaterEqual(len(rate_labels), 3)
+        self.assertEqual(rate_labels[0], 'On-time rate')
+        self.assertIn('value_color', rate_section['cards'][0])
+        self.assertNotIn('Completion rate', rate_labels)
+
+    def test_build_kpi_page_context_designer_avg_completion_card(self):
+        kpis = {
+            'total_assigned': 10,
+            'total_completed': 8,
+            'total_corrections': 2,
+            'on_time_rate': 80.0,
+            'late_rate': 20.0,
+            'first_time_approval_rate': 70.0,
+            'completion_rate': 80.0,
+            'avg_completion_days': 4.2,
+        }
+        context = build_kpi_page_context(UserRole.DESIGNER, kpis)
+        rate_labels = [
+            card['label'] for section in context['sections']
+            if section['type'] == 'rate' for card in section['cards']
         ]
-        self.assertGreaterEqual(len(rate_cards), 3)
-        self.assertEqual(rate_cards[0]['label'], 'On-Time Rate')
-        self.assertIn('tone_class', rate_cards[0])
+        self.assertIn('Avg. completion time', rate_labels)
+        avg_card = next(
+            card for section in context['sections'] for card in section['cards']
+            if card.get('label') == 'Avg. completion time'
+        )
+        self.assertEqual(avg_card['unit'], 'd')
+        self.assertEqual(avg_card['value'], 4.2)
 
     def test_build_kpi_page_context_empty_for_admin(self):
         context = build_kpi_page_context(UserRole.ADMIN, {})
         self.assertFalse(context['has_kpis'])
         self.assertIsNone(context['headline'])
+
+    def test_build_headline_ring_offset_calculation(self):
+        headline = _build_headline('Completion rate', 87, 'test context')
+        self.assertAlmostEqual(headline['ring_offset'], 251.3 - (251.3 * 87 / 100), places=1)
+
+    def test_build_headline_inverted_tone_for_overdue_rate(self):
+        headline = _build_headline('Overdue rate', 15, 'test context', inverted=True)
+        self.assertEqual(headline['value_color'], TONE_COLORS['good']['text'])

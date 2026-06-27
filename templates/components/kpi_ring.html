@@ -1,0 +1,10 @@
+<svg class="kpi-ring-svg" viewBox="0 0 96 96" role="img" aria-label="{{ percent }} percent">
+  <circle cx="48" cy="48" r="40" fill="none" stroke="#F1F5F9" stroke-width="8"/>
+  <circle cx="48" cy="48" r="40" fill="none" stroke="{{ color }}" stroke-width="8"
+          stroke-linecap="round"
+          stroke-dasharray="{{ circumference|default:'251.3' }}"
+          stroke-dashoffset="{{ ring_offset }}"
+          transform="rotate(-90 48 48)"/>
+  <text x="48" y="48" text-anchor="middle" dominant-baseline="central"
+        class="kpi-ring-label" fill="{{ text_color|default:'#0F172A' }}">{{ percent }}%</text>
+</svg>
