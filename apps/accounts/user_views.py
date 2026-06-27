@@ -88,7 +88,7 @@ def user_list(request):
 @require_global_permission('PERM_MANAGE_USERS')
 def user_create(request):
     if request.method == 'POST':
-        form = UserCreateForm(request.POST)
+        form = UserCreateForm(request.POST, request.FILES)
         if form.is_valid():
             user = form.save()
             save_user_extra_permissions(user, request.POST)
@@ -107,7 +107,7 @@ def user_create(request):
 def user_edit(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method == 'POST':
-        form = UserEditForm(request.POST, instance=user_obj)
+        form = UserEditForm(request.POST, request.FILES, instance=user_obj)
         if form.is_valid():
             user = form.save()
             save_user_extra_permissions(user, request.POST)

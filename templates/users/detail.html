@@ -18,7 +18,7 @@
 
 <div class="g-card p-8 mb-8">
     <div class="flex flex-col sm:flex-row sm:items-center gap-6">
-        <div class="w-20 h-20 rounded-2xl bg-primary text-white text-2xl font-bold flex items-center justify-center shrink-0">{{ profile_user|initials }}</div>
+        {% render_user_avatar profile_user size_class='w-20 h-20' fallback_class='bg-primary text-white text-2xl' %}
         <div class="flex-1">
             <h1 class="text-2xl font-bold text-slate-900">{{ profile_user.get_full_name }}</h1>
             <p class="text-slate-500">{{ profile_user.get_role_display }} · {{ profile_user.designation|default:"—" }}</p>

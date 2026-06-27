@@ -23,6 +23,7 @@ class UserAdmin(BaseUserAdmin):
             'fields': (
                 'employee_id', 'designation', 'department', 'role',
                 'team', 'manager', 'mobile_number', 'joining_date', 'status',
+                'avatar',
             ),
         }),
     )
@@ -31,6 +32,7 @@ class UserAdmin(BaseUserAdmin):
             'fields': (
                 'employee_id', 'designation', 'department', 'role',
                 'team', 'manager', 'mobile_number', 'joining_date', 'status',
+                'avatar',
             ),
         }),
     )

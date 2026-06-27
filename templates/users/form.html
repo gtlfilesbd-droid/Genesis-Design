@@ -9,7 +9,7 @@
     <p class="text-sm text-slate-500 mb-8">Assign a role group, then optionally add individual extra permissions.</p>
 
     <div class="g-card p-8 mb-6">
-        <form method="post" class="space-y-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
             {% csrf_token %}
             {% for field in form %}
             <div id="{% if field.name == 'role' %}role-group-field{% endif %}">
@@ -20,6 +20,8 @@
                 {{ field }}
                 {% if field.name == 'role' %}
                 <p class="text-xs text-slate-500 mt-1">The group defines default permissions. See summary below.</p>
+                {% elif field.name == 'avatar' %}
+                <p class="text-xs text-slate-400 mt-1">JPG, PNG or WebP. Leave empty to keep current photo.</p>
                 {% endif %}
                 {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
             </div>

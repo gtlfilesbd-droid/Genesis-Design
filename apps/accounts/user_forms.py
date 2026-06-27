@@ -6,6 +6,7 @@ from .models import Team, UserRole
 
 User = get_user_model()
 INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+AVATAR = forms.FileInput(attrs={'class': INPUT, 'accept': 'image/*'})
 
 
 class UserCreateForm(forms.ModelForm):
@@ -16,7 +17,7 @@ class UserCreateForm(forms.ModelForm):
         fields = [
             'username', 'first_name', 'last_name', 'email', 'employee_id',
             'designation', 'department', 'role', 'team', 'manager',
-            'mobile_number', 'status',
+            'mobile_number', 'status', 'avatar',
         ]
         widgets = {
             'username': forms.TextInput(attrs={'class': INPUT}),
@@ -31,6 +32,7 @@ class UserCreateForm(forms.ModelForm):
             'manager': forms.Select(attrs={'class': INPUT}),
             'mobile_number': forms.TextInput(attrs={'class': INPUT}),
             'status': forms.Select(attrs={'class': INPUT}),
+            'avatar': AVATAR,
         }
 
     def save(self, commit=True):
@@ -51,7 +53,7 @@ class UserEditForm(forms.ModelForm):
         fields = [
             'first_name', 'last_name', 'email', 'employee_id',
             'designation', 'department', 'role', 'team', 'manager',
-            'mobile_number', 'status', 'is_active',
+            'mobile_number', 'status', 'is_active', 'avatar',
         ]
         widgets = {f: forms.Select(attrs={'class': INPUT}) if f in ('role', 'team', 'manager', 'status') else forms.TextInput(attrs={'class': INPUT})
                    for f in ['first_name', 'last_name', 'email', 'employee_id', 'designation', 'department', 'mobile_number']}
@@ -61,6 +63,7 @@ class UserEditForm(forms.ModelForm):
             'manager': forms.Select(attrs={'class': INPUT}),
             'status': forms.Select(attrs={'class': INPUT}),
             'is_active': forms.CheckboxInput(attrs={'class': 'rounded'}),
+            'avatar': AVATAR,
         })
 
 
@@ -78,5 +81,5 @@ class ProfileEditForm(forms.ModelForm):
             'mobile_number': forms.TextInput(attrs={'class': INPUT}),
             'designation': forms.TextInput(attrs={'class': INPUT}),
             'department': forms.TextInput(attrs={'class': INPUT}),
-            'avatar': forms.FileInput(attrs={'class': INPUT, 'accept': 'image/*'}),
+            'avatar': AVATAR,
         }
