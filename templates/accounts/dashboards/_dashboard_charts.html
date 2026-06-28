@@ -1,0 +1,56 @@
+{% if show_charts and charts %}
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+    <div class="g-card p-6">
+        <h2 class="text-base font-semibold text-slate-900 mb-1">Designs by Status</h2>
+        <p class="text-xs text-slate-500 mb-4">Current distribution across workflow stages</p>
+        <div class="g-chart-container">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+    <div class="g-card p-6">
+        <h2 class="text-base font-semibold text-slate-900 mb-1">Workload by Designer</h2>
+        <p class="text-xs text-slate-500 mb-4">Active assignments per designer</p>
+        <div class="g-chart-container max-w-md mx-auto">
+            <canvas id="workloadChart"></canvas>
+        </div>
+    </div>
+</div>
+{{ charts|json_script:"charts-data" }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const charts = JSON.parse(document.getElementById('charts-data').textContent);
+    const statusCtx = document.getElementById('statusChart');
+    if (statusCtx && window.Chart) {
+        new Chart(statusCtx, {
+            type: 'bar',
+            data: {
+                labels: charts.status_labels,
+                datasets: [{ label: 'Designs', data: charts.status_data, backgroundColor: '#2E75B6', borderRadius: 6 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
+    const workloadCtx = document.getElementById('workloadChart');
+    if (workloadCtx && window.Chart && charts.workload_labels.length) {
+        new Chart(workloadCtx, {
+            type: 'doughnut',
+            data: {
+                labels: charts.workload_labels,
+                datasets: [{ data: charts.workload_data, backgroundColor: ['#1A3C6E','#2E75B6','#60A5FA','#93C5FD','#BFDBFE','#DBEAFE','#E8F0F8','#F1F5F9'], borderWidth: 0 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '58%',
+                plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, boxWidth: 8 } } }
+            }
+        });
+    }
+});
+</script>
+{% endif %}

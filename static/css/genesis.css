@@ -223,6 +223,91 @@ a.g-stat-card-link:focus-visible {
   color: var(--primary);
 }
 
+.g-chart-container {
+  position: relative;
+  height: 16rem;
+  max-width: 100%;
+}
+
+.g-dashboard-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0F172A;
+  margin-bottom: 0.25rem;
+}
+
+.g-dashboard-section-subtitle {
+  font-size: 0.75rem;
+  color: #64748B;
+  margin-bottom: 1rem;
+}
+
+.g-metric-tile {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #FAFBFC;
+}
+
+.g-metric-tile-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748B;
+  margin-bottom: 0.35rem;
+}
+
+.g-metric-tile-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0F172A;
+}
+
+.g-metric-tile-success .g-metric-tile-value { color: #16A34A; }
+.g-metric-tile-warning .g-metric-tile-value { color: #D97706; }
+.g-metric-tile-danger .g-metric-tile-value { color: #DC2626; }
+
+.g-quick-link-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s ease;
+}
+
+.g-quick-link-tile:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.g-quick-link-tile-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.g-quick-link-tile-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+.g-dashboard-divider {
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+  padding-top: 0.25rem;
+}
+
 .g-progress {
   height: 6px;
   background: #F1F5F9;

@@ -1,0 +1,34 @@
+{% load genesis_ui %}
+<div class="xl:col-span-3 g-card p-6">
+    <div class="mb-5">
+        <h2 class="text-base font-semibold text-slate-900">Recent Activity</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Latest actions across the system</p>
+    </div>
+    <div class="relative g-timeline space-y-5 pl-8">
+        {% for log in recent_activity %}
+        <div class="relative">
+            <div class="absolute -left-8 top-1 rounded-full ring-4 ring-white"
+                 style="width: {{ log.action|activity_dot_size }}; height: {{ log.action|activity_dot_size }}; background-color: {{ log.action|activity_dot_color }};"></div>
+            <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
+                    {{ log.user|initials }}
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm text-slate-900">
+                        <span class="font-semibold">{{ log.user|default:"System" }}</span>
+                        — {{ log.description|default:log.action|activity_title }}
+                    </p>
+                    <p class="text-xs text-slate-400 mt-0.5">{{ log.created_at|datetime_with_hint }}</p>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8">
+            <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="activity" class="w-6 h-6 text-slate-400"></i>
+            </div>
+            <p class="text-sm text-slate-500">No recent activity yet.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>

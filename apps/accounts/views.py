@@ -294,6 +294,7 @@ def _base_dashboard_context(request):
     stats = get_dashboard_stats(request.user)
     return {
         'user_obj': request.user,
+        'role_display': request.user.get_role_display(),
         'pending_count': DesignRequest.objects.filter(current_holder=request.user).exclude(
             status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
         ).count(),

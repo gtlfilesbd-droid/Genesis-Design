@@ -1,10 +1,16 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load genesis_ui %}
-{% block title %}Dashboard — Head of Design{% endblock %}
+{% block title %}HoD Dashboard — Genesis Design{% endblock %}
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 
-<div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-4 mt-8 mb-6">
+<div class="g-dashboard-divider"></div>
+
+<div class="mb-6">
+    <h2 class="g-dashboard-section-title">Pipeline Status</h2>
+    <p class="g-dashboard-section-subtitle">Designs at each workflow stage</p>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3 mb-8">
     {% url 'requests:list' as requests_list_url %}
     {% include 'components/stat_card.html' with label='New Requests' value=new_requests icon='inbox' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=new_request' %}
     {% include 'components/stat_card.html' with label='With Designer' value=assigned_to_designer icon='pen-tool' icon_bg='bg-indigo-50' icon_color='text-indigo-600' url=requests_list_url|add:'?status=in_progress' %}
@@ -15,40 +21,80 @@
     {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs url=requests_list_url|add:'?overdue=1' %}
 </div>
 
-<div class="g-card p-6 mb-6">
-    <h2 class="text-base font-semibold text-slate-900 mb-4">Performance Statistics</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 text-sm">
-        <div><p class="text-slate-500">Requests Managed</p><p class="text-xl font-bold text-slate-900">{{ hod_performance.total_managed }}</p></div>
-        <div><p class="text-slate-500">Approved</p><p class="text-xl font-bold text-green-600">{{ hod_performance.total_approved }}</p></div>
-        <div><p class="text-slate-500">Cancelled</p><p class="text-xl font-bold text-slate-600">{{ hod_performance.total_cancelled }}</p></div>
-        <div><p class="text-slate-500">Corrections Issued</p><p class="text-xl font-bold text-amber-600">{{ hod_performance.total_corrections }}</p></div>
-        <div><p class="text-slate-500">Avg Review Time</p><p class="text-xl font-bold text-slate-900">{% if hod_performance.avg_review_hours %}{{ hod_performance.avg_review_hours }}h{% else %}—{% endif %}</p></div>
-        <div><p class="text-slate-500">Avg Assignment Time</p><p class="text-xl font-bold text-slate-900">{% if hod_performance.avg_assignment_hours %}{{ hod_performance.avg_assignment_hours }}h{% else %}—{% endif %}</p></div>
+<div class="g-card p-6 mb-8">
+    <div class="mb-5">
+        <h2 class="text-base font-semibold text-slate-900">Performance Statistics</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Key metrics for your department</p>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        {% include 'components/metric_tile.html' with label='Requests Managed' value=hod_performance.total_managed %}
+        {% include 'components/metric_tile.html' with label='Approved' value=hod_performance.total_approved tone='success' %}
+        {% include 'components/metric_tile.html' with label='Cancelled' value=hod_performance.total_cancelled %}
+        {% include 'components/metric_tile.html' with label='Corrections Issued' value=hod_performance.total_corrections tone='warning' %}
+        {% if hod_performance.avg_review_hours %}
+        {% include 'components/metric_tile.html' with label='Avg Review Time' value=hod_performance.avg_review_hours|add:"h" %}
+        {% else %}
+        {% include 'components/metric_tile.html' with label='Avg Review Time' value='—' %}
+        {% endif %}
+        {% if hod_performance.avg_assignment_hours %}
+        {% include 'components/metric_tile.html' with label='Avg Assignment Time' value=hod_performance.avg_assignment_hours|add:"h" %}
+        {% else %}
+        {% include 'components/metric_tile.html' with label='Avg Assignment Time' value='—' %}
+        {% endif %}
     </div>
 </div>
 
-<h2 class="text-lg font-semibold text-slate-900 mb-4">Work Queue</h2>
-<div class="g-card overflow-x-auto">
-    <table class="g-table w-full">
-        <thead><tr><th>Design</th><th>Project</th><th>Stage</th><th>Holder</th><th>Pending Since</th><th>Due</th><th>Priority</th><th></th></tr></thead>
-        <tbody>
-        {% for d in work_queue %}
-        <tr>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
-            <td>{{ d.project.code }}</td>
-            <td>{% render_status_badge d.status %}</td>
-            <td>
-                {% if d.assigned_verifier %}{{ d.assigned_verifier }}{% elif d.assigned_compliance_officer %}{{ d.assigned_compliance_officer }}{% elif d.assigned_designer %}{{ d.assigned_designer }}{% elif d.current_holder %}{{ d.current_holder }}{% else %}—{% endif %}
-            </td>
-            <td class="text-slate-500">{{ d.updated_at|date:"d M Y, h:i A" }}</td>
-            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"d M Y, h:i A"|default:"—" }}</td>
-            <td>{% render_priority_badge d.priority %}</td>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1">Open</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="8" class="text-center text-slate-500 py-8">Queue is empty.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">Work Queue</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Designs requiring HoD attention</p>
+        </div>
+        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">{{ work_queue|length }} items</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Design</th>
+                    <th>Project</th>
+                    <th>Stage</th>
+                    <th>Holder</th>
+                    <th>Pending Since</th>
+                    <th>Due</th>
+                    <th>Priority</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in work_queue %}
+                <tr class="{% if d.is_overdue %}bg-red-50/50{% endif %}">
+                    <td><a href="{% url 'requests:detail' d.pk %}" class="font-semibold text-primary-light hover:text-primary">{{ d.design_number }}</a></td>
+                    <td>{{ d.project.code }}</td>
+                    <td>{% render_status_badge d.status %}</td>
+                    <td>
+                        {% if d.assigned_verifier %}{{ d.assigned_verifier }}{% elif d.assigned_compliance_officer %}{{ d.assigned_compliance_officer }}{% elif d.assigned_designer %}{{ d.assigned_designer }}{% elif d.current_holder %}{{ d.current_holder }}{% else %}—{% endif %}
+                    </td>
+                    <td class="text-slate-500 text-sm">{{ d.updated_at|date:"d M Y, h:i A" }}</td>
+                    <td class="{% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">{{ d.due_date|date:"d M Y, h:i A"|default:"—" }}</td>
+                    <td>{% render_priority_badge d.priority %}</td>
+                    <td class="text-right">
+                        <a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1.5">Open</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="inbox" class="w-6 h-6 text-slate-400"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">Queue is clear</p>
+                        <p class="text-xs text-slate-500 mt-1">No designs waiting for HoD action.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

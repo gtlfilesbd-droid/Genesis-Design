@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load genesis_ui %}
-{% block title %}Dashboard — Requester{% endblock %}
+{% block title %}Requester Dashboard — Genesis Design{% endblock %}
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 mb-6">
+<div class="g-dashboard-divider"></div>
+
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
     {% url 'projects:list' as projects_list_url %}
     {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' url=projects_list_url %}
     {% include 'components/stat_card.html' with label='Active' value=active_projects icon='activity' icon_bg='bg-green-50' icon_color='text-green-600' url=projects_list_url|add:'?status=active' %}
@@ -12,54 +14,126 @@
     {% include 'components/stat_card.html' with label='Cancelled' value=cancelled_projects icon='x-circle' icon_bg='bg-slate-100' icon_color='text-slate-600' url=projects_list_url|add:'?status=cancelled' %}
 </div>
 
-<div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-semibold text-slate-900">My Projects</h2>
-    {% if can_create_project %}
-    <a href="{% url 'projects:new' %}" class="g-btn-primary inline-flex items-center gap-2">
-        <i data-lucide="plus" class="w-4 h-4"></i> New Project
-    </a>
-    {% endif %}
-</div>
-<div class="g-card overflow-hidden">
-    <table class="g-table w-full">
-        <thead><tr><th>Name</th><th>Code</th><th>Created</th><th>Status</th><th>Total</th><th>Running</th><th>Completed</th><th></th></tr></thead>
-        <tbody>
-        {% for p in projects %}
-        <tr>
-            <td class="font-medium text-slate-900">{{ p.name }}</td>
-            <td class="font-medium text-primary">{{ p.code }}</td>
-            <td class="text-slate-500">{{ p.created_at|date:"d M Y, h:i A" }}</td>
-            <td>{% render_status_badge p.status %}</td>
-            <td>{{ p.total_design_requests }}</td>
-            <td>{{ p.running_designs }}</td>
-            <td>{{ p.completed_designs }}</td>
-            <td><a href="{% url 'projects:detail' p.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="8" class="text-center text-slate-500 py-8">No projects yet. <a href="{% url 'projects:new' %}" class="text-primary-light font-semibold">Create one</a></td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<div class="g-card overflow-hidden mb-8">
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">My Projects</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Progress across your active projects</p>
+        </div>
+        {% if can_create_project %}
+        <a href="{% url 'projects:new' %}" class="g-btn-primary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> New Project
+        </a>
+        {% endif %}
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Created</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Running</th>
+                    <th>Completed</th>
+                    <th>Progress</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in projects %}
+                <tr>
+                    <td class="font-semibold text-slate-900">{{ p.name }}</td>
+                    <td class="font-medium text-primary">{{ p.code }}</td>
+                    <td class="text-slate-500 text-sm">{{ p.created_at|date:"d M Y" }}</td>
+                    <td>{% render_status_badge p.status %}</td>
+                    <td>{{ p.total_design_requests }}</td>
+                    <td>{{ p.running_designs }}</td>
+                    <td>{{ p.completed_designs }}</td>
+                    <td class="min-w-[120px]">
+                        {% with pct=p.completed_designs|progress_pct:p.total_design_requests %}
+                        <div class="flex items-center gap-2">
+                            <div class="g-progress flex-1">
+                                <div class="g-progress-fill" style="width: {{ pct }}%;"></div>
+                            </div>
+                            <span class="text-xs font-medium text-slate-600 w-8 text-right">{{ pct }}%</span>
+                        </div>
+                        {% endwith %}
+                    </td>
+                    <td class="text-right">
+                        <a href="{% url 'projects:detail' p.pk %}" class="text-primary-light hover:text-primary text-sm font-medium">View →</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="folder" class="w-6 h-6 text-slate-400"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">No projects yet</p>
+                        <p class="text-xs text-slate-500 mt-1 mb-4">Projects you create or manage will appear here.</p>
+                        {% if can_create_project %}
+                        <a href="{% url 'projects:new' %}" class="g-btn-primary text-sm inline-flex items-center gap-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Create Project
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<h2 class="text-lg font-semibold text-slate-900 mt-8 mb-4">Design Request History</h2>
 <div class="g-card overflow-hidden">
-    <table class="g-table w-full">
-        <thead><tr><th>Design #</th><th>Type</th><th>Request Date</th><th>Priority</th><th>Stage</th><th>Holder</th></tr></thead>
-        <tbody>
-        {% for d in designs %}
-        <tr>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
-            <td>{{ d.drawing_type.name }}</td>
-            <td class="text-slate-500">{{ d.created_at|date:"d M Y, h:i A" }}</td>
-            <td>{% render_priority_badge d.priority %}</td>
-            <td>{% render_status_badge d.status %}</td>
-            <td class="text-slate-500">{{ d.current_holder|default:"—" }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6" class="text-center text-slate-500 py-8">No design requests.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">Design Request History</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Recent design requests across your projects</p>
+        </div>
+        <a href="{% url 'projects:list' %}" class="g-btn-primary text-xs px-3 py-1.5 inline-flex items-center gap-1.5">
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i> View Projects
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Design #</th>
+                    <th>Type</th>
+                    <th>Request Date</th>
+                    <th>Priority</th>
+                    <th>Stage</th>
+                    <th>Holder</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in designs %}
+                <tr>
+                    <td><a href="{% url 'requests:detail' d.pk %}" class="font-semibold text-primary-light hover:text-primary">{{ d.design_number }}</a></td>
+                    <td>{{ d.drawing_type.name }}</td>
+                    <td class="text-slate-500 text-sm">{{ d.created_at|date:"d M Y" }}</td>
+                    <td>{% render_priority_badge d.priority %}</td>
+                    <td>{% render_status_badge d.status %}</td>
+                    <td class="text-slate-500">{{ d.current_holder|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="file-plus" class="w-6 h-6 text-slate-400"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">No design requests yet</p>
+                        <p class="text-xs text-slate-500 mt-1 mb-4">Submit your first design request to get started.</p>
+                        <a href="{% url 'projects:list' %}" class="g-btn-primary text-sm inline-flex items-center gap-2">
+                            <i data-lucide="folder" class="w-4 h-4"></i> Go to Projects
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

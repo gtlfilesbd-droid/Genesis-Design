@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load genesis_ui %}
-{% block title %}Dashboard — Designer{% endblock %}
+{% block title %}Designer Dashboard — Genesis Design{% endblock %}
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 
-<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4 mt-8 mb-6">
+<div class="g-dashboard-divider"></div>
+
+<div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-8">
     {% url 'my_tasks:list' as my_tasks_url %}
     {% url 'requests:list' as requests_list_url %}
     {% include 'components/stat_card.html' with label='Assigned' value=assigned_total icon='clipboard-list' url=my_tasks_url %}
@@ -15,38 +17,86 @@
     {% include 'components/stat_card.html' with label='Overdue' value=overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue url=requests_list_url|add:'?overdue=1&mine=1' %}
 </div>
 
-<div class="g-card p-6 mb-6">
-    <h2 class="text-base font-semibold text-slate-900 mb-4">Productivity</h2>
-    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
-        <div><p class="text-slate-500">Avg Completion</p><p class="text-xl font-bold text-slate-900">{% if productivity.avg_completion_days %}{{ productivity.avg_completion_days }} days{% else %}—{% endif %}</p></div>
-        <div><p class="text-slate-500">Fastest</p><p class="text-xl font-bold text-green-600">{% if productivity.fastest_days %}{{ productivity.fastest_days }} days{% else %}—{% endif %}</p></div>
-        <div><p class="text-slate-500">Slowest</p><p class="text-xl font-bold text-amber-600">{% if productivity.slowest_days %}{{ productivity.slowest_days }} days{% else %}—{% endif %}</p></div>
-        <div><p class="text-slate-500">Monthly Output</p><p class="text-xl font-bold text-slate-900">{{ productivity.monthly_output }}</p></div>
-        <div><p class="text-slate-500">Yearly Output</p><p class="text-xl font-bold text-slate-900">{{ productivity.yearly_output }}</p></div>
+<div class="g-card p-6 mb-8">
+    <div class="mb-5">
+        <h2 class="text-base font-semibold text-slate-900">Productivity</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Your completion metrics and output</p>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+        {% if productivity.avg_completion_days %}
+        {% include 'components/metric_tile.html' with label='Avg Completion' value=productivity.avg_completion_days|add:" days" %}
+        {% else %}
+        {% include 'components/metric_tile.html' with label='Avg Completion' value='—' %}
+        {% endif %}
+        {% if productivity.fastest_days %}
+        {% include 'components/metric_tile.html' with label='Fastest' value=productivity.fastest_days|add:" days" tone='success' %}
+        {% else %}
+        {% include 'components/metric_tile.html' with label='Fastest' value='—' tone='success' %}
+        {% endif %}
+        {% if productivity.slowest_days %}
+        {% include 'components/metric_tile.html' with label='Slowest' value=productivity.slowest_days|add:" days" tone='warning' %}
+        {% else %}
+        {% include 'components/metric_tile.html' with label='Slowest' value='—' tone='warning' %}
+        {% endif %}
+        {% include 'components/metric_tile.html' with label='Monthly Output' value=productivity.monthly_output %}
+        {% include 'components/metric_tile.html' with label='Yearly Output' value=productivity.yearly_output %}
     </div>
 </div>
 
-<h2 class="text-lg font-semibold text-slate-900 mb-4">My Designs</h2>
-<div class="g-card overflow-x-auto">
-    <table class="g-table w-full">
-        <thead><tr><th>Design</th><th>Project</th><th>Request Date</th><th>Assigned</th><th>Due</th><th>Status</th><th>Stage</th><th>Revisions</th><th></th></tr></thead>
-        <tbody>
-        {% for d in my_designs %}
-        <tr>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
-            <td>{{ d.project.code }}</td>
-            <td class="text-slate-500">{{ d.created_at|date:"d M Y, h:i A" }}</td>
-            <td class="text-slate-500">{{ d.latest_assigned_at|date:"d M Y, h:i A"|default:"—" }}</td>
-            <td class="{% if d.is_overdue %}text-red-600 font-semibold{% endif %}">{{ d.due_date|date:"d M Y, h:i A"|default:"—" }}</td>
-            <td>{% render_status_badge d.status %}</td>
-            <td class="text-slate-500">{{ d.get_status_display }}</td>
-            <td>{{ d.revision_count }}</td>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">Open →</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="9" class="text-center text-slate-500 py-8">No assigned designs.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">My Designs</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Active and recent assignments</p>
+        </div>
+        <a href="{% url 'requests:list' %}?mine=1" class="text-xs font-medium text-primary-light hover:text-primary">View all →</a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Design</th>
+                    <th>Project</th>
+                    <th>Request Date</th>
+                    <th>Assigned</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th>Stage</th>
+                    <th>Revisions</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in my_designs %}
+                <tr class="{% if d.is_overdue %}bg-red-50/50{% endif %}">
+                    <td><a href="{% url 'requests:detail' d.pk %}" class="font-semibold text-primary-light hover:text-primary">{{ d.design_number }}</a></td>
+                    <td>{{ d.project.code }}</td>
+                    <td class="text-slate-500 text-sm">{{ d.created_at|timesince_short }}</td>
+                    <td class="text-slate-500 text-sm">{{ d.latest_assigned_at|date:"d M Y"|default:"—" }}</td>
+                    <td class="{% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                        {{ d.due_date|date:"d M Y, h:i A"|default:"—" }}
+                        {% if d.is_overdue %}<span class="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Overdue</span>{% endif %}
+                    </td>
+                    <td>{% render_status_badge d.status %}</td>
+                    <td class="text-slate-500 text-sm">{{ d.get_status_display }}</td>
+                    <td>{{ d.revision_count }}</td>
+                    <td class="text-right">
+                        <a href="{% url 'requests:detail' d.pk %}" class="text-primary-light hover:text-primary text-sm font-medium">Open →</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="pen-tool" class="w-6 h-6 text-slate-400"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">No assigned designs</p>
+                        <p class="text-xs text-slate-500 mt-1">New assignments will appear here.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

@@ -1,10 +1,12 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load genesis_ui %}
-{% block title %}Dashboard — Verification{% endblock %}
+{% block title %}Verification Dashboard — Genesis Design{% endblock %}
 {% block content %}
 {% include 'accounts/dashboards/_shared.html' %}
 
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 mb-6">
+<div class="g-dashboard-divider"></div>
+
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
     {% url 'requests:list' as requests_list_url %}
     {% url 'designs:library' as library_url %}
     {% include 'components/stat_card.html' with label='Total Verified' value=verification_performance.total_reviewed icon='shield' icon_bg='bg-blue-50' icon_color='text-blue-600' url=library_url %}
@@ -13,35 +15,75 @@
     {% include 'components/stat_card.html' with label='Approved' value=approved_total icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' url=library_url %}
 </div>
 
-<div class="g-card p-6 mb-6">
-    <h2 class="text-base font-semibold text-slate-900 mb-4">Performance</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-        <div><p class="text-slate-500">Avg Verification Time</p><p class="text-xl font-bold text-slate-900">{% if verification_performance.avg_verification_hours %}{{ verification_performance.avg_verification_hours }}h{% else %}—{% endif %}</p></div>
-        <div><p class="text-slate-500">Corrections Raised</p><p class="text-xl font-bold text-amber-600">{{ verification_performance.total_corrections }}</p></div>
-        <div><p class="text-slate-500">Final Approvals</p><p class="text-xl font-bold text-green-600">{{ verification_performance.total_final_approvals }}</p></div>
+<div class="g-card p-6 mb-8">
+    <div class="mb-5">
+        <h2 class="text-base font-semibold text-slate-900">Performance</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Your review throughput and quality metrics</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {% if verification_performance.avg_verification_hours %}
+        {% include 'components/metric_tile.html' with label='Avg Verification Time' value=verification_performance.avg_verification_hours|add:"h" %}
+        {% else %}
+        {% include 'components/metric_tile.html' with label='Avg Verification Time' value='—' %}
+        {% endif %}
+        {% include 'components/metric_tile.html' with label='Corrections Raised' value=verification_performance.total_corrections tone='warning' %}
+        {% include 'components/metric_tile.html' with label='Final Approvals' value=verification_performance.total_final_approvals tone='success' %}
     </div>
 </div>
 
-<h2 class="text-lg font-semibold text-slate-900 mb-4">Verification Queue</h2>
-<div class="g-card overflow-x-auto">
-    <table class="g-table w-full">
-        <thead><tr><th>Design</th><th>Project</th><th>Received</th><th>Acknowledged</th><th>Pending Days</th><th>Assigned By</th><th>Priority</th><th></th></tr></thead>
-        <tbody>
-        {% for d in verification_queue %}
-        <tr>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="font-medium text-primary-light">{{ d.design_number }}</a></td>
-            <td>{{ d.project.code }}</td>
-            <td class="text-slate-500">{{ d.verification_assigned_at|date:"d M Y, h:i A"|default:"—" }}</td>
-            <td class="text-slate-500">{{ d.verification_acknowledged_at|date:"d M Y, h:i A"|default:"—" }}</td>
-            <td>{{ d.pending_days }}</td>
-            <td>{{ d.sent_by|default:"—" }}</td>
-            <td>{% render_priority_badge d.priority %}</td>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1">Verify</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="8" class="text-center text-slate-500 py-8">Queue is empty.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">Verification Queue</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Designs awaiting your verification</p>
+        </div>
+        <span class="text-xs font-semibold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">{{ verification_queue|length }} pending</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Design</th>
+                    <th>Project</th>
+                    <th>Received</th>
+                    <th>Acknowledged</th>
+                    <th>Pending Days</th>
+                    <th>Assigned By</th>
+                    <th>Priority</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in verification_queue %}
+                <tr>
+                    <td><a href="{% url 'requests:detail' d.pk %}" class="font-semibold text-primary-light hover:text-primary">{{ d.design_number }}</a></td>
+                    <td>{{ d.project.code }}</td>
+                    <td class="text-slate-500 text-sm">{{ d.verification_assigned_at|date:"d M Y, h:i A"|default:"—" }}</td>
+                    <td class="text-slate-500 text-sm">{{ d.verification_acknowledged_at|date:"d M Y, h:i A"|default:"—" }}</td>
+                    <td>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full {% if d.pending_days > 3 %}bg-red-100 text-red-700{% elif d.pending_days > 1 %}bg-amber-100 text-amber-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+                            {{ d.pending_days }} day{{ d.pending_days|pluralize }}
+                        </span>
+                    </td>
+                    <td>{{ d.sent_by|default:"—" }}</td>
+                    <td>{% render_priority_badge d.priority %}</td>
+                    <td class="text-right">
+                        <a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1.5">Verify</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="check-circle" class="w-6 h-6 text-green-600"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">Queue is clear</p>
+                        <p class="text-xs text-slate-500 mt-1">No designs pending verification.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
