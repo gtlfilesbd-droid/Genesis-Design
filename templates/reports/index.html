@@ -209,7 +209,9 @@
     <div class="xl:col-span-3 g-card p-6">
         <h2 class="font-semibold text-slate-900 mb-1">Compliance Distribution</h2>
         <p class="text-xs text-slate-500 mb-4">Breakdown of deadline status across designs</p>
-        <canvas id="deadlineChart" height="220"></canvas>
+        <div class="relative w-full max-w-md mx-auto h-64">
+            <canvas id="deadlineChart"></canvas>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -295,9 +297,10 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 cutout: '62%',
                 plugins: {
-                    legend: { position: 'bottom', labels: { usePointStyle: true, padding: 16 } },
+                    legend: { position: 'bottom', labels: { usePointStyle: true, padding: 12, boxWidth: 8 } },
                 },
             },
         });
