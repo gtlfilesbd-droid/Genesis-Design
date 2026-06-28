@@ -1,0 +1,34 @@
+{% load genesis_ui %}
+<div class="g-card p-6">
+    <div class="flex items-center justify-between mb-5">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">Assigned to Me</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Active designs across your projects</p>
+        </div>
+        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">{{ assigned_tasks|length }} active</span>
+    </div>
+    <div class="space-y-3">
+        {% for d in assigned_tasks %}
+        <a href="{% url 'requests:detail' d.pk %}" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50 transition">
+            <div>
+                <p class="text-sm font-medium text-primary-light">{{ d.design_number }}</p>
+                <p class="text-xs text-slate-500">{{ d.project.code }} · {{ d.drawing_type.name }}</p>
+                {% if d.due_date %}
+                <p class="text-xs {% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-400{% endif %} mt-1">
+                    Due {{ d.due_date|date:"d M Y, h:i A" }}
+                    {% if d.is_overdue %}<span class="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Overdue</span>{% endif %}
+                </p>
+                {% endif %}
+            </div>
+            {% render_status_badge d.status %}
+        </a>
+        {% empty %}
+        <div class="text-center py-8">
+            <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="clipboard-list" class="w-6 h-6 text-slate-400"></i>
+            </div>
+            <p class="text-sm text-slate-500">No assigned tasks right now.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>

@@ -3,17 +3,63 @@
 {% block title %}My Tasks{% endblock %}
 {% block content %}
 <div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">My Tasks</h1>
+    <h1 class="text-[28px] font-bold text-slate-900 tracking-tight">My Tasks</h1>
+    {% if task_view == 'designer' %}
+    <p class="text-sm text-slate-500 mt-1">Your assigned designs across active projects</p>
+    {% elif task_view == 'verification' %}
+    <p class="text-sm text-slate-500 mt-1">Designs awaiting your verification review</p>
+    {% elif task_view == 'compliance' %}
+    <p class="text-sm text-slate-500 mt-1">Designs awaiting your compliance sign-off</p>
+    {% elif task_view == 'requester' %}
+    <p class="text-sm text-slate-500 mt-1">Your submitted design requests across projects</p>
+    {% else %}
     <p class="text-sm text-slate-500 mt-1">Your assigned work, pending actions, and requests</p>
+    {% endif %}
 </div>
 
+{% if task_view == 'designer' %}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-    {% include 'components/stat_card.html' with label='Overdue' value=overdue_count icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_count %}
-    {% include 'components/stat_card.html' with label='Due Today' value=due_today_count icon='calendar' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
-    {% include 'components/stat_card.html' with label='Due in 3 Days' value=due_3d_count icon='clock' %}
-    {% include 'components/stat_card.html' with label='Due in 7 Days' value=due_7d_count icon='calendar-days' %}
+    {% include 'components/stat_card.html' with label='Active Projects' value=stats.active_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' %}
+    {% include 'components/stat_card.html' with label='Running Designs' value=stats.running_designs icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs %}
+    {% include 'components/stat_card.html' with label='Finished' value=stats.finished_designs icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
 </div>
+{% include 'tasks/_my_tasks_designer.html' %}
 
+{% elif task_view == 'verification' %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% include 'components/stat_card.html' with label='Active Projects' value=stats.active_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' %}
+    {% include 'components/stat_card.html' with label='Running Designs' value=stats.running_designs icon='clock' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs %}
+    {% include 'components/stat_card.html' with label='Finished' value=stats.finished_designs icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
+</div>
+{% include 'tasks/_my_tasks_verification.html' %}
+
+{% elif task_view == 'compliance' %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% include 'components/stat_card.html' with label='Active Projects' value=stats.active_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' %}
+    {% include 'components/stat_card.html' with label='Running Designs' value=stats.running_designs icon='clock' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs %}
+    {% include 'components/stat_card.html' with label='Finished' value=stats.finished_designs icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
+</div>
+{% include 'tasks/_my_tasks_compliance.html' %}
+
+{% elif task_view == 'requester' %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% include 'components/stat_card.html' with label='Projects Requested' value=stats.projects_requested icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' %}
+    {% include 'components/stat_card.html' with label='Running Designs' value=stats.running_designs icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Target Overdue' value=stats.target_overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.target_overdue %}
+    {% include 'components/stat_card.html' with label='Finished' value=stats.finished_designs icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
+</div>
+{% include 'tasks/_my_tasks_requester.html' %}
+
+{% else %}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_count icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_count %}
+    {% include 'components/stat_card.html' with label='Due Today' value=stats.due_today_count icon='calendar' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Due in 3 Days' value=stats.due_3d_count icon='clock' %}
+    {% include 'components/stat_card.html' with label='Due in 7 Days' value=stats.due_7d_count icon='calendar-days' %}
+</div>
 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
     <div class="g-card p-6">
         <h2 class="font-semibold text-slate-900 mb-4">Assigned to Me</h2>
@@ -49,11 +95,10 @@
         </div>
     </div>
 </div>
-
 <div class="g-card p-6">
     <h2 class="font-semibold text-slate-900 mb-4">My Open Requests</h2>
     <div class="overflow-x-auto">
-        <table class="g-table w-full">
+        <table class="g-table g-table-pro w-full">
             <thead><tr><th>Design #</th><th>Project</th><th>Type</th><th>Status</th><th></th></tr></thead>
             <tbody>
             {% for d in requested_tasks %}
@@ -71,4 +116,5 @@
         </table>
     </div>
 </div>
+{% endif %}
 {% endblock %}

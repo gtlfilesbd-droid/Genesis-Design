@@ -1,4 +1,3 @@
-from datetime import timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
@@ -9,6 +8,7 @@ import json
 from apps.permissions.decorators import require_global_permission, require_project_permission
 from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
+from apps.core.my_tasks_helpers import get_my_tasks_context
 from apps.core.utils import log_activity
 from apps.projects.models import Project
 
@@ -301,30 +301,11 @@ def design_request_list(request):
 @login_required
 @require_global_permission('NAV_PERM_MY_TASKS')
 def my_tasks(request):
-    user = request.user
-    terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
-    assigned = DesignRequest.objects.filter(
-        assigned_designer=user
-    ).exclude(status__in=terminal).select_related('project', 'drawing_type')
-    held = DesignRequest.objects.filter(
-        current_holder=user
-    ).exclude(status__in=terminal).select_related('project', 'drawing_type')
-    requested = DesignRequest.objects.filter(
-        requested_by=user
-    ).exclude(status__in=terminal).select_related('project', 'drawing_type')
-
-    today = timezone.now().date()
-    overdue = assigned.filter(due_date__lt=timezone.now())
-    due_today = assigned.filter(due_date__date=today)
-    due_3d = assigned.filter(due_date__date__lte=today + timedelta(days=3), due_date__date__gt=today)
-    due_7d = assigned.filter(due_date__date__lte=today + timedelta(days=7), due_date__date__gt=today + timedelta(days=3))
-
+    task_view, stats, querysets = get_my_tasks_context(request.user)
     return render(request, 'tasks/list.html', {
-        'assigned_tasks': assigned.order_by('due_date'),
-        'held_tasks': held.order_by('-priority', 'due_date'),
-        'requested_tasks': requested.order_by('-created_at')[:20],
-        'overdue_count': overdue.count(),
-        'due_today_count': due_today.count(),
-        'due_3d_count': due_3d.count(),
-        'due_7d_count': due_7d.count(),
+        'task_view': task_view,
+        'stats': stats,
+        'now': timezone.now(),
+        'today': timezone.now().date(),
+        **querysets,
     })

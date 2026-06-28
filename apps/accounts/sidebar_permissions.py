@@ -100,7 +100,7 @@ DEFAULT_SIDEBAR_BY_ROLE = {
     UserRole.DESIGN_REQUESTER: {
         'nav_dashboard': True,
         'nav_projects': True,
-        'nav_my_tasks': False,
+        'nav_my_tasks': True,
         'nav_design_library': True,
         'nav_taskboard': False,
         'nav_reports': False,

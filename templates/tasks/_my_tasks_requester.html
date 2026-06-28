@@ -1,0 +1,55 @@
+{% load genesis_ui %}
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">My Open Requests</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Running design requests you have submitted</p>
+        </div>
+        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">{{ requested_tasks|length }} running</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Design #</th>
+                    <th>Project</th>
+                    <th>Type</th>
+                    <th>Target Date</th>
+                    <th>Status</th>
+                    <th>Holder</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in requested_tasks %}
+                <tr>
+                    <td class="font-semibold text-primary-light">{{ d.design_number }}</td>
+                    <td>{{ d.project.code }}</td>
+                    <td>{{ d.drawing_type.name }}</td>
+                    <td class="{% if d.target_completion_date and d.target_completion_date < today %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                        {{ d.target_completion_date|date:"d M Y"|default:"—" }}
+                        {% if d.target_completion_date and d.target_completion_date < today %}
+                        <span class="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Overdue</span>
+                        {% endif %}
+                    </td>
+                    <td>{% render_status_badge d.status %}</td>
+                    <td class="text-slate-500">{{ d.current_holder|default:"—" }}</td>
+                    <td class="text-right">
+                        <a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="file-plus" class="w-6 h-6 text-slate-400"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">No open requests</p>
+                        <p class="text-xs text-slate-500 mt-1">Submit a design request from a project page to get started.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
