@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView, PasswordResetDoneView, PasswordResetView
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 import json
 
@@ -300,16 +300,22 @@ def _base_dashboard_context(request):
     stats = get_dashboard_stats(request.user)
     view_role = get_my_tasks_view_role(request.user)
     my_tasks_overdue_url = None
-    if view_role in ('hod', 'designer', 'verification', 'compliance'):
+    dashboard_overdue_url = f"{reverse('requests:list')}?overdue=1"
+    if view_role == 'hod':
+        # HoD dashboard: pipeline-wide due_date overdue; My Tasks keeps actionable scope.
+        pass
+    elif view_role in ('designer', 'verification', 'compliance'):
         mt_stats = get_my_tasks_stats_for_scope(request.user, view_role)
         stats['overdue_designs'] = mt_stats['overdue_designs']
         stats['trend_overdue'] = 'Action required' if stats['overdue_designs'] else 'On track'
         my_tasks_overdue_url = build_my_tasks_request_url(view_role, 'overdue')
+        dashboard_overdue_url = my_tasks_overdue_url
     elif view_role == 'requester':
         mt_stats = get_my_tasks_stats_for_scope(request.user, 'requester')
         stats['overdue_designs'] = mt_stats['target_overdue']
         stats['trend_overdue'] = 'Action required' if stats['overdue_designs'] else 'On track'
         my_tasks_overdue_url = build_my_tasks_request_url('requester', 'target_overdue')
+        dashboard_overdue_url = my_tasks_overdue_url
 
     return {
         'user_obj': request.user,
@@ -319,6 +325,7 @@ def _base_dashboard_context(request):
         ).count(),
         'stats': stats,
         'my_tasks_overdue_url': my_tasks_overdue_url,
+        'dashboard_overdue_url': dashboard_overdue_url,
         'recent_activity': get_recent_activity(),
         'pending_actions': get_pending_actions(request.user),
         'today': timezone.now(),

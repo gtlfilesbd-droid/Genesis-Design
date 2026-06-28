@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.accounts.models import User, UserRole
 from apps.accounts.sidebar_permissions import get_default_sidebar_for_role
 from apps.core.models import DeadlineConfiguration
+from apps.core.dashboard_helpers import get_dashboard_stats
 from apps.core.my_tasks_helpers import (
     build_my_tasks_request_url,
     filter_my_tasks_stat,
@@ -278,21 +279,48 @@ class MyTasksStatsTests(TestCase):
         _, _, stats, _ = get_my_tasks_context(self.designer)
         self.assertEqual(stats['overdue_designs'], 1)
 
-    def test_hod_dashboard_overdue_matches_my_tasks(self):
-        self._create_design(
+    def test_hod_dashboard_overdue_uses_pipeline_scope(self):
+        ack_overdue = self._create_design(
             self.project_a,
             status=DesignStatus.NEW_REQUEST,
             assigned_designer=None,
             current_holder=self.hod,
         )
-        DesignRequest.objects.filter(project=self.project_a, status=DesignStatus.NEW_REQUEST).update(
+        DesignRequest.objects.filter(pk=ack_overdue.pk).update(
             created_at=timezone.now() - timedelta(days=2),
+        )
+        designer_overdue = self._create_design(
+            self.project_b,
+            status=DesignStatus.IN_PROGRESS,
+            assigned_designer=self.designer,
+            current_holder=self.designer,
+            assigned_by=self.hod,
+            due_date=timezone.now() - timedelta(days=1),
         )
         self.client.login(username='hod', password='pass')
         response = self.client.get(reverse('accounts:hod_dashboard'))
         self.assertEqual(response.status_code, 200)
         _, _, mt_stats, _ = get_my_tasks_context(self.hod)
-        self.assertEqual(response.context['stats']['overdue_designs'], mt_stats['overdue_designs'])
+        pipeline_stats = get_dashboard_stats(self.hod)
+        self.assertEqual(mt_stats['overdue_designs'], 1)
+        self.assertEqual(pipeline_stats['overdue_designs'], 1)
+        self.assertEqual(
+            response.context['stats']['overdue_designs'],
+            pipeline_stats['overdue_designs'],
+        )
+        filtered_pipeline = filter_my_tasks_stat(
+            DesignRequest.objects.filter(due_date__lt=timezone.now()).exclude(
+                status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED],
+            ),
+            self.hod,
+            'hod',
+            'overdue',
+        )
+        self.assertIn(designer_overdue, DesignRequest.objects.filter(due_date__lt=timezone.now()))
+        self.assertNotIn(ack_overdue, DesignRequest.objects.filter(due_date__lt=timezone.now()))
+        self.assertNotIn(designer_overdue, filtered_pipeline)
+        self.assertIn('overdue=1', response.context['dashboard_overdue_url'])
+        self.assertNotIn('scope=hod', response.context['dashboard_overdue_url'])
 
     def test_period_filter_scopes_finished_not_running(self):
         old_completed = self._create_design(
