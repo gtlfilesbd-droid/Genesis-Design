@@ -9,4 +9,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.workflow.tasks.process_deadline_escalations_task',
         'schedule': crontab(minute='0', hour='*/1'),
     },
+    'check-action-sla-breaches': {
+        'task': 'apps.workflow.tasks.check_action_sla_breaches_task',
+        'schedule': crontab(minute='*/15'),
+    },
 }

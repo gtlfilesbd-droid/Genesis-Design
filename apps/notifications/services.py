@@ -480,6 +480,34 @@ def send_escalation(design, level):
             create_notification(admin, title, message, link, NotificationType.ESCALATION)
 
 
+def notify_action_sla_breach(design):
+    from apps.accounts.models import UserRole
+    from apps.designs.models import DesignStatus
+
+    link = f'/requests/{design.pk}/'
+    due = design.action_due_at
+    due_text = due.strftime('%d %b %Y %H:%M') if due else 'N/A'
+    title = f'Action Overdue: {design.design_number}'
+    message = (
+        f'Design {design.design_number} requires your action (due {due_text}). '
+        f'Current status: {design.get_status_display()}.'
+    )
+    recipients = []
+    if design.current_holder:
+        recipients.append(design.current_holder)
+    if design.status == DesignStatus.ASSIGNED and design.assigned_designer:
+        recipients = [design.assigned_designer]
+    elif design.status == DesignStatus.VERIFICATION_PENDING_ACK and design.assigned_verifier:
+        recipients = [design.assigned_verifier]
+    elif design.status == DesignStatus.COMPLIANCE_PENDING_ACK and design.assigned_compliance_officer:
+        recipients = [design.assigned_compliance_officer]
+    hod = User.objects.filter(role=UserRole.HEAD_OF_DESIGN, is_active=True).first()
+    if hod and hod not in recipients:
+        recipients.append(hod)
+    for user in recipients:
+        create_notification(user, title, message, link, NotificationType.DEADLINE)
+
+
 def notify_deadline_breach(design):
     from apps.accounts.models import UserRole
 

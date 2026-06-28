@@ -3,6 +3,7 @@ from datetime import datetime, time
 from django.utils import timezone
 
 from apps.designs.models import DesignStatus
+from apps.workflow.action_sla import ACTION_SLA_STATUSES, get_action_due_at, get_action_anchor
 
 _DELAY_SOURCE_TO_STAGE = {
     'Designer': 'Designer',
@@ -92,21 +93,15 @@ def get_deadline_timer_data(design):
     if status in designer_stages:
         start = _latest_assignment_at(design)
         due = design.due_date
-    elif status == DesignStatus.VERIFICATION_PENDING_ACK:
-        start = design.verification_assigned_at
-        due = design.verification_due_date
+    elif status in ACTION_SLA_STATUSES:
+        start = get_action_anchor(design)
+        due = get_action_due_at(design)
     elif status in (DesignStatus.VERIFICATION_PENDING, DesignStatus.VERIFICATION_CORRECTION):
         start = design.verification_acknowledged_at or design.verification_assigned_at
         due = design.verification_due_date
-    elif status == DesignStatus.COMPLIANCE_PENDING_ACK:
-        start = design.compliance_assigned_at
-        due = design.compliance_due_date
     elif status in (DesignStatus.COMPLIANCE_PENDING, DesignStatus.COMPLIANCE_CORRECTION):
         start = design.compliance_acknowledged_at or design.compliance_assigned_at
         due = design.compliance_due_date
-    elif status == DesignStatus.ACKNOWLEDGED:
-        start = design.deadline_start
-        due = design.deadline_due
 
     if not start or not due:
         return None

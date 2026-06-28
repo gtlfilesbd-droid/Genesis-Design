@@ -291,7 +291,26 @@ def compliance_dashboard(request):
 
 
 def _base_dashboard_context(request):
+    from apps.core.my_tasks_helpers import (
+        build_my_tasks_request_url,
+        get_my_tasks_stats_for_scope,
+        get_my_tasks_view_role,
+    )
+
     stats = get_dashboard_stats(request.user)
+    view_role = get_my_tasks_view_role(request.user)
+    my_tasks_overdue_url = None
+    if view_role in ('hod', 'designer', 'verification', 'compliance'):
+        mt_stats = get_my_tasks_stats_for_scope(request.user, view_role)
+        stats['overdue_designs'] = mt_stats['overdue_designs']
+        stats['trend_overdue'] = 'Action required' if stats['overdue_designs'] else 'On track'
+        my_tasks_overdue_url = build_my_tasks_request_url(view_role, 'overdue')
+    elif view_role == 'requester':
+        mt_stats = get_my_tasks_stats_for_scope(request.user, 'requester')
+        stats['overdue_designs'] = mt_stats['target_overdue']
+        stats['trend_overdue'] = 'Action required' if stats['overdue_designs'] else 'On track'
+        my_tasks_overdue_url = build_my_tasks_request_url('requester', 'target_overdue')
+
     return {
         'user_obj': request.user,
         'role_display': request.user.get_role_display(),
@@ -299,6 +318,7 @@ def _base_dashboard_context(request):
             status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
         ).count(),
         'stats': stats,
+        'my_tasks_overdue_url': my_tasks_overdue_url,
         'recent_activity': get_recent_activity(),
         'pending_actions': get_pending_actions(request.user),
         'today': timezone.now(),

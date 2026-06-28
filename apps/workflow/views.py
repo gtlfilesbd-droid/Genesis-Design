@@ -8,6 +8,10 @@ from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 
+from django.utils import timezone
+
+from apps.workflow.deadline_utils import add_allowed_duration, get_deadline_config
+
 from .services import WorkflowError, suggest_designer, transition
 from .permissions import can_run_workflow_action, can_user_submit_work, design_action_flags
 
@@ -23,14 +27,25 @@ class AssignDesignerForm(forms.Form):
     )
     due_date = forms.DateTimeField(
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': INPUT}),
-        required=False,
+        required=True,
+        label='Due Date',
     )
     instructions = forms.CharField(widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}), required=False)
 
-    def __init__(self, *args, project=None, **kwargs):
+    def __init__(self, *args, project=None, design=None, **kwargs):
         super().__init__(*args, **kwargs)
         if project is not None:
             self.fields['designer'].queryset = PermissionService.get_assignable_designers(project)
+        if design and not self.is_bound and 'due_date' not in self.initial:
+            drawing_type = design.drawing_type
+            config = get_deadline_config()
+            due = add_allowed_duration(
+                timezone.now(),
+                drawing_type.allowed_days,
+                drawing_type.allowed_hours,
+                count_weekends=config.count_weekends,
+            )
+            self.fields['due_date'].initial = timezone.localtime(due).strftime('%Y-%m-%dT%H:%M')
 
 
 class CommentForm(forms.Form):
@@ -156,7 +171,7 @@ def workflow_action(request, pk, action):
         return redirect('requests:detail', pk=pk)
 
     form_actions = {
-        'assign': lambda **kw: AssignDesignerForm(project=design.project, **kw),
+        'assign': lambda **kw: AssignDesignerForm(project=design.project, design=design, **kw),
         'submit_work': CommentForm,
         'resubmit': CommentForm,
         'request_correction': CommentForm,
@@ -184,7 +199,7 @@ def workflow_action(request, pk, action):
         try:
             kwargs = {}
             if action == 'assign':
-                form = AssignDesignerForm(request.POST, project=design.project)
+                form = AssignDesignerForm(request.POST, project=design.project, design=design)
                 if not form.is_valid():
                     return render(request, 'workflow/action_form.html', {
                         'design': design, 'action': action, 'form': form,
@@ -248,7 +263,7 @@ def assign_designer_view(request, pk):
         return redirect('requests:detail', pk=pk)
     suggested = suggest_designer(design)
     if request.method == 'POST':
-        form = AssignDesignerForm(request.POST, project=design.project)
+        form = AssignDesignerForm(request.POST, project=design.project, design=design)
         if form.is_valid():
             try:
                 _warn_if_past_target(request, design, form.cleaned_data.get('due_date'))
@@ -261,7 +276,7 @@ def assign_designer_view(request, pk):
         initial = {}
         if suggested:
             initial['designer'] = suggested
-        form = AssignDesignerForm(initial=initial, project=design.project)
+        form = AssignDesignerForm(initial=initial, project=design.project, design=design)
     return render(request, 'workflow/assign.html', {
         'design': design, 'form': form, 'suggested_designer': suggested,
     })

@@ -68,17 +68,15 @@ def settings_index(request):
                 redirect_tab = 'deadline'
             else:
                 messages.error(request, 'Could not save deadline settings. Check escalation order and values.')
-                return render(request, 'settings/index.html', {
-                    'tab': 'deadline',
-                    'settings_tabs': SETTINGS_TABS,
-                    'company_form': CompanySettingsForm(instance=company),
-                    'deadline_form': form,
-                    'notification_form': NotificationSettingForm(instance=notif_settings),
-                    'drawing_types': drawing_types,
-                    'drawing_type_form': DrawingTypeForm(),
-                    'role_permissions': role_permissions,
-                    'company': company,
-                })
+                return render(request, 'settings/index.html', _settings_context(
+                    tab='deadline',
+                    company=company,
+                    deadline_config=deadline_config,
+                    notif_settings=notif_settings,
+                    drawing_types=drawing_types,
+                    role_permissions=role_permissions,
+                    deadline_form=form,
+                ))
         elif action == 'update_notifications':
             form = NotificationSettingForm(request.POST, instance=notif_settings)
             if form.is_valid():
@@ -115,14 +113,46 @@ def settings_index(request):
 
         return redirect(f"{reverse('settings:index')}?tab={redirect_tab}")
 
-    return render(request, 'settings/index.html', {
+    return render(request, 'settings/index.html', _settings_context(
+        tab=tab,
+        company=company,
+        deadline_config=deadline_config,
+        notif_settings=notif_settings,
+        drawing_types=drawing_types,
+        role_permissions=role_permissions,
+    ))
+
+
+def _deadline_action_sla_rows(deadline_form):
+    rows = []
+    for prefix, label in DeadlineConfiguration.ACTION_SLA_FIELD_GROUPS:
+        rows.append({
+            'label': label,
+            'days': deadline_form[f'{prefix}_days'],
+            'hours': deadline_form[f'{prefix}_hours'],
+        })
+    return rows
+
+
+def _settings_context(
+    tab,
+    company,
+    deadline_config,
+    notif_settings,
+    drawing_types,
+    role_permissions,
+    deadline_form=None,
+):
+    deadline_form = deadline_form or DeadlineConfigurationForm(instance=deadline_config)
+    return {
         'tab': tab,
         'settings_tabs': SETTINGS_TABS,
         'company_form': CompanySettingsForm(instance=company),
-        'deadline_form': DeadlineConfigurationForm(instance=deadline_config),
+        'deadline_form': deadline_form,
+        'deadline_action_sla_rows': _deadline_action_sla_rows(deadline_form),
         'notification_form': NotificationSettingForm(instance=notif_settings),
         'drawing_types': drawing_types,
         'drawing_type_form': DrawingTypeForm(),
         'role_permissions': role_permissions,
         'company': company,
-    })
+    }

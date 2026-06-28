@@ -55,6 +55,16 @@ class DeadlineConfigurationForm(forms.ModelForm):
             'escalation_level_3_days', 'escalation_level_3_hours',
             'escalation_level_4_days', 'escalation_level_4_hours',
             'auto_breach_notify', 'count_weekends',
+            'action_acknowledge_days', 'action_acknowledge_hours',
+            'action_assign_designer_days', 'action_assign_designer_hours',
+            'action_accept_assignment_days', 'action_accept_assignment_hours',
+            'action_hod_review_days', 'action_hod_review_hours',
+            'action_send_to_verification_days', 'action_send_to_verification_hours',
+            'action_verification_ack_days', 'action_verification_ack_hours',
+            'action_send_to_compliance_days', 'action_send_to_compliance_hours',
+            'action_compliance_ack_days', 'action_compliance_ack_hours',
+            'action_compliance_correction_days', 'action_compliance_correction_hours',
+            'action_mark_complete_days', 'action_mark_complete_hours',
         ]
         labels = {
             'default_warning_percent': 'Warning threshold (%)',
@@ -90,6 +100,17 @@ class DeadlineConfigurationForm(forms.ModelForm):
             'auto_breach_notify': forms.CheckboxInput(attrs={'class': 'rounded'}),
             'count_weekends': forms.CheckboxInput(attrs={'class': 'rounded'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for prefix, label in DeadlineConfiguration.ACTION_SLA_FIELD_GROUPS:
+            for suffix in ('days', 'hours'):
+                field_name = f'{prefix}_{suffix}'
+                if field_name in self.fields:
+                    self.fields[field_name].widget.attrs.setdefault('class', DURATION_INPUT)
+                    self.fields[field_name].widget.attrs.setdefault('min', 0)
+                    if suffix == 'hours':
+                        self.fields[field_name].widget.attrs.setdefault('max', 23)
 
     def clean(self):
         cleaned = super().clean()

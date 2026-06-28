@@ -403,6 +403,10 @@ def get_current_delay_info(design):
     if design.status == DesignStatus.NEW_REQUEST and not design.deadline_start:
         label = 'Head of Design — Acknowledgement'
 
+    from apps.workflow.action_sla import get_action_due_at, is_action_overdue
+    action_due_at = get_action_due_at(design)
+    is_action_sla_overdue = is_action_overdue(design)
+
     return {
         'current_stage_label': label,
         'current_person': person,
@@ -411,6 +415,8 @@ def get_current_delay_info(design):
         'elapsed_days': elapsed_days,
         'is_overdue': is_overdue,
         'days_over_target': days_over_target,
+        'action_due_at': action_due_at,
+        'is_action_sla_overdue': is_action_sla_overdue,
     }
 
 

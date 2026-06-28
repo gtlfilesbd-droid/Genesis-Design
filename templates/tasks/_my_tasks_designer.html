@@ -9,11 +9,17 @@
     </div>
     <div class="space-y-3">
         {% for d in assigned_tasks %}
-        <a href="{% url 'requests:detail' d.pk %}" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50 transition">
+        {% action_due d as act_due %}
+        <a href="{% url 'requests:detail' d.pk %}" class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary/30 hover:bg-slate-50 transition {% if d|action_overdue_for:user %}border-red-200 bg-red-50/30{% endif %}">
             <div>
                 <p class="text-sm font-medium text-primary-light">{{ d.design_number }}</p>
                 <p class="text-xs text-slate-500">{{ d.project.code }} · {{ d.drawing_type.name }}</p>
-                {% if d.due_date %}
+                {% if d.status == 'assigned' and act_due %}
+                <p class="text-xs {% if d|action_overdue_for:user %}text-red-600 font-semibold{% else %}text-slate-400{% endif %} mt-1">
+                    Accept due {{ act_due|date:"d M Y, h:i A" }}
+                    {% if d|action_overdue_for:user %}<span class="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Overdue</span>{% endif %}
+                </p>
+                {% elif d.due_date %}
                 <p class="text-xs {% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-400{% endif %} mt-1">
                     Due {{ d.due_date|date:"d M Y, h:i A" }}
                     {% if d.is_overdue %}<span class="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Overdue</span>{% endif %}

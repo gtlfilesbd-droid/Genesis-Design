@@ -21,12 +21,17 @@
             </thead>
             <tbody>
                 {% for d in active_tasks %}
-                <tr>
+                {% action_due d as act_due %}
+                <tr class="{% if d|action_overdue_for:user %}bg-red-50/50{% endif %}">
                     <td class="font-semibold text-primary-light">{{ d.design_number }}</td>
                     <td>{{ d.project.code }}</td>
                     <td>{{ d.assigned_designer|default:"—" }}</td>
-                    <td class="{% if d.verification_due_date and d.verification_due_date < now %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                    <td class="{% if d|action_overdue_for:user or d.verification_due_date and d.verification_due_date < now %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                        {% if d.status == 'verification_pending_ack' and act_due %}
+                        Ack due {{ act_due|date:"d M Y, h:i A" }}
+                        {% else %}
                         {{ d.verification_due_date|date:"d M Y, h:i A"|default:"—" }}
+                        {% endif %}
                     </td>
                     <td>{% render_status_badge d.status %}</td>
                     <td class="text-right">

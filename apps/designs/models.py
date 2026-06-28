@@ -213,6 +213,8 @@ class DesignRequest(models.Model):
     sequence_number = models.PositiveIntegerField(default=0, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    action_sla_breached_at = models.DateTimeField(null=True, blank=True)
+    action_sla_breach_status = models.CharField(max_length=50, blank=True, default='')
 
     class Meta:
         ordering = ['-created_at']
@@ -237,6 +239,16 @@ class DesignRequest(models.Model):
         )['max_seq'] or 0
         self.sequence_number = last_seq + 1
         return f'{self.project.code}-{self.drawing_type.code_prefix}-{self.sequence_number:03d}'
+
+    @property
+    def action_due_at(self):
+        from apps.workflow.action_sla import get_action_due_at
+        return get_action_due_at(self)
+
+    @property
+    def is_action_overdue(self):
+        from apps.workflow.action_sla import is_action_overdue
+        return is_action_overdue(self)
 
     @property
     def is_overdue(self):

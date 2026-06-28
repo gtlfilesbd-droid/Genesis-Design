@@ -1,10 +1,12 @@
 from datetime import date, timedelta
 
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
 from apps.accounts.sidebar_permissions import get_default_sidebar_for_role
+from apps.core.models import DeadlineConfiguration
 from apps.core.my_tasks_helpers import (
     build_my_tasks_request_url,
     filter_my_tasks_stat,
@@ -12,7 +14,13 @@ from apps.core.my_tasks_helpers import (
     get_my_tasks_stat_cards,
 )
 from apps.core.settings_forms import ensure_role_permissions
-from apps.designs.models import DesignRequest, DesignStatus, DrawingType
+from apps.designs.models import (
+    ComplianceReview,
+    DesignAssignment,
+    DesignRequest,
+    DesignStatus,
+    DrawingType,
+)
 from apps.permissions.services import PermissionService
 from apps.projects.models import Project
 
@@ -31,6 +39,9 @@ class MyTasksStatsTests(TestCase):
         )
         self.hod = User.objects.create_user(
             username='hod', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H1',
+        )
+        self.compliance = User.objects.create_user(
+            username='comp', password='pass', role=UserRole.COMPLIANCE_TEAM, employee_id='C1',
         )
         self.drawing_type = DrawingType.objects.create(name='Layout', code_prefix='LY', allowed_days=3)
         self.project_a = Project.objects.create(
@@ -133,14 +144,17 @@ class MyTasksStatsTests(TestCase):
         )
 
     def test_hod_stats_involvement_and_overdue(self):
-        today = timezone.now().date()
         ack = self._create_design(
             self.project_a,
             status=DesignStatus.NEW_REQUEST,
             assigned_designer=None,
             current_holder=self.hod,
-            target_completion_date=today - timedelta(days=1),
+            target_completion_date=timezone.now().date() - timedelta(days=1),
         )
+        DesignRequest.objects.filter(pk=ack.pk).update(
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        ack.refresh_from_db()
         self_work = self._create_design(
             self.project_b,
             status=DesignStatus.IN_PROGRESS,
@@ -210,6 +224,10 @@ class MyTasksStatsTests(TestCase):
             current_holder=self.hod,
             target_completion_date=timezone.now().date() - timedelta(days=1),
         )
+        DesignRequest.objects.filter(pk=overdue_ack.pk).update(
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        overdue_ack.refresh_from_db()
         qs = DesignRequest.objects.all()
         filtered = filter_my_tasks_stat(qs, self.hod, 'hod', 'overdue')
         self.assertIn(overdue_ack, filtered)
@@ -221,6 +239,60 @@ class MyTasksStatsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, overdue_ack.design_number)
         self.assertNotContains(response, at_verification.design_number)
+
+    def test_hod_ack_action_sla_overdue_not_target_date(self):
+        target_only = self._create_design(
+            self.project_a,
+            status=DesignStatus.NEW_REQUEST,
+            assigned_designer=None,
+            current_holder=self.hod,
+            target_completion_date=timezone.now().date() - timedelta(days=5),
+        )
+        ack_overdue = self._create_design(
+            self.project_b,
+            status=DesignStatus.NEW_REQUEST,
+            assigned_designer=None,
+            current_holder=self.hod,
+        )
+        DesignRequest.objects.filter(pk=ack_overdue.pk).update(
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        filtered = filter_my_tasks_stat(DesignRequest.objects.all(), self.hod, 'hod', 'overdue')
+        self.assertNotIn(target_only, filtered)
+        self.assertIn(ack_overdue, filtered)
+
+    def test_designer_assigned_action_sla_overdue(self):
+        assigned = self._create_design(
+            self.project_a,
+            status=DesignStatus.ASSIGNED,
+            assigned_designer=self.designer,
+        )
+        assignment = DesignAssignment.objects.create(
+            design=assigned,
+            designer=self.designer,
+            assigned_by=self.hod,
+        )
+        DesignAssignment.objects.filter(pk=assignment.pk).update(
+            assigned_at=timezone.now() - timedelta(days=2),
+        )
+        _, _, stats, _ = get_my_tasks_context(self.designer)
+        self.assertEqual(stats['overdue_designs'], 1)
+
+    def test_hod_dashboard_overdue_matches_my_tasks(self):
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.NEW_REQUEST,
+            assigned_designer=None,
+            current_holder=self.hod,
+        )
+        DesignRequest.objects.filter(project=self.project_a, status=DesignStatus.NEW_REQUEST).update(
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('accounts:hod_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        _, _, mt_stats, _ = get_my_tasks_context(self.hod)
+        self.assertEqual(response.context['stats']['overdue_designs'], mt_stats['overdue_designs'])
 
     def test_period_filter_scopes_finished_not_running(self):
         old_completed = self._create_design(

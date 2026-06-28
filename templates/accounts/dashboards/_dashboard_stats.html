@@ -3,6 +3,6 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
     {% include 'components/stat_card.html' with label='Active Projects' value=stats.active_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' subtext=stats.trend_active url=projects_list_url|add:'?status=active' %}
     {% include 'components/stat_card.html' with label='Running Designs' value=stats.running_designs icon='pen-tool' icon_bg='bg-amber-50' icon_color='text-amber-600' subtext=stats.trend_running url=requests_list_url|add:'?running=1' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='clock' icon_bg='bg-red-50' icon_color='text-red-600' subtext=stats.trend_overdue subtext_class='text-red-600' danger=stats.overdue_designs url=requests_list_url|add:'?overdue=1' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='clock' icon_bg='bg-red-50' icon_color='text-red-600' subtext=stats.trend_overdue subtext_class='text-red-600' danger=stats.overdue_designs url=my_tasks_overdue_url|default:requests_list_url|add:'?overdue=1' %}
     {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext=stats.trend_completed subtext_class='text-green-600' url=requests_list_url|add:'?status=completed&completed_month=1' %}
 </div>

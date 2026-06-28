@@ -96,6 +96,26 @@
                     {% if deadline_form.default_warning_percent.help_text %}<p class="text-xs text-slate-500">{{ deadline_form.default_warning_percent.help_text }}</p>{% endif %}
                 </div>
 
+                <div class="rounded-lg border border-slate-200 p-4 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-800">Action response times</h3>
+                        <p class="text-xs text-slate-500 mt-1">Maximum time allowed to complete each workflow action before it appears as overdue in My Tasks.</p>
+                    </div>
+                    {% for row in deadline_action_sla_rows %}
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                        <p class="text-sm text-slate-700 sm:col-span-1">{{ row.label }}</p>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Days</label>
+                            {{ row.days }}
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Hours</label>
+                            {{ row.hours }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
                 {% for level in "1234"|make_list %}
                 <div class="rounded-lg border border-slate-200 p-4 space-y-3">
                     <h3 class="text-sm font-semibold text-slate-800">Escalation Level {{ level }}</h3>

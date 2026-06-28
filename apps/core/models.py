@@ -126,6 +126,39 @@ class DeadlineConfiguration(models.Model):
         default=False,
         help_text='Count only weekdays when calculating deadline due dates.',
     )
+    action_acknowledge_days = models.PositiveSmallIntegerField(default=1)
+    action_acknowledge_hours = models.PositiveSmallIntegerField(default=0)
+    action_assign_designer_days = models.PositiveSmallIntegerField(default=1)
+    action_assign_designer_hours = models.PositiveSmallIntegerField(default=0)
+    action_accept_assignment_days = models.PositiveSmallIntegerField(default=1)
+    action_accept_assignment_hours = models.PositiveSmallIntegerField(default=0)
+    action_hod_review_days = models.PositiveSmallIntegerField(default=2)
+    action_hod_review_hours = models.PositiveSmallIntegerField(default=0)
+    action_send_to_verification_days = models.PositiveSmallIntegerField(default=1)
+    action_send_to_verification_hours = models.PositiveSmallIntegerField(default=0)
+    action_verification_ack_days = models.PositiveSmallIntegerField(default=1)
+    action_verification_ack_hours = models.PositiveSmallIntegerField(default=0)
+    action_send_to_compliance_days = models.PositiveSmallIntegerField(default=1)
+    action_send_to_compliance_hours = models.PositiveSmallIntegerField(default=0)
+    action_compliance_ack_days = models.PositiveSmallIntegerField(default=1)
+    action_compliance_ack_hours = models.PositiveSmallIntegerField(default=0)
+    action_compliance_correction_days = models.PositiveSmallIntegerField(default=1)
+    action_compliance_correction_hours = models.PositiveSmallIntegerField(default=0)
+    action_mark_complete_days = models.PositiveSmallIntegerField(default=1)
+    action_mark_complete_hours = models.PositiveSmallIntegerField(default=0)
+
+    ACTION_SLA_FIELD_GROUPS = (
+        ('action_acknowledge', 'Acknowledge request (HoD)'),
+        ('action_assign_designer', 'Assign designer (HoD)'),
+        ('action_accept_assignment', 'Accept assignment (Designer)'),
+        ('action_hod_review', 'Review / send to verification (HoD)'),
+        ('action_send_to_verification', 'Re-send to verification (HoD)'),
+        ('action_verification_ack', 'Acknowledge verification'),
+        ('action_send_to_compliance', 'Send to compliance (HoD)'),
+        ('action_compliance_ack', 'Acknowledge compliance'),
+        ('action_compliance_correction', 'Forward compliance correction (HoD)'),
+        ('action_mark_complete', 'Mark complete (HoD)'),
+    )
 
     class Meta:
         verbose_name_plural = 'Deadline configuration'

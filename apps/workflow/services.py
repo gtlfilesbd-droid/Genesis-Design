@@ -505,6 +505,10 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     elif action == 'submit_request':
         design.current_holder = hod
 
+    if old_status != new_status:
+        from apps.workflow.action_sla import reset_action_sla_breach
+        reset_action_sla_breach(design)
+
     _end_stage(design, old_status)
     design.status = new_status
     design.save()

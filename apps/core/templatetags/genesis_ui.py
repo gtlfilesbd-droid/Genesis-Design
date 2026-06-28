@@ -1,6 +1,13 @@
 from django import template
 from django.utils import timezone
 
+from apps.workflow.action_sla import (
+    get_action_due_at,
+    get_action_due_label,
+    is_action_overdue,
+    is_action_overdue_for_user,
+)
+
 register = template.Library()
 
 STATUS_BADGE = {
@@ -35,6 +42,26 @@ DEADLINE_BADGE = {
     'yellow': ('Deadline Warning', 'bg-amber-100 text-amber-700'),
     'red': ('Deadline Missed', 'bg-red-100 text-red-700'),
 }
+
+
+@register.simple_tag
+def action_due(design):
+    return get_action_due_at(design)
+
+
+@register.filter
+def action_overdue(design):
+    return is_action_overdue(design)
+
+
+@register.filter
+def action_overdue_for(design, user):
+    return is_action_overdue_for_user(design, user)
+
+
+@register.simple_tag
+def action_due_label(design):
+    return get_action_due_label(design)
 
 
 @register.simple_tag
