@@ -127,6 +127,7 @@
         <table class="g-table w-full g-table-pro">
             <thead>
                 <tr>
+                    <th class="w-12 text-center">SL</th>
                     <th>Design</th>
                     <th>Project</th>
                     <th>Type</th>
@@ -140,6 +141,7 @@
             <tbody>
             {% for d in designs %}
             <tr class="group cursor-pointer" onclick="window.location='{% url 'requests:detail' d.pk %}'">
+                <td class="text-center text-sm text-slate-500 tabular-nums">{{ forloop.counter }}</td>
                 <td>
                     <div class="font-semibold text-primary-light group-hover:text-primary transition-colors">{{ d.design_number }}</div>
                     <div class="text-xs text-slate-400 mt-0.5">{{ d.created_at|timesince_short }}</div>
@@ -189,7 +191,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="8" class="py-16">
+                <td colspan="9" class="py-16">
                     <div class="text-center max-w-sm mx-auto">
                         <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                             <i data-lucide="file-search" class="w-7 h-7 text-slate-400"></i>
