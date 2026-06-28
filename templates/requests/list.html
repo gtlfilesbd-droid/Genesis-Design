@@ -18,12 +18,22 @@
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-    {% include 'components/stat_card.html' with label='Total Requests' value=stats.total icon='files' icon_bg='bg-slate-50' icon_color='text-slate-600' url=requests_list_url active=stat_card_active.total %}
-    {% include 'components/stat_card.html' with label='Running' value=stats.running icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?running=1' active=stat_card_active.running %}
-    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' subtext_class='text-red-600' danger=stats.overdue url=requests_list_url|add:'?overdue=1' active=stat_card_active.overdue %}
-    {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext_class='text-green-600' url=requests_list_url|add:'?completed_month=1' active=stat_card_active.completed_month %}
+    {% if my_tasks_scope and my_tasks_stat_cards %}
+        {% for card in my_tasks_stat_cards %}
+        {% include 'components/stat_card.html' with label=card.label value=card.value icon=card.icon icon_bg=card.icon_bg icon_color=card.icon_color url=card.url active=card.active danger=card.danger only %}
+        {% endfor %}
+    {% else %}
+    {% include 'components/stat_card.html' with label='Total Requests' value=stats.total icon='files' icon_bg='bg-slate-50' icon_color='text-slate-600' url=requests_list_url active=stat_card_active.total only %}
+    {% include 'components/stat_card.html' with label='Running' value=stats.running icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?running=1' active=stat_card_active.running only %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' subtext_class='text-red-600' danger=stats.overdue url=requests_list_url|add:'?overdue=1' active=stat_card_active.overdue only %}
+    {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext_class='text-green-600' url=requests_list_url|add:'?completed_month=1' active=stat_card_active.completed_month only %}
+    {% endif %}
 </div>
 
+{% if my_tasks_scope %}
+{% include 'requests/_my_tasks_period_filter.html' %}
+<p class="text-xs text-slate-500 mb-4">Active workload is live; Finished{% if my_tasks_scope == 'requester' %} and Projects Requested{% endif %} reflect the selected period.</p>
+{% else %}
 <div class="flex flex-wrap gap-2 mb-6">
     <a href="{{ requests_list_url }}" class="g-filter-chip {% if not has_filters %}active{% endif %}">
         <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> All
@@ -41,7 +51,9 @@
         <i data-lucide="badge-check" class="w-3.5 h-3.5"></i> Completed this month
     </a>
 </div>
+{% endif %}
 
+{% if not my_tasks_scope %}
 <form method="get" class="g-card p-5 mb-6 space-y-4">
     <div class="relative">
         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
@@ -85,6 +97,7 @@
         </div>
     </div>
 </form>
+{% endif %}
 
 {% if has_filters %}
 <div class="flex flex-wrap items-center gap-2 mb-4 px-1">

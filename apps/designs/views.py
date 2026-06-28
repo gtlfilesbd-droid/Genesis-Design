@@ -8,7 +8,14 @@ import json
 from apps.permissions.decorators import require_global_permission, require_project_permission
 from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
-from apps.core.my_tasks_helpers import get_my_tasks_context
+from apps.core.my_tasks_helpers import (
+    MY_TASKS_STAT_CARD_DEFS,
+    filter_my_tasks_stat,
+    get_my_tasks_context,
+    get_my_tasks_stat_cards,
+    get_my_tasks_stats_for_scope,
+    normalize_period,
+)
 from apps.core.utils import log_activity
 from apps.projects.models import Project
 
@@ -192,47 +199,84 @@ def design_request_list(request):
     terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
     now = timezone.now()
 
+    my_tasks_scope = request.GET.get('scope')
+    my_tasks_stat = request.GET.get('stat')
+    period = normalize_period(request.GET.get('period', 'all'))
+    scoped_mode = my_tasks_scope in MY_TASKS_STAT_CARD_DEFS
+
     designs = base_qs
     status = request.GET.get('status')
     priority = request.GET.get('priority')
     project = request.GET.get('project')
     search = request.GET.get('q')
-    if status:
-        designs = designs.filter(status=status)
-    if priority:
-        designs = designs.filter(priority=priority)
-    if project:
-        designs = designs.filter(project_id=project)
-    if search:
-        designs = designs.filter(
-            Q(design_number__icontains=search) | Q(project__code__icontains=search)
-        )
-    if request.GET.get('running'):
-        designs = designs.exclude(status__in=terminal)
-    if request.GET.get('overdue'):
-        designs = designs.filter(due_date__lt=now).exclude(status__in=terminal)
-    if request.GET.get('completed_month'):
-        designs = designs.filter(
-            status=DesignStatus.COMPLETED,
-            completion_date__month=now.month,
-            completion_date__year=now.year,
-        )
-    if request.GET.get('mine'):
-        designs = designs.filter(assigned_designer=request.user)
 
-    stats = {
-        'total': designs.count(),
-        'running': designs.exclude(status__in=terminal).count(),
-        'overdue': designs.filter(due_date__lt=now).exclude(status__in=terminal).count(),
-        'completed_month': designs.filter(
-            status=DesignStatus.COMPLETED,
-            completion_date__month=now.month,
-            completion_date__year=now.year,
-        ).count(),
-    }
+    if scoped_mode and my_tasks_stat:
+        designs = filter_my_tasks_stat(designs, request.user, my_tasks_scope, my_tasks_stat, period)
+    else:
+        if status:
+            designs = designs.filter(status=status)
+        if priority:
+            designs = designs.filter(priority=priority)
+        if project:
+            designs = designs.filter(project_id=project)
+        if search:
+            designs = designs.filter(
+                Q(design_number__icontains=search) | Q(project__code__icontains=search)
+            )
+        if request.GET.get('running'):
+            designs = designs.exclude(status__in=terminal)
+        if request.GET.get('overdue'):
+            designs = designs.filter(due_date__lt=now).exclude(status__in=terminal)
+        if request.GET.get('completed_month'):
+            designs = designs.filter(
+                status=DesignStatus.COMPLETED,
+                completion_date__month=now.month,
+                completion_date__year=now.year,
+            )
+        if request.GET.get('mine'):
+            designs = designs.filter(assigned_designer=request.user)
+
+    if scoped_mode:
+        scoped_stats = get_my_tasks_stats_for_scope(request.user, my_tasks_scope, period=period)
+        my_tasks_stat_cards = get_my_tasks_stat_cards(
+            my_tasks_scope, scoped_stats, period=period, active_stat=my_tasks_stat,
+        )
+        stats = {card['key']: card['value'] for card in my_tasks_stat_cards}
+        stat_card_active = {card['key']: card['active'] for card in my_tasks_stat_cards}
+    else:
+        my_tasks_stat_cards = None
+        stats = {
+            'total': designs.count(),
+            'running': designs.exclude(status__in=terminal).count(),
+            'overdue': designs.filter(due_date__lt=now).exclude(status__in=terminal).count(),
+            'completed_month': designs.filter(
+                status=DesignStatus.COMPLETED,
+                completion_date__month=now.month,
+                completion_date__year=now.year,
+            ).count(),
+        }
+        active_stat = None
+        if request.GET.get('running'):
+            active_stat = 'running'
+        elif request.GET.get('overdue'):
+            active_stat = 'overdue'
+        elif request.GET.get('completed_month'):
+            active_stat = 'completed_month'
+        elif request.GET.get('mine'):
+            active_stat = 'mine'
+        elif not any([status, priority, project, search, request.GET.get('running'),
+                      request.GET.get('overdue'), request.GET.get('completed_month'),
+                      request.GET.get('mine')]):
+            active_stat = 'total'
+        stat_card_active = {
+            'total': active_stat == 'total',
+            'running': active_stat == 'running',
+            'overdue': active_stat == 'overdue',
+            'completed_month': active_stat == 'completed_month',
+        }
 
     designs = designs.order_by('-created_at')
-    result_count = stats['total']
+    result_count = designs.count()
 
     status_labels = dict(DesignStatus.choices)
     project_labels = {
@@ -246,6 +290,26 @@ def design_request_list(request):
         'low': 'Low',
     }
     active_filters = []
+    if scoped_mode:
+        scope_labels = {
+            'designer': 'Designer',
+            'hod': 'Head of Design',
+            'verification': 'Verification',
+            'compliance': 'Compliance',
+            'requester': 'Requester',
+        }
+        active_filters.append({
+            'param': 'scope',
+            'label': scope_labels.get(my_tasks_scope, my_tasks_scope),
+        })
+        if my_tasks_stat:
+            stat_label = next(
+                (c['label'] for c in my_tasks_stat_cards if c['key'] == my_tasks_stat),
+                my_tasks_stat,
+            )
+            active_filters.append({'param': 'stat', 'label': stat_label})
+        if period != 'all':
+            active_filters.append({'param': 'period', 'label': f'Period: {period}'})
     if search:
         active_filters.append({'param': 'q', 'label': f'Search: “{search}”'})
     if status:
@@ -254,35 +318,17 @@ def design_request_list(request):
         active_filters.append({'param': 'priority', 'label': priority_labels.get(priority, priority)})
     if project:
         active_filters.append({'param': 'project', 'label': project_labels.get(project, f'Project #{project}')})
-    if request.GET.get('running'):
-        active_filters.append({'param': 'running', 'label': 'Running only'})
-    if request.GET.get('overdue'):
-        active_filters.append({'param': 'overdue', 'label': 'Overdue only'})
-    if request.GET.get('completed_month'):
-        active_filters.append({'param': 'completed_month', 'label': 'Completed this month'})
-    if request.GET.get('mine'):
-        active_filters.append({'param': 'mine', 'label': 'Assigned to me'})
+    if not scoped_mode:
+        if request.GET.get('running'):
+            active_filters.append({'param': 'running', 'label': 'Running only'})
+        if request.GET.get('overdue'):
+            active_filters.append({'param': 'overdue', 'label': 'Overdue only'})
+        if request.GET.get('completed_month'):
+            active_filters.append({'param': 'completed_month', 'label': 'Completed this month'})
+        if request.GET.get('mine'):
+            active_filters.append({'param': 'mine', 'label': 'Assigned to me'})
 
     has_filters = bool(active_filters)
-
-    active_stat = None
-    if request.GET.get('running'):
-        active_stat = 'running'
-    elif request.GET.get('overdue'):
-        active_stat = 'overdue'
-    elif request.GET.get('completed_month'):
-        active_stat = 'completed_month'
-    elif request.GET.get('mine'):
-        active_stat = 'mine'
-    elif not has_filters:
-        active_stat = 'total'
-
-    stat_card_active = {
-        'total': active_stat == 'total',
-        'running': active_stat == 'running',
-        'overdue': active_stat == 'overdue',
-        'completed_month': active_stat == 'completed_month',
-    }
 
     return render(request, 'requests/list.html', {
         'designs': designs[:100],
@@ -293,8 +339,11 @@ def design_request_list(request):
         'stats': stats,
         'active_filters': active_filters,
         'has_filters': has_filters,
-        'active_stat': active_stat,
         'stat_card_active': stat_card_active,
+        'my_tasks_scope': my_tasks_scope if scoped_mode else None,
+        'my_tasks_stat': my_tasks_stat,
+        'my_tasks_stat_cards': my_tasks_stat_cards,
+        'period': period,
     })
 
 
@@ -303,10 +352,12 @@ def design_request_list(request):
 def my_tasks(request):
     period = request.GET.get('period', 'all')
     task_view, period, stats, querysets = get_my_tasks_context(request.user, period=period)
+    stat_cards = get_my_tasks_stat_cards(task_view, stats, period=period)
     return render(request, 'tasks/list.html', {
         'task_view': task_view,
         'period': period,
         'stats': stats,
+        'stat_cards': stat_cards,
         'now': timezone.now(),
         'today': timezone.now().date(),
         'user_obj': request.user,

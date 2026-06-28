@@ -5,7 +5,12 @@ from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
 from apps.accounts.sidebar_permissions import get_default_sidebar_for_role
-from apps.core.my_tasks_helpers import get_my_tasks_context
+from apps.core.my_tasks_helpers import (
+    build_my_tasks_request_url,
+    filter_my_tasks_stat,
+    get_my_tasks_context,
+    get_my_tasks_stat_cards,
+)
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.permissions.services import PermissionService
@@ -202,3 +207,38 @@ class MyTasksStatsTests(TestCase):
         self.assertEqual(stats_all['projects_requested'], 2)
         self.assertEqual(stats_month['projects_requested'], 1)
         self.assertEqual(recent.project_id, self.project_b.pk)
+
+    def test_stat_cards_link_to_design_requests_with_scope_and_stat(self):
+        _, _, stats, _ = get_my_tasks_context(self.designer, period='month')
+        cards = get_my_tasks_stat_cards('designer', stats, period='month')
+        self.assertEqual(len(cards), 4)
+        running = next(c for c in cards if c['key'] == 'running')
+        self.assertIn('scope=designer', running['url'])
+        self.assertIn('stat=running', running['url'])
+        self.assertIn('period=month', running['url'])
+
+    def test_filter_my_tasks_stat_matches_running_count(self):
+        self._create_design(self.project_a, due_date=timezone.now() + timedelta(days=2))
+        self._create_design(self.project_b, due_date=timezone.now() + timedelta(days=3))
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.COMPLETED,
+            completion_date=timezone.now(),
+        )
+        qs = DesignRequest.objects.all()
+        filtered = filter_my_tasks_stat(qs, self.designer, 'designer', 'running')
+        self.assertEqual(filtered.count(), 2)
+
+    def test_design_request_list_scoped_filter(self):
+        self.client.login(username='des', password='pass')
+        running = self._create_design(self.project_a, due_date=timezone.now() + timedelta(days=2))
+        self._create_design(
+            self.project_b,
+            status=DesignStatus.COMPLETED,
+            completion_date=timezone.now(),
+        )
+        url = build_my_tasks_request_url('designer', 'running')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, running.design_number)
+        self.assertNotContains(response, 'Completed this month')
