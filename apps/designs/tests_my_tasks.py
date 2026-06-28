@@ -166,6 +166,62 @@ class MyTasksStatsTests(TestCase):
         self.assertIn(ack, querysets['active_tasks'])
         self.assertIn(self_work, querysets['active_tasks'])
 
+    def test_hod_excludes_verification_stage_from_active_and_overdue(self):
+        at_verification = self._create_design(
+            self.project_a,
+            status=DesignStatus.VERIFICATION_PENDING,
+            assigned_designer=self.hod,
+            assigned_verifier=self.verifier,
+            current_holder=self.verifier,
+            due_date=timezone.now() - timedelta(days=2),
+        )
+        _, _, stats, querysets = get_my_tasks_context(self.hod)
+        self.assertEqual(stats['running_designs'], 0)
+        self.assertEqual(stats['overdue_designs'], 0)
+        self.assertNotIn(at_verification, querysets['active_tasks'])
+
+    def test_designer_excludes_verification_stage_from_active_and_overdue(self):
+        at_verification = self._create_design(
+            self.project_a,
+            status=DesignStatus.VERIFICATION_PENDING,
+            assigned_designer=self.designer,
+            assigned_verifier=self.verifier,
+            current_holder=self.verifier,
+            due_date=timezone.now() - timedelta(days=2),
+        )
+        _, _, stats, querysets = get_my_tasks_context(self.designer)
+        self.assertEqual(stats['running_designs'], 0)
+        self.assertEqual(stats['overdue_designs'], 0)
+        self.assertNotIn(at_verification, querysets['assigned_tasks'])
+
+    def test_hod_overdue_filter_excludes_verification_stage_design(self):
+        at_verification = self._create_design(
+            self.project_a,
+            status=DesignStatus.VERIFICATION_PENDING,
+            assigned_designer=self.hod,
+            assigned_verifier=self.verifier,
+            current_holder=self.verifier,
+            due_date=timezone.now() - timedelta(days=2),
+        )
+        overdue_ack = self._create_design(
+            self.project_b,
+            status=DesignStatus.NEW_REQUEST,
+            assigned_designer=None,
+            current_holder=self.hod,
+            target_completion_date=timezone.now().date() - timedelta(days=1),
+        )
+        qs = DesignRequest.objects.all()
+        filtered = filter_my_tasks_stat(qs, self.hod, 'hod', 'overdue')
+        self.assertIn(overdue_ack, filtered)
+        self.assertNotIn(at_verification, filtered)
+
+        self.client.login(username='hod', password='pass')
+        url = build_my_tasks_request_url('hod', 'overdue')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, overdue_ack.design_number)
+        self.assertNotContains(response, at_verification.design_number)
+
     def test_period_filter_scopes_finished_not_running(self):
         old_completed = self._create_design(
             self.project_a,

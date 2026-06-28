@@ -45,6 +45,13 @@ COMPLIANCE_FINISHED_STATUSES = [
     DesignStatus.COMPLETED,
 ]
 
+DESIGNER_WORK_STATUSES = [
+    DesignStatus.ASSIGNED,
+    DesignStatus.IN_PROGRESS,
+    DesignStatus.CORRECTION_REQUIRED,
+    DesignStatus.RESUBMITTED,
+]
+
 
 def normalize_period(period):
     return period if period in VALID_PERIODS else 'all'
@@ -64,8 +71,32 @@ def get_period_start(period, now=None):
     return None
 
 
-def _hod_involvement_q(user):
-    return Q(current_holder=user) | Q(assigned_designer=user)
+def _designer_work_q(user):
+    return Q(assigned_designer=user, status__in=DESIGNER_WORK_STATUSES)
+
+
+def _hod_actionable_q(user):
+    return Q(current_holder=user) | _designer_work_q(user)
+
+
+def _hod_overdue_q(user, now, today):
+    return (
+        Q(current_holder=user, target_completion_date__isnull=False, target_completion_date__lt=today)
+        | Q(
+            assigned_designer=user,
+            status__in=DESIGNER_WORK_STATUSES,
+            due_date__isnull=False,
+            due_date__lt=now,
+        )
+    )
+
+
+def _designer_active_qs(qs, user):
+    return qs.filter(assigned_designer=user, status__in=DESIGNER_WORK_STATUSES)
+
+
+def _hod_active_qs(qs, user):
+    return qs.filter(_hod_actionable_q(user)).distinct().exclude(status__in=TERMINAL_STATUSES)
 
 
 def _finished_by_completion(qs, period_start):
@@ -77,7 +108,7 @@ def _finished_by_completion(qs, period_start):
 
 def _designer_stats_and_querysets(user, now, today, period_start):
     base = DesignRequest.objects.filter(assigned_designer=user)
-    active = base.exclude(status__in=TERMINAL_STATUSES)
+    active = _designer_active_qs(DesignRequest.objects.all(), user)
     active_qs = active.select_related('project', 'drawing_type')
     stats = {
         'active_projects': active.values('project_id').distinct().count(),
@@ -95,16 +126,9 @@ def _designer_stats_and_querysets(user, now, today, period_start):
 
 
 def _hod_stats_and_querysets(user, now, today, period_start):
-    involvement = _hod_involvement_q(user)
-    base = DesignRequest.objects.filter(involvement).distinct()
-    active = base.exclude(status__in=TERMINAL_STATUSES)
+    active = _hod_active_qs(DesignRequest.objects.all(), user)
     active_qs = active.select_related(
         'project', 'drawing_type', 'assigned_designer', 'current_holder',
-    )
-    overdue_q = Q(due_date__isnull=False, due_date__lt=now) | Q(
-        current_holder=user,
-        target_completion_date__isnull=False,
-        target_completion_date__lt=today,
     )
     finished_base = DesignRequest.objects.filter(
         status=DesignStatus.COMPLETED,
@@ -115,7 +139,7 @@ def _hod_stats_and_querysets(user, now, today, period_start):
     stats = {
         'active_projects': active.values('project_id').distinct().count(),
         'running_designs': active.count(),
-        'overdue_designs': active.filter(overdue_q).count(),
+        'overdue_designs': active.filter(_hod_overdue_q(user, now, today)).count(),
         'finished_designs': finished_base.count(),
     }
     querysets = {
@@ -319,7 +343,7 @@ def filter_my_tasks_stat(qs, user, scope, stat, period='all'):
 
     if scope == 'designer':
         base = qs.filter(assigned_designer=user)
-        active = base.exclude(status__in=TERMINAL_STATUSES)
+        active = _designer_active_qs(qs, user)
         if stat in ('active_projects', 'running'):
             return active
         if stat == 'overdue':
@@ -328,17 +352,11 @@ def filter_my_tasks_stat(qs, user, scope, stat, period='all'):
             return _finished_queryset(base, period_start)
 
     if scope == 'hod':
-        base = qs.filter(_hod_involvement_q(user)).distinct()
-        active = base.exclude(status__in=TERMINAL_STATUSES)
-        overdue_q = Q(due_date__isnull=False, due_date__lt=now) | Q(
-            current_holder=user,
-            target_completion_date__isnull=False,
-            target_completion_date__lt=today,
-        )
+        active = _hod_active_qs(qs, user)
         if stat in ('active_projects', 'running'):
             return active
         if stat == 'overdue':
-            return active.filter(overdue_q)
+            return active.filter(_hod_overdue_q(user, now, today))
         if stat == 'finished':
             finished = qs.filter(
                 status=DesignStatus.COMPLETED,
