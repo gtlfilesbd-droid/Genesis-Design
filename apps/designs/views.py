@@ -182,7 +182,7 @@ def design_library(request):
 
 @login_required
 def design_request_list(request):
-    designs = PermissionService.filter_design_requests(
+    base_qs = PermissionService.filter_design_requests(
         request.user,
         DesignRequest.objects.select_related(
             'project', 'drawing_type', 'requested_by', 'assigned_designer', 'current_holder'
@@ -190,6 +190,19 @@ def design_request_list(request):
     )
 
     terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
+    now = timezone.now()
+    stats = {
+        'total': base_qs.count(),
+        'running': base_qs.exclude(status__in=terminal).count(),
+        'overdue': base_qs.filter(due_date__lt=now).exclude(status__in=terminal).count(),
+        'completed_month': base_qs.filter(
+            status=DesignStatus.COMPLETED,
+            completion_date__month=now.month,
+            completion_date__year=now.year,
+        ).count(),
+    }
+
+    designs = base_qs
     status = request.GET.get('status')
     priority = request.GET.get('priority')
     project = request.GET.get('project')
@@ -209,7 +222,6 @@ def design_request_list(request):
     if request.GET.get('overdue'):
         designs = designs.filter(due_date__lt=timezone.now()).exclude(status__in=terminal)
     if request.GET.get('completed_month'):
-        now = timezone.now()
         designs = designs.filter(
             status=DesignStatus.COMPLETED,
             completion_date__month=now.month,
@@ -220,12 +232,47 @@ def design_request_list(request):
 
     designs = designs.order_by('-created_at')
     result_count = designs.count()
+
+    status_labels = dict(DesignStatus.choices)
+    project_labels = {
+        str(p.pk): p.code
+        for p in PermissionService.get_user_projects(request.user)[:50]
+    }
+    priority_labels = {
+        'critical': 'Critical',
+        'high': 'High',
+        'medium': 'Medium',
+        'low': 'Low',
+    }
+    active_filters = []
+    if search:
+        active_filters.append({'param': 'q', 'label': f'Search: “{search}”'})
+    if status:
+        active_filters.append({'param': 'status', 'label': status_labels.get(status, status)})
+    if priority:
+        active_filters.append({'param': 'priority', 'label': priority_labels.get(priority, priority)})
+    if project:
+        active_filters.append({'param': 'project', 'label': project_labels.get(project, f'Project #{project}')})
+    if request.GET.get('running'):
+        active_filters.append({'param': 'running', 'label': 'Running only'})
+    if request.GET.get('overdue'):
+        active_filters.append({'param': 'overdue', 'label': 'Overdue only'})
+    if request.GET.get('completed_month'):
+        active_filters.append({'param': 'completed_month', 'label': 'Completed this month'})
+    if request.GET.get('mine'):
+        active_filters.append({'param': 'mine', 'label': 'Assigned to me'})
+
+    has_filters = bool(active_filters)
+
     return render(request, 'requests/list.html', {
         'designs': designs[:100],
         'result_count': result_count,
         'results_truncated': result_count > 100,
         'statuses': DesignStatus.choices,
         'projects': PermissionService.get_user_projects(request.user)[:50],
+        'stats': stats,
+        'active_filters': active_filters,
+        'has_filters': has_filters,
     })
 
 

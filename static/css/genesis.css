@@ -156,6 +156,47 @@ a.g-stat-card-link:focus-visible {
   background: #F8FAFC;
 }
 
+.g-table-pro tbody tr {
+  transition: background 0.12s ease;
+}
+
+.g-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.g-filter-chip:hover {
+  border-color: #CBD5E1;
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+.g-filter-chip.active {
+  border-color: var(--primary-light);
+  background: #E8F0F8;
+  color: var(--primary);
+}
+
+.g-filter-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #F1F5F9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .g-progress {
   height: 6px;
   background: #F1F5F9;

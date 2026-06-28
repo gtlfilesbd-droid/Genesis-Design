@@ -2,77 +2,206 @@
 {% load genesis_ui %}
 {% block title %}Design Requests{% endblock %}
 {% block content %}
-<div class="mb-8">
-    <h1 class="text-[28px] font-bold text-slate-900">Design Requests</h1>
-    <p class="text-sm text-slate-500 mt-1">All design requests across projects</p>
+{% url 'requests:list' as requests_list_url %}
+
+<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-[28px] font-bold text-slate-900 tracking-tight">Design Requests</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Track and manage design submissions across all your projects
+        </p>
+    </div>
+    <a href="{% url 'projects:list' %}" class="g-btn-secondary inline-flex items-center gap-2 self-start shrink-0">
+        <i data-lucide="folder-kanban" class="w-4 h-4"></i>
+        Browse Projects
+    </a>
 </div>
 
-<form method="get" class="g-card p-4 mb-6 flex flex-wrap gap-3 items-center">
-    <div class="relative flex-1 min-w-[200px]">
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    {% include 'components/stat_card.html' with label='Total Requests' value=stats.total icon='files' icon_bg='bg-slate-50' icon_color='text-slate-600' url=requests_list_url %}
+    {% include 'components/stat_card.html' with label='Running' value=stats.running icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?running=1' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' subtext_class='text-red-600' danger=stats.overdue url=requests_list_url|add:'?overdue=1' %}
+    {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext_class='text-green-600' url=requests_list_url|add:'?completed_month=1' %}
+</div>
+
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="{{ requests_list_url }}" class="g-filter-chip {% if not has_filters %}active{% endif %}">
+        <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> All
+    </a>
+    <a href="{{ requests_list_url }}?running=1" class="g-filter-chip {% if request.GET.running %}active{% endif %}">
+        <i data-lucide="activity" class="w-3.5 h-3.5"></i> Running
+    </a>
+    <a href="{{ requests_list_url }}?overdue=1" class="g-filter-chip {% if request.GET.overdue %}active{% endif %}">
+        <i data-lucide="clock" class="w-3.5 h-3.5"></i> Overdue
+    </a>
+    <a href="{{ requests_list_url }}?mine=1" class="g-filter-chip {% if request.GET.mine %}active{% endif %}">
+        <i data-lucide="user-check" class="w-3.5 h-3.5"></i> Assigned to me
+    </a>
+    <a href="{{ requests_list_url }}?completed_month=1" class="g-filter-chip {% if request.GET.completed_month %}active{% endif %}">
+        <i data-lucide="badge-check" class="w-3.5 h-3.5"></i> Completed this month
+    </a>
+</div>
+
+<form method="get" class="g-card p-5 mb-6 space-y-4">
+    <div class="relative">
         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search by design # or project..." class="g-input pl-10">
+        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search by design number or project code..." class="g-input pl-10 w-full">
     </div>
-    <select name="status" class="g-input w-auto min-w-[150px]">
-        <option value="">All Statuses</option>
-        {% for val, label in statuses %}
-        <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <select name="project" class="g-input w-auto min-w-[150px]">
-        <option value="">All Projects</option>
-        {% for p in projects %}
-        <option value="{{ p.pk }}" {% if request.GET.project == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.code }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit" class="g-btn-secondary">Filter</button>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Project</label>
+            <select name="project" class="g-input">
+                <option value="">All projects</option>
+                {% for p in projects %}
+                <option value="{{ p.pk }}" {% if request.GET.project == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.code }} · {{ p.client_name|default:p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Status</label>
+            <select name="status" class="g-input">
+                <option value="">All statuses</option>
+                {% for val, label in statuses %}
+                <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Priority</label>
+            <select name="priority" class="g-input">
+                <option value="">All priorities</option>
+                <option value="critical" {% if request.GET.priority == 'critical' %}selected{% endif %}>Critical</option>
+                <option value="high" {% if request.GET.priority == 'high' %}selected{% endif %}>High</option>
+                <option value="medium" {% if request.GET.priority == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="low" {% if request.GET.priority == 'low' %}selected{% endif %}>Low</option>
+            </select>
+        </div>
+        <div class="flex items-end gap-2">
+            <button type="submit" class="g-btn-primary inline-flex items-center gap-2 flex-1 justify-center">
+                <i data-lucide="filter" class="w-4 h-4"></i> Apply filters
+            </button>
+            <a href="{{ requests_list_url }}" class="g-btn-secondary shrink-0">Reset</a>
+        </div>
+    </div>
 </form>
 
-{% if request.GET.overdue %}
-<p class="text-sm text-red-700 mb-3 px-1">Showing overdue designs only. <a href="{% url 'requests:list' %}" class="font-semibold underline">Clear filter</a></p>
+{% if has_filters %}
+<div class="flex flex-wrap items-center gap-2 mb-4 px-1">
+    <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active filters</span>
+    {% for filter in active_filters %}
+    <span class="g-filter-tag">{{ filter.label }}</span>
+    {% endfor %}
+    <a href="{{ requests_list_url }}" class="text-xs font-semibold text-primary-light hover:underline ml-1">Clear all</a>
+</div>
 {% endif %}
 
-<div class="flex items-center justify-between mb-3 px-1">
-    <p class="text-sm text-slate-500">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 px-1">
+    <p class="text-sm text-slate-600">
         {% if result_count == 0 %}
-            No records found
+            <span class="font-medium text-slate-900">No records found</span>
+            {% if has_filters %}<span class="text-slate-500"> — try adjusting your filters</span>{% endif %}
         {% elif results_truncated %}
-            Showing 100 of {{ result_count }} records
+            Showing <span class="font-semibold text-slate-900">100</span> of <span class="font-semibold text-slate-900">{{ result_count }}</span> records
         {% else %}
-            {{ result_count }} record{{ result_count|pluralize }} found
+            <span class="font-semibold text-slate-900">{{ result_count }}</span> record{{ result_count|pluralize }} found
         {% endif %}
     </p>
 </div>
 
-<div class="g-card overflow-x-auto">
-    <table class="g-table w-full">
-        <thead>
-            <tr>
-                <th>Design #</th>
-                <th>Project</th>
-                <th>Type</th>
-                <th>Priority</th>
-                <th>Requester</th>
-                <th>Designer</th>
-                <th>Status</th>
-                <th></th>
+<div class="g-card overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="g-table w-full g-table-pro">
+            <thead>
+                <tr>
+                    <th>Design</th>
+                    <th>Project</th>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>People</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th class="w-16"></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in designs %}
+            <tr class="group cursor-pointer" onclick="window.location='{% url 'requests:detail' d.pk %}'">
+                <td>
+                    <div class="font-semibold text-primary-light group-hover:text-primary transition-colors">{{ d.design_number }}</div>
+                    <div class="text-xs text-slate-400 mt-0.5">{{ d.created_at|timesince_short }}</div>
+                </td>
+                <td>
+                    <div class="font-medium text-slate-800">{{ d.project.code }}</div>
+                    <div class="text-xs text-slate-500 truncate max-w-[140px]">{{ d.project.client_name|default:d.project.name }}</div>
+                </td>
+                <td class="text-slate-700">{{ d.drawing_type.name }}</td>
+                <td>{% render_priority_badge d.priority %}</td>
+                <td>
+                    <div class="flex items-center gap-2 min-w-[160px]">
+                        <div class="flex -space-x-1.5">
+                            <span class="inline-flex w-7 h-7 rounded-full bg-slate-100 border-2 border-white items-center justify-center text-[10px] font-semibold text-slate-600" title="Requester: {{ d.requested_by }}">{{ d.requested_by|initials }}</span>
+                            {% if d.assigned_designer %}
+                            <span class="inline-flex w-7 h-7 rounded-full bg-blue-50 border-2 border-white items-center justify-center text-[10px] font-semibold text-blue-700" title="Designer: {{ d.assigned_designer }}">{{ d.assigned_designer|initials }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="min-w-0 text-xs text-slate-500 truncate">
+                            {{ d.requested_by.get_full_name|default:d.requested_by.username }}
+                            {% if d.assigned_designer %}
+                            <span class="text-slate-300">→</span> {{ d.assigned_designer.get_full_name|default:d.assigned_designer.username }}
+                            {% else %}
+                            <span class="text-slate-400"> · unassigned</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    {% if d.due_date %}
+                    <div class="text-sm {% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-700{% endif %}">
+                        {{ d.due_date|date:"d M Y" }}
+                    </div>
+                    {% if d.is_overdue %}
+                    <span class="inline-flex mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-red-100 text-red-700">Overdue</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-slate-400">—</span>
+                    {% endif %}
+                </td>
+                <td>{% render_status_badge d.status %}</td>
+                <td class="text-right">
+                    <a href="{% url 'requests:detail' d.pk %}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 group-hover:text-primary-light group-hover:bg-blue-50 transition-colors" onclick="event.stopPropagation()">
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </a>
+                </td>
             </tr>
-        </thead>
-        <tbody>
-        {% for d in designs %}
-        <tr>
-            <td class="font-medium text-primary-light">{{ d.design_number }}</td>
-            <td>{{ d.project.code }}</td>
-            <td>{{ d.drawing_type.name }}</td>
-            <td>{% render_priority_badge d.priority %}</td>
-            <td>{{ d.requested_by }}</td>
-            <td>{{ d.assigned_designer|default:"—" }}</td>
-            <td>{% render_status_badge d.status %}</td>
-            <td><a href="{% url 'requests:detail' d.pk %}" class="text-primary-light text-sm font-semibold">View →</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="8" class="text-center text-slate-500 py-10">No design requests found.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+            {% empty %}
+            <tr>
+                <td colspan="8" class="py-16">
+                    <div class="text-center max-w-sm mx-auto">
+                        <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="file-search" class="w-7 h-7 text-slate-400"></i>
+                        </div>
+                        <p class="font-semibold text-slate-900 mb-1">No design requests found</p>
+                        <p class="text-sm text-slate-500 mb-5">
+                            {% if has_filters %}
+                            No results match your current filters. Try clearing filters or searching with different terms.
+                            {% else %}
+                            Requests will appear here once submitted from your projects.
+                            {% endif %}
+                        </p>
+                        {% if has_filters %}
+                        <a href="{{ requests_list_url }}" class="g-btn-secondary inline-flex items-center gap-2">Clear filters</a>
+                        {% else %}
+                        <a href="{% url 'projects:list' %}" class="g-btn-primary inline-flex items-center gap-2">
+                            <i data-lucide="folder-kanban" class="w-4 h-4"></i> Go to Projects
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
