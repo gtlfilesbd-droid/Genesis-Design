@@ -41,6 +41,7 @@
         <div class="text-sm text-slate-600 space-y-1 mb-4">
             <p>Started: {{ p.start_date|date:"d M Y" }}</p>
             {% if p.expected_completion_date %}<p>Target: {{ p.expected_completion_date|date:"d M Y" }}</p>{% endif %}
+            <p>Created by: <span class="text-slate-700 font-medium">{{ p.created_by.get_full_name|default:p.created_by.username }}</span></p>
         </div>
         <div class="flex items-center gap-4 text-xs text-slate-500 mb-3">
             <span><strong class="text-slate-700">{{ p.total_design_requests }}</strong> Drawings</span>

@@ -208,6 +208,12 @@ class PermissionService:
         if PermissionService._is_admin_or_hod(user):
             return Project.objects.all()
 
+        if (
+            user.role == UserRole.DESIGN_REQUESTER
+            and PermissionService._matrix_flag(user, 'can_create_request')
+        ):
+            return Project.objects.all()
+
         involved_project_ids = DesignRequest.objects.filter(
             Q(requested_by=user)
             | Q(assigned_designer=user)

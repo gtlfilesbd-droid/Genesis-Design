@@ -9,7 +9,7 @@
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
             <h1 class="text-[28px] font-bold text-slate-900">{{ project.client_name }}</h1>
-            <p class="text-sm text-slate-500 mt-1">{{ project.code }} · Started {{ project.start_date|date:"d M Y" }}</p>
+            <p class="text-sm text-slate-500 mt-1">{{ project.code }} · Started {{ project.start_date|date:"d M Y" }} · Created by {{ project.created_by.get_full_name|default:project.created_by.username }}</p>
         </div>
         <div class="flex gap-2 self-start">
         {% if can_edit_project %}
@@ -51,6 +51,7 @@
             <div class="flex justify-between"><dt class="text-slate-500">Start Date</dt><dd>{{ project.start_date|date:"d M Y" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Target Completion</dt><dd>{{ project.expected_completion_date|date:"d M Y"|default:"—" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Status</dt><dd>{% render_status_badge project.status %}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Created By</dt><dd class="font-medium text-slate-900">{{ project.created_by.get_full_name|default:project.created_by.username }}</dd></div>
             <div><dt class="text-slate-500 mb-1">Description</dt><dd class="text-slate-700">{{ project.description|default:"—" }}</dd></div>
         </dl>
     </div>

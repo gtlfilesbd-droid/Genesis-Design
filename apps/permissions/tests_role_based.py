@@ -78,6 +78,41 @@ class RoleBasedPermissionTests(TestCase):
         self.assertIn(other_on_owned_project, visible)
         self.assertNotIn(other_on_foreign_project, visible)
 
+    def test_requester_sees_admin_created_project_when_can_submit_requests(self):
+        admin = User.objects.create_user(
+            username='admin', password='pass', role=UserRole.ADMIN, employee_id='A1',
+        )
+        admin_project = Project.objects.create(
+            name='Admin P', code='ADM-1', client_name='Admin Client',
+            start_date=date.today(), created_by=admin,
+        )
+        visible = PermissionService.get_user_projects(self.requester)
+        self.assertIn(admin_project, visible)
+        self.assertTrue(
+            PermissionService.has_project_permission(
+                self.requester, admin_project, 'PROJECT_PERM_VIEW',
+            )
+        )
+
+    def test_requester_without_submit_permission_only_sees_own_projects(self):
+        from apps.core.models import RolePermission
+
+        rp = RolePermission.objects.get(role=UserRole.DESIGN_REQUESTER)
+        rp.can_create_request = False
+        rp.save()
+        self.requester._cached_role_perms = None
+
+        admin = User.objects.create_user(
+            username='admin2', password='pass', role=UserRole.ADMIN, employee_id='A2',
+        )
+        admin_project = Project.objects.create(
+            name='Admin P2', code='ADM-2', client_name='Admin Client 2',
+            start_date=date.today(), created_by=admin,
+        )
+        visible = PermissionService.get_user_projects(self.requester)
+        self.assertIn(self.project, visible)
+        self.assertNotIn(admin_project, visible)
+
     def test_extra_permission_grants_verify_to_designer(self):
         designer = User.objects.create_user(
             username='des', password='pass', role=UserRole.DESIGNER, employee_id='D1',
