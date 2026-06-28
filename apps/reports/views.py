@@ -65,6 +65,196 @@ def _deadline_compliance_data():
     }
 
 
+def _export_query(request, *keys):
+    parts = []
+    for key in keys:
+        value = request.GET.get(key)
+        if value:
+            parts.append(f'{key}={value}')
+    return '&'.join(parts)
+
+
+def _append_query(url, query):
+    if not query:
+        return url
+    separator = '&' if '?' in url else '?'
+    return f'{url}{separator}{query}'
+
+
+def _report_export_urls(request, report_type, *filter_keys):
+    from django.urls import reverse
+    query = _export_query(request, *filter_keys)
+    return {
+        'csv': _append_query(reverse('reports:export_csv', args=[report_type]), query),
+        'excel': _append_query(reverse('reports:export_excel', args=[report_type]), query),
+        'pdf': _append_query(reverse('reports:export_pdf', args=[report_type]), query),
+    }
+
+
+def _write_csv_rows(writer, report_type, designer_filter=None, project_filter=None):
+    if report_type == 'designer_performance':
+        writer.writerow([
+            'Designer', 'Assigned', 'Completed', 'On-Time', 'Completion Rate %',
+            'On-Time Rate %', 'Avg Days', 'Corrections', 'Score',
+        ])
+        for row in _designer_performance_data(designer_filter, project_filter):
+            writer.writerow([
+                row['designer'], row['assigned'], row['completed'], row['on_time'],
+                row['completion_rate'], row['on_time_rate'], row['avg_days'],
+                row['corrections'], row['score'],
+            ])
+    elif report_type == 'project_progress':
+        writer.writerow([
+            'Project Code', 'Client Name', 'Status', 'Total Designs',
+            'Completed', 'Running', 'Progress %', 'Health Score',
+        ])
+        for p in Project.objects.all():
+            total = p.total_design_requests
+            pct = round(p.completed_designs / total * 100) if total else 0
+            writer.writerow([
+                p.code, p.client_name, p.get_status_display(), total,
+                p.completed_designs, p.running_designs, pct, p.health_score,
+            ])
+    elif report_type == 'deadline_compliance':
+        writer.writerow(['Design Number', 'Project', 'Deadline Status', 'Due Date', 'Status'])
+        for d in DesignRequest.objects.exclude(deadline_due__isnull=True).select_related('project'):
+            writer.writerow([
+                d.design_number, d.project.code, d.deadline_status,
+                d.deadline_due, d.get_status_display(),
+            ])
+    elif report_type == 'delay_analysis':
+        writer.writerow(['Design Number', 'Delay Source', 'Delay Days', 'Status'])
+        for d in DesignRequest.objects.exclude(delay_source=''):
+            writer.writerow([
+                d.design_number, d.delay_source, d.delay_duration_days, d.get_status_display(),
+            ])
+    elif report_type == 'verification':
+        writer.writerow(['Design Number', 'Verifier', 'Status', 'Revisions'])
+        for d in DesignRequest.objects.filter(verified_by__isnull=False).select_related('verified_by'):
+            writer.writerow([
+                d.design_number,
+                d.verified_by.get_full_name() if d.verified_by else '',
+                d.get_status_display(), d.revision_count,
+            ])
+    else:
+        writer.writerow(['Metric', 'Value'])
+        deadline_stats = _deadline_compliance_data()
+        writer.writerow(['Total Projects', Project.objects.count()])
+        writer.writerow(['Total Designs', DesignRequest.objects.count()])
+        writer.writerow(['Pending Designs', DesignRequest.objects.exclude(
+            status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED],
+        ).count()])
+        writer.writerow(['Deadline Compliance %', deadline_stats['compliance_rate']])
+
+
+def _write_excel_rows(ws, report_type, designer_filter=None, project_filter=None):
+    if report_type == 'designer_performance':
+        ws.append([
+            'Designer', 'Assigned', 'Completed', 'On-Time', 'Completion Rate %',
+            'On-Time Rate %', 'Avg Days', 'Corrections', 'Score',
+        ])
+        for row in _designer_performance_data(designer_filter, project_filter):
+            ws.append([
+                row['designer'], row['assigned'], row['completed'], row['on_time'],
+                row['completion_rate'], row['on_time_rate'], row['avg_days'],
+                row['corrections'], row['score'],
+            ])
+    elif report_type == 'project_progress':
+        ws.append([
+            'Project Code', 'Client Name', 'Status', 'Total Designs',
+            'Completed', 'Running', 'Progress %', 'Health Score',
+        ])
+        for p in Project.objects.all():
+            total = p.total_design_requests
+            pct = round(p.completed_designs / total * 100) if total else 0
+            ws.append([
+                p.code, p.client_name, p.get_status_display(), total,
+                p.completed_designs, p.running_designs, pct, p.health_score,
+            ])
+    elif report_type == 'deadline_compliance':
+        ws.append(['Design Number', 'Project', 'Deadline Status', 'Due Date', 'Status'])
+        for d in DesignRequest.objects.exclude(deadline_due__isnull=True).select_related('project'):
+            ws.append([
+                d.design_number, d.project.code, d.deadline_status,
+                d.deadline_due, d.get_status_display(),
+            ])
+    elif report_type == 'delay_analysis':
+        ws.append(['Design Number', 'Delay Source', 'Delay Days', 'Status'])
+        for d in DesignRequest.objects.exclude(delay_source=''):
+            ws.append([
+                d.design_number, d.delay_source, d.delay_duration_days, d.get_status_display(),
+            ])
+    elif report_type == 'verification':
+        ws.append(['Design Number', 'Verifier', 'Status', 'Revisions'])
+        for d in DesignRequest.objects.filter(verified_by__isnull=False).select_related('verified_by'):
+            ws.append([
+                d.design_number,
+                d.verified_by.get_full_name() if d.verified_by else '',
+                d.get_status_display(), d.revision_count,
+            ])
+    else:
+        deadline_stats = _deadline_compliance_data()
+        ws.append(['Metric', 'Value'])
+        ws.append(['Total Projects', Project.objects.count()])
+        ws.append(['Total Designs', DesignRequest.objects.count()])
+        ws.append(['Pending Designs', DesignRequest.objects.exclude(
+            status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED],
+        ).count()])
+        ws.append(['Deadline Compliance %', deadline_stats['compliance_rate']])
+
+
+def _write_pdf_lines(p, report_type, designer_filter=None, project_filter=None):
+    p.setFont('Helvetica-Bold', 14)
+    p.drawString(50, 800, f'Genesis Design - {report_type.replace("_", " ").title()}')
+    p.setFont('Helvetica', 10)
+    y = 770
+
+    def next_line(text):
+        nonlocal y
+        p.drawString(50, y, text[:110])
+        y -= 15
+        if y < 50:
+            p.showPage()
+            p.setFont('Helvetica', 10)
+            y = 800
+
+    if report_type == 'designer_performance':
+        for row in _designer_performance_data(designer_filter, project_filter):
+            next_line(
+                f"{row['designer']}: {row['completed']}/{row['assigned']} "
+                f"({row['completion_rate']}%) · Score {row['score']}"
+            )
+    elif report_type == 'project_progress':
+        for proj in Project.objects.all()[:80]:
+            total = proj.total_design_requests
+            pct = round(proj.completed_designs / total * 100) if total else 0
+            next_line(f"{proj.code}: {proj.completed_designs}/{total} complete ({pct}%)")
+    elif report_type == 'deadline_compliance':
+        stats = _deadline_compliance_data()
+        for line in [
+            f"Compliance rate: {stats['compliance_rate']}%",
+            f"On track: {stats['green']}",
+            f"Warning: {stats['yellow']}",
+            f"Missed: {stats['red']}",
+            f"Total tracked: {stats['total']}",
+        ]:
+            next_line(line)
+    elif report_type == 'delay_analysis':
+        for d in DesignRequest.objects.exclude(delay_source='')[:80]:
+            next_line(
+                f"{d.design_number}: {d.delay_source} ({d.delay_duration_days} days)"
+            )
+    else:
+        deadline_stats = _deadline_compliance_data()
+        for line in [
+            f'Total Projects: {Project.objects.count()}',
+            f'Total Designs: {DesignRequest.objects.count()}',
+            f'Deadline Compliance: {deadline_stats["compliance_rate"]}%',
+            f'Missed Deadlines: {deadline_stats["red"]}',
+        ]:
+            next_line(line)
+
+
 @login_required
 @require_global_permission('NAV_PERM_REPORTS')
 def reports_index(request):
@@ -74,6 +264,7 @@ def reports_index(request):
     delay_data = DesignRequest.objects.exclude(delay_source='').values(
         'design_number', 'delay_source', 'delay_duration_days', 'status'
     )[:50]
+    deadline_data = _deadline_compliance_data()
     project_rows = []
     for p in Project.objects.all():
         project_rows.append({
@@ -86,10 +277,66 @@ def reports_index(request):
             'health': p.health_score,
             'pct': round(p.completed_designs / p.total_design_requests * 100) if p.total_design_requests else 0,
         })
+
+    performance_exports = _report_export_urls(
+        request, 'designer_performance', 'designer', 'project',
+    )
+    project_exports = _report_export_urls(request, 'project_progress')
+    deadline_exports = _report_export_urls(request, 'deadline_compliance')
+    delay_exports = _report_export_urls(request, 'delay_analysis')
+    summary_exports = _report_export_urls(request, 'management_summary')
+
+    report_catalog = [
+        {
+            'title': 'Designer Performance',
+            'description': 'Completion rates, on-time delivery, and quality scores by designer.',
+            'icon': 'users',
+            'icon_bg': 'bg-blue-50',
+            'icon_color': 'text-blue-600',
+            'exports': performance_exports,
+        },
+        {
+            'title': 'Project Progress',
+            'description': 'Design volume, completion progress, and health scores per project.',
+            'icon': 'folder-kanban',
+            'icon_bg': 'bg-indigo-50',
+            'icon_color': 'text-indigo-600',
+            'exports': project_exports,
+        },
+        {
+            'title': 'Deadline Compliance',
+            'description': 'On-track, warning, and breached deadline status across designs.',
+            'icon': 'calendar-clock',
+            'icon_bg': 'bg-amber-50',
+            'icon_color': 'text-amber-600',
+            'exports': deadline_exports,
+        },
+        {
+            'title': 'Delay Analysis',
+            'description': 'Delay attribution by source with duration and current status.',
+            'icon': 'timer',
+            'icon_bg': 'bg-red-50',
+            'icon_color': 'text-red-600',
+            'exports': delay_exports,
+        },
+        {
+            'title': 'Management Summary',
+            'description': 'Executive snapshot of projects, designs, and compliance metrics.',
+            'icon': 'pie-chart',
+            'icon_bg': 'bg-green-50',
+            'icon_color': 'text-green-600',
+            'exports': {
+                'csv': summary_exports['csv'],
+                'excel': summary_exports['excel'],
+                'pdf': summary_exports['pdf'],
+            },
+        },
+    ]
+
     return render(request, 'reports/index.html', {
         'tab': tab,
         'designer_data': _designer_performance_data(designer_filter, project_filter),
-        'deadline_data': _deadline_compliance_data(),
+        'deadline_data': deadline_data,
         'delay_data': delay_data,
         'project_data': project_rows,
         'designers': PermissionService.get_design_team_members(),
@@ -101,64 +348,32 @@ def reports_index(request):
         'pending_designs': DesignRequest.objects.exclude(
             status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
         ).count(),
+        'performance_exports': performance_exports,
+        'project_exports': project_exports,
+        'deadline_exports': deadline_exports,
+        'delay_exports': delay_exports,
+        'summary_exports': summary_exports,
+        'report_catalog': report_catalog,
     })
 
 
 @login_required
 @require_global_permission('NAV_PERM_REPORTS')
 def export_csv(request, report_type):
+    designer_filter = request.GET.get('designer')
+    project_filter = request.GET.get('project')
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{report_type}.csv"'
     writer = csv.writer(response)
-
-    if report_type == 'designer_performance':
-        writer.writerow(['Designer', 'Assigned', 'Completed', 'Completion Rate %', 'Corrections'])
-        for row in _designer_performance_data():
-            writer.writerow([
-                row['designer'], row['assigned'], row['completed'],
-                row['completion_rate'], row['corrections'],
-            ])
-    elif report_type == 'project_progress':
-        writer.writerow(['Project Code', 'Name', 'Status', 'Total Designs', 'Completed', 'Health Score'])
-        for p in Project.objects.all():
-            writer.writerow([
-                p.code, p.name, p.status, p.total_design_requests,
-                p.completed_designs, p.health_score,
-            ])
-    elif report_type == 'deadline_compliance':
-        writer.writerow(['Design Number', 'Project', 'Deadline Status', 'Due Date', 'Status'])
-        for d in DesignRequest.objects.exclude(deadline_due__isnull=True):
-            writer.writerow([
-                d.design_number, d.project.code, d.deadline_status,
-                d.deadline_due, d.status,
-            ])
-    elif report_type == 'delay_analysis':
-        writer.writerow(['Design Number', 'Delay Source', 'Delay Days', 'Status'])
-        for d in DesignRequest.objects.exclude(delay_source=''):
-            writer.writerow([
-                d.design_number, d.delay_source, d.delay_duration_days, d.status,
-            ])
-    elif report_type == 'verification':
-        writer.writerow(['Design Number', 'Verifier', 'Status', 'Revisions'])
-        for d in DesignRequest.objects.filter(verified_by__isnull=False):
-            writer.writerow([
-                d.design_number,
-                d.verified_by.get_full_name() if d.verified_by else '',
-                d.status, d.revision_count,
-            ])
-    else:
-        writer.writerow(['Metric', 'Value'])
-        deadline_stats = _deadline_compliance_data()
-        writer.writerow(['Total Projects', Project.objects.count()])
-        writer.writerow(['Total Designs', DesignRequest.objects.count()])
-        writer.writerow(['Deadline Compliance %', deadline_stats['compliance_rate']])
-
+    _write_csv_rows(writer, report_type, designer_filter, project_filter)
     return response
 
 
 @login_required
 @require_global_permission('NAV_PERM_REPORTS')
 def export_excel(request, report_type):
+    designer_filter = request.GET.get('designer')
+    project_filter = request.GET.get('project')
     try:
         import openpyxl
     except ImportError:
@@ -166,15 +381,8 @@ def export_excel(request, report_type):
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = report_type
-
-    if report_type == 'designer_performance':
-        ws.append(['Designer', 'Assigned', 'Completed', 'Completion Rate %', 'Corrections'])
-        for row in _designer_performance_data():
-            ws.append([
-                row['designer'], row['assigned'], row['completed'],
-                row['completion_rate'], row['corrections'],
-            ])
+    ws.title = report_type[:31]
+    _write_excel_rows(ws, report_type, designer_filter, project_filter)
 
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -187,6 +395,8 @@ def export_excel(request, report_type):
 @login_required
 @require_global_permission('NAV_PERM_REPORTS')
 def export_pdf(request, report_type):
+    designer_filter = request.GET.get('designer')
+    project_filter = request.GET.get('project')
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas
@@ -195,30 +405,7 @@ def export_pdf(request, report_type):
 
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
-    p.setFont('Helvetica-Bold', 14)
-    p.drawString(50, 800, f'Genesis Design - {report_type.replace("_", " ").title()}')
-    p.setFont('Helvetica', 10)
-    y = 770
-
-    if report_type == 'designer_performance':
-        for row in _designer_performance_data():
-            p.drawString(50, y, f"{row['designer']}: {row['completed']}/{row['assigned']} ({row['completion_rate']}%)")
-            y -= 15
-            if y < 50:
-                p.showPage()
-                y = 800
-    elif report_type == 'management_summary':
-        deadline_stats = _deadline_compliance_data()
-        lines = [
-            f'Total Projects: {Project.objects.count()}',
-            f'Total Designs: {DesignRequest.objects.count()}',
-            f'Deadline Compliance: {deadline_stats["compliance_rate"]}%',
-            f'Missed Deadlines: {deadline_stats["red"]}',
-        ]
-        for line in lines:
-            p.drawString(50, y, line)
-            y -= 15
-
+    _write_pdf_lines(p, report_type, designer_filter, project_filter)
     p.showPage()
     p.save()
     buffer.seek(0)

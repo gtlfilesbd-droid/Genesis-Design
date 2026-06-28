@@ -1,0 +1,20 @@
+<div class="flex flex-wrap items-center gap-2">
+    {% if csv_url %}
+    <a href="{{ csv_url }}" class="g-export-btn" title="Download CSV">
+        <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+        <span>CSV</span>
+    </a>
+    {% endif %}
+    {% if excel_url %}
+    <a href="{{ excel_url }}" class="g-export-btn" title="Download Excel">
+        <i data-lucide="sheet" class="w-3.5 h-3.5"></i>
+        <span>Excel</span>
+    </a>
+    {% endif %}
+    {% if pdf_url %}
+    <a href="{{ pdf_url }}" class="g-export-btn" title="Download PDF">
+        <i data-lucide="file-down" class="w-3.5 h-3.5"></i>
+        <span>PDF</span>
+    </a>
+    {% endif %}
+</div>

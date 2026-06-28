@@ -202,6 +202,27 @@ a.g-stat-card-link:focus-visible {
   font-weight: 600;
 }
 
+.g-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.g-export-btn:hover {
+  border-color: var(--primary-light);
+  background: #E8F0F8;
+  color: var(--primary);
+}
+
 .g-progress {
   height: 6px;
   background: #F1F5F9;

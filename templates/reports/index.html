@@ -1,324 +1,308 @@
 {% extends "base.html" %}
-
+{% load genesis_ui %}
 {% block title %}Reports{% endblock %}
-
 {% block content %}
 
-<div class="mb-8">
-
-    <h1 class="text-[28px] font-bold text-slate-900">Reports</h1>
-
-    <p class="text-sm text-slate-500 mt-1">Export and analyze design operations data</p>
-
-</div>
-
-
-
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
-
-    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' %}
-
-    {% include 'components/stat_card.html' with label='Total Designs' value=total_designs icon='file-text' %}
-
-    {% include 'components/stat_card.html' with label='Pending' value=pending_designs icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
-
-</div>
-
-
-
-<div class="flex gap-1 border-b border-slate-200 mb-6">
-
-    <a href="?tab=performance" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'performance' or not tab %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Performance</a>
-    <a href="?tab=projects" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'projects' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Project Report</a>
-
-    <a href="?tab=deadline" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'deadline' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Deadline Compliance</a>
-
-    <a href="?tab=delay" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'delay' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Delay Analysis</a>
-
-    <a href="?tab=export" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px {% if tab == 'export' %}border-primary text-primary{% else %}border-transparent text-slate-500 hover:text-slate-700{% endif %}">Export</a>
-
-</div>
-
-
-
-{% if tab == 'performance' or not tab %}
-<form method="get" class="g-card p-4 mb-4 flex flex-wrap gap-3 items-end">
-    <input type="hidden" name="tab" value="performance">
-    <div><label class="text-xs text-slate-500 block mb-1">Designer</label>
-    <select name="designer" class="g-input w-auto min-w-[160px]"><option value="">All</option>{% for d in designers %}<option value="{{ d.pk }}" {% if designer_filter == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.get_full_name }}</option>{% endfor %}</select></div>
-    <div><label class="text-xs text-slate-500 block mb-1">Project</label>
-    <select name="project" class="g-input w-auto min-w-[160px]"><option value="">All</option>{% for p in projects %}<option value="{{ p.pk }}" {% if project_filter == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.code }}</option>{% endfor %}</select></div>
-    <button type="submit" class="g-btn-secondary">Apply Filters</button>
-</form>
-<div class="g-card overflow-x-auto">
-
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-
-        <h2 class="font-semibold text-slate-900">Designer Performance</h2>
-
-        <div class="flex gap-2 text-xs">
-
-            <a href="{% url 'reports:export_csv' 'designer_performance' %}" class="text-primary-light font-semibold">CSV</a>
-
-            <a href="{% url 'reports:export_excel' 'designer_performance' %}" class="text-primary-light font-semibold">Excel</a>
-
-            <a href="{% url 'reports:export_pdf' 'designer_performance' %}" class="text-primary-light font-semibold">PDF</a>
-
-        </div>
-
+<div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-[28px] font-bold text-slate-900 tracking-tight">Reports</h1>
+        <p class="text-sm text-slate-500 mt-1">Analyze operations data and export reports in CSV, Excel, or PDF</p>
     </div>
-
-    <table class="g-table w-full">
-
-        <thead><tr><th>Designer</th><th>Assigned</th><th>Completed</th><th>On-Time</th><th>Rate</th><th>Avg Days</th><th>Corrections</th><th>Score</th></tr></thead>
-
-        <tbody>
-
-        {% for row in designer_data %}
-
-        <tr>
-
-            <td class="font-medium">{{ row.designer }}</td>
-
-            <td>{{ row.assigned }}</td>
-
-            <td>{{ row.completed }}</td>
-            <td>{{ row.on_time }}</td>
-            <td class="font-semibold text-green-600">{{ row.completion_rate }}%</td>
-            <td>{{ row.avg_days }}</td>
-            <td>{{ row.corrections }}</td>
-            <td class="font-bold {% if row.score >= 85 %}text-green-600{% elif row.score >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ row.score }}</td>
-
-        </tr>
-
-        {% empty %}
-
-        <tr><td colspan="8" class="text-center text-slate-500 py-8">No data</td></tr>
-
-        {% endfor %}
-
-        </tbody>
-
-    </table>
-
+    <a href="?tab=export" class="g-btn-primary inline-flex items-center gap-2 self-start shrink-0">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        Export Center
+    </a>
 </div>
 
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    {% include 'components/stat_card.html' with label='Total Projects' value=total_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' %}
+    {% include 'components/stat_card.html' with label='Total Designs' value=total_designs icon='files' icon_bg='bg-slate-50' icon_color='text-slate-600' %}
+    {% include 'components/stat_card.html' with label='Pending Designs' value=pending_designs icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
+    {% include 'components/stat_card.html' with label='Deadline Compliance' value=deadline_data.compliance_rate|floatformat:0 icon='shield-check' icon_bg='bg-green-50' icon_color='text-green-600' subtext='Percent on track' subtext_class='text-green-600' %}
+</div>
+
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="?tab=performance" class="g-filter-chip {% if tab == 'performance' %}active{% endif %}">
+        <i data-lucide="users" class="w-3.5 h-3.5"></i> Performance
+    </a>
+    <a href="?tab=projects" class="g-filter-chip {% if tab == 'projects' %}active{% endif %}">
+        <i data-lucide="folder-kanban" class="w-3.5 h-3.5"></i> Projects
+    </a>
+    <a href="?tab=deadline" class="g-filter-chip {% if tab == 'deadline' %}active{% endif %}">
+        <i data-lucide="calendar-clock" class="w-3.5 h-3.5"></i> Deadlines
+    </a>
+    <a href="?tab=delay" class="g-filter-chip {% if tab == 'delay' %}active{% endif %}">
+        <i data-lucide="timer" class="w-3.5 h-3.5"></i> Delays
+    </a>
+    <a href="?tab=export" class="g-filter-chip {% if tab == 'export' %}active{% endif %}">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i> Export
+    </a>
+</div>
+
+{% if tab == 'performance' %}
+<form method="get" class="g-card p-5 mb-4">
+    <input type="hidden" name="tab" value="performance">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Designer</label>
+            <select name="designer" class="g-input">
+                <option value="">All designers</option>
+                {% for d in designers %}
+                <option value="{{ d.pk }}" {% if designer_filter == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.get_full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Project</label>
+            <select name="project" class="g-input">
+                <option value="">All projects</option>
+                {% for p in projects %}
+                <option value="{{ p.pk }}" {% if project_filter == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.code }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="flex gap-2 sm:col-span-2 lg:col-span-2">
+            <button type="submit" class="g-btn-primary inline-flex items-center gap-2 flex-1 justify-center">
+                <i data-lucide="filter" class="w-4 h-4"></i> Apply filters
+            </button>
+            <a href="?tab=performance" class="g-btn-secondary shrink-0">Reset</a>
+        </div>
+    </div>
+</form>
+
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h2 class="font-semibold text-slate-900">Designer Performance</h2>
+            <p class="text-xs text-slate-500 mt-0.5">{{ designer_data|length }} designer{{ designer_data|length|pluralize }} in report</p>
+        </div>
+        {% include 'components/report_export_buttons.html' with csv_url=performance_exports.csv excel_url=performance_exports.excel pdf_url=performance_exports.pdf %}
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table w-full g-table-pro">
+            <thead>
+                <tr>
+                    <th>Designer</th>
+                    <th>Assigned</th>
+                    <th>Completed</th>
+                    <th>On-Time</th>
+                    <th>Completion</th>
+                    <th>On-Time %</th>
+                    <th>Avg Days</th>
+                    <th>Corrections</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in designer_data %}
+            <tr>
+                <td class="font-semibold text-slate-900">{{ row.designer }}</td>
+                <td>{{ row.assigned }}</td>
+                <td>{{ row.completed }}</td>
+                <td>{{ row.on_time }}</td>
+                <td><span class="font-semibold text-green-600">{{ row.completion_rate }}%</span></td>
+                <td>{{ row.on_time_rate }}%</td>
+                <td>{{ row.avg_days }}</td>
+                <td>{{ row.corrections }}</td>
+                <td>
+                    <span class="inline-flex min-w-[2.5rem] justify-center px-2 py-0.5 rounded-full text-xs font-bold {% if row.score >= 85 %}bg-green-100 text-green-700{% elif row.score >= 70 %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                        {{ row.score }}
+                    </span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="py-14 text-center text-slate-500">No performance data for the selected filters.</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endif %}
 
 {% if tab == 'projects' %}
-<div class="g-card overflow-x-auto">
-    <table class="g-table w-full">
-        <thead><tr><th>Project</th><th>Status</th><th>Total</th><th>Completed</th><th>Running</th><th>Progress</th><th>Health</th></tr></thead>
-        <tbody>
-        {% for row in project_data %}
-        <tr>
-            <td><span class="font-medium">{{ row.code }}</span><br><span class="text-xs text-slate-500">{{ row.name }}</span></td>
-            <td>{{ row.status }}</td>
-            <td>{{ row.total }}</td>
-            <td>{{ row.completed }}</td>
-            <td>{{ row.running }}</td>
-            <td><div class="g-progress w-24 inline-block align-middle mr-2"><div class="g-progress-fill" style="width: {{ row.pct }}%"></div></div>{{ row.pct }}%</td>
-            <td>{{ row.health }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="text-center py-8 text-slate-500">No projects.</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h2 class="font-semibold text-slate-900">Project Progress</h2>
+            <p class="text-xs text-slate-500 mt-0.5">{{ project_data|length }} project{{ project_data|length|pluralize }}</p>
+        </div>
+        {% include 'components/report_export_buttons.html' with csv_url=project_exports.csv excel_url=project_exports.excel pdf_url=project_exports.pdf %}
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table w-full g-table-pro">
+            <thead>
+                <tr>
+                    <th>Project</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                    <th>Completed</th>
+                    <th>Running</th>
+                    <th>Progress</th>
+                    <th>Health</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in project_data %}
+            <tr>
+                <td>
+                    <div class="font-semibold text-slate-900">{{ row.code }}</div>
+                    <div class="text-xs text-slate-500">{{ row.name }}</div>
+                </td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.total }}</td>
+                <td class="text-green-600 font-medium">{{ row.completed }}</td>
+                <td>{% if row.running %}<span class="text-amber-600 font-medium">{{ row.running }}</span>{% else %}0{% endif %}</td>
+                <td>
+                    <div class="flex items-center gap-2 min-w-[120px]">
+                        <div class="g-progress flex-1"><div class="g-progress-fill" style="width: {{ row.pct }}%"></div></div>
+                        <span class="text-xs font-semibold text-slate-600">{{ row.pct }}%</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold {% if row.health >= 80 %}bg-green-100 text-green-700{% elif row.health >= 60 %}bg-amber-100 text-amber-700{% else %}bg-red-100 text-red-700{% endif %}">
+                        {{ row.health }}
+                    </span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="py-14 text-center text-slate-500">No projects found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endif %}
 
 {% if tab == 'deadline' %}
-
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-    <div class="g-card p-6">
-
-        <h2 class="font-semibold text-slate-900 mb-4">Deadline Overview</h2>
-
-        <div class="text-4xl font-bold text-primary mb-2">{{ deadline_data.compliance_rate }}%</div>
-
-        <p class="text-sm text-slate-500 mb-6">Overall compliance rate</p>
-
-        <div class="space-y-3 text-sm">
-
-            <div class="flex justify-between"><span class="text-green-600">On Track</span><span class="font-semibold">{{ deadline_data.green }}</span></div>
-
-            <div class="flex justify-between"><span class="text-amber-600">Warning</span><span class="font-semibold">{{ deadline_data.yellow }}</span></div>
-
-            <div class="flex justify-between"><span class="text-red-600">Missed</span><span class="font-semibold">{{ deadline_data.red }}</span></div>
-
-            <div class="flex justify-between border-t pt-2"><span>Total tracked</span><span class="font-semibold">{{ deadline_data.total }}</span></div>
-
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+    <div class="xl:col-span-2 g-card p-6">
+        <div class="flex items-start justify-between gap-3 mb-4">
+            <div>
+                <h2 class="font-semibold text-slate-900">Deadline Overview</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Tracked designs with active deadlines</p>
+            </div>
+            {% include 'components/report_export_buttons.html' with csv_url=deadline_exports.csv excel_url=deadline_exports.excel pdf_url=deadline_exports.pdf %}
         </div>
-
-        <a href="{% url 'reports:export_csv' 'deadline_compliance' %}" class="g-btn-secondary text-sm mt-6 inline-block">Export CSV</a>
-
+        <div class="text-5xl font-bold text-primary mb-1">{{ deadline_data.compliance_rate }}%</div>
+        <p class="text-sm text-slate-500 mb-6">Overall compliance rate</p>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-100">
+                <span class="text-sm font-medium text-green-800">On Track</span>
+                <span class="text-lg font-bold text-green-700">{{ deadline_data.green }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-100">
+                <span class="text-sm font-medium text-amber-800">Warning</span>
+                <span class="text-lg font-bold text-amber-700">{{ deadline_data.yellow }}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-100">
+                <span class="text-sm font-medium text-red-800">Missed</span>
+                <span class="text-lg font-bold text-red-700">{{ deadline_data.red }}</span>
+            </div>
+            <div class="flex items-center justify-between px-1 pt-2 text-sm text-slate-600">
+                <span>Total tracked</span>
+                <span class="font-semibold text-slate-900">{{ deadline_data.total }}</span>
+            </div>
+        </div>
     </div>
-
-    <div class="g-card p-6">
-
-        <h2 class="font-semibold text-slate-900 mb-4">Compliance Chart</h2>
-
-        <canvas id="deadlineChart" height="200"></canvas>
-
+    <div class="xl:col-span-3 g-card p-6">
+        <h2 class="font-semibold text-slate-900 mb-1">Compliance Distribution</h2>
+        <p class="text-xs text-slate-500 mb-4">Breakdown of deadline status across designs</p>
+        <canvas id="deadlineChart" height="220"></canvas>
     </div>
-
 </div>
-
 {% endif %}
-
-
 
 {% if tab == 'delay' %}
-
-<div class="g-card overflow-x-auto">
-
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-
-        <h2 class="font-semibold text-slate-900">Delay Attribution</h2>
-
-        <a href="{% url 'reports:export_csv' 'delay_analysis' %}" class="text-primary-light text-xs font-semibold">Export CSV</a>
-
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h2 class="font-semibold text-slate-900">Delay Attribution</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Designs with recorded delay sources</p>
+        </div>
+        {% include 'components/report_export_buttons.html' with csv_url=delay_exports.csv excel_url=delay_exports.excel pdf_url=delay_exports.pdf %}
     </div>
-
-    <table class="g-table w-full">
-
-        <thead><tr><th>Design #</th><th>Delay Source</th><th>Days</th><th>Status</th></tr></thead>
-
-        <tbody>
-
-        {% for row in delay_data %}
-
-        <tr>
-
-            <td class="font-medium">{{ row.design_number }}</td>
-
-            <td class="text-red-600">{{ row.delay_source }}</td>
-
-            <td>{{ row.delay_duration_days }}</td>
-
-            <td>{{ row.status }}</td>
-
-        </tr>
-
-        {% empty %}
-
-        <tr><td colspan="4" class="text-center text-slate-500 py-8">No delays recorded.</td></tr>
-
-        {% endfor %}
-
-        </tbody>
-
-    </table>
-
+    <div class="overflow-x-auto">
+        <table class="g-table w-full g-table-pro">
+            <thead>
+                <tr>
+                    <th>Design #</th>
+                    <th>Delay Source</th>
+                    <th>Days</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in delay_data %}
+            <tr>
+                <td class="font-semibold text-primary-light">{{ row.design_number }}</td>
+                <td><span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">{{ row.delay_source }}</span></td>
+                <td class="font-semibold text-slate-800">{{ row.delay_duration_days }}</td>
+                <td>{{ row.status }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="py-14 text-center text-slate-500">No delays recorded.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
-
 {% endif %}
-
-
 
 {% if tab == 'export' %}
-
-<div class="g-card p-6 max-w-xl">
-
-    <h2 class="font-semibold text-slate-900 mb-4">Export Reports</h2>
-
-    <div class="space-y-3">
-
-        <div class="flex items-center justify-between py-3 border-b border-slate-100">
-
-            <span class="text-sm font-medium">Designer Performance</span>
-
-            <div class="flex gap-2 text-xs">
-
-                <a href="{% url 'reports:export_csv' 'designer_performance' %}" class="text-primary-light font-semibold">CSV</a>
-
-                <a href="{% url 'reports:export_excel' 'designer_performance' %}" class="text-primary-light font-semibold">Excel</a>
-
-                <a href="{% url 'reports:export_pdf' 'designer_performance' %}" class="text-primary-light font-semibold">PDF</a>
-
-            </div>
-
-        </div>
-
-        <div class="flex items-center justify-between py-3 border-b border-slate-100">
-
-            <span class="text-sm font-medium">Project Progress</span>
-
-            <a href="{% url 'reports:export_csv' 'project_progress' %}" class="text-primary-light text-xs font-semibold">CSV</a>
-
-        </div>
-
-        <div class="flex items-center justify-between py-3 border-b border-slate-100">
-
-            <span class="text-sm font-medium">Deadline Compliance</span>
-
-            <a href="{% url 'reports:export_csv' 'deadline_compliance' %}" class="text-primary-light text-xs font-semibold">CSV</a>
-
-        </div>
-
-        <div class="flex items-center justify-between py-3 border-b border-slate-100">
-
-            <span class="text-sm font-medium">Delay Analysis</span>
-
-            <a href="{% url 'reports:export_csv' 'delay_analysis' %}" class="text-primary-light text-xs font-semibold">CSV</a>
-
-        </div>
-
-        <div class="flex items-center justify-between py-3">
-
-            <span class="text-sm font-medium">Management Summary</span>
-
-            <a href="{% url 'reports:export_pdf' 'management_summary' %}" class="text-primary-light text-xs font-semibold">PDF</a>
-
-        </div>
-
-    </div>
-
+<div class="mb-4">
+    <h2 class="text-lg font-semibold text-slate-900">Export Center</h2>
+    <p class="text-sm text-slate-500 mt-1">Download any report in your preferred format</p>
 </div>
-
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for report in report_catalog %}
+    <div class="g-card p-5 flex flex-col">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="w-11 h-11 rounded-xl {{ report.icon_bg }} flex items-center justify-center shrink-0">
+                <i data-lucide="{{ report.icon }}" class="w-5 h-5 {{ report.icon_color }}"></i>
+            </div>
+            <div class="min-w-0">
+                <h3 class="font-semibold text-slate-900">{{ report.title }}</h3>
+                <p class="text-sm text-slate-500 mt-1">{{ report.description }}</p>
+            </div>
+        </div>
+        <div class="mt-auto pt-4 border-t border-slate-100">
+            {% include 'components/report_export_buttons.html' with csv_url=report.exports.csv excel_url=report.exports.excel pdf_url=report.exports.pdf %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
 {% endif %}
 
 {% endblock %}
-
-
 
 {% block extra_js %}
-
 {% if tab == 'deadline' %}
-
 <script>
-
 document.addEventListener('DOMContentLoaded', () => {
-
     const ctx = document.getElementById('deadlineChart');
-
     if (ctx && window.Chart) {
-
         new Chart(ctx, {
-
             type: 'doughnut',
-
             data: {
-
-                labels: ['On Track', 'Warning', 'Breached'],
-
-                datasets: [{ data: [{{ deadline_data.green }}, {{ deadline_data.yellow }}, {{ deadline_data.red }}], backgroundColor: ['#22c55e','#f59e0b','#ef4444'] }],
-
+                labels: ['On Track', 'Warning', 'Missed'],
+                datasets: [{
+                    data: [{{ deadline_data.green }}, {{ deadline_data.yellow }}, {{ deadline_data.red }}],
+                    backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+                    borderWidth: 0,
+                }],
             },
-
-            options: { plugins: { legend: { position: 'bottom' } } },
-
+            options: {
+                responsive: true,
+                cutout: '62%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, padding: 16 } },
+                },
+            },
         });
-
     }
-
 });
-
 </script>
-
 {% endif %}
-
 {% endblock %}
-
