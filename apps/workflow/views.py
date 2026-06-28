@@ -268,7 +268,7 @@ def assign_designer_view(request, pk):
 
 
 @login_required
-@require_global_permission('VIS_PERM_WORKFLOW_BOARD')
+@require_global_permission('NAV_PERM_TASKBOARD')
 def kanban_board(request):
     statuses = [
         (s.value, s.label) for s in DesignStatus

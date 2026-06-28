@@ -30,7 +30,7 @@ SETTINGS_TABS = [
 
 
 @login_required
-@require_global_permission('PERM_ADMIN_PANEL')
+@require_global_permission('NAV_PERM_SETTINGS')
 def settings_index(request):
     tab = request.GET.get('tab', 'general')
     ensure_role_permissions()

@@ -21,6 +21,12 @@ from .role_groups import (
     PERMISSION_FIELD_LABELS,
     save_user_extra_permissions,
 )
+from .sidebar_permissions import (
+    get_sidebar_defaults_for_ui,
+    get_sidebar_permission_initial,
+    save_user_sidebar_permissions,
+    SIDEBAR_ITEMS,
+)
 from .user_forms import UserCreateForm, UserEditForm
 
 
@@ -32,16 +38,28 @@ def _user_form_context(form, edit_user=None):
         {'field': field, 'label': label, 'checked': extra_initial.get(field, False)}
         for field, label in PERMISSION_FIELD_LABELS.items()
     ]
+    role = edit_user.role if edit_user else form.initial.get('role') or form.data.get('role')
+    sidebar_initial = get_sidebar_permission_initial(edit_user, role=role)
+    sidebar_permission_items = [
+        {
+            'field': item['field'],
+            'label': item['label'],
+            'checked': sidebar_initial.get(item['field'], False),
+        }
+        for item in SIDEBAR_ITEMS
+    ]
     return {
         'form': form,
         'edit_user': edit_user,
         'role_groups': get_role_groups_for_ui(),
         'extra_permission_items': extra_permission_items,
+        'sidebar_permission_items': sidebar_permission_items,
+        'sidebar_defaults_json': json.dumps(get_sidebar_defaults_for_ui()),
     }
 
 
 @login_required
-@require_global_permission('PERM_MANAGE_USERS')
+@require_global_permission('NAV_PERM_TEAM')
 def user_list(request):
     users = User.objects.select_related('team', 'manager').annotate(
         running_tasks=Count(
@@ -85,13 +103,14 @@ def user_list(request):
 
 
 @login_required
-@require_global_permission('PERM_MANAGE_USERS')
+@require_global_permission('NAV_PERM_TEAM')
 def user_create(request):
     if request.method == 'POST':
         form = UserCreateForm(request.POST, request.FILES)
         if form.is_valid():
             user = form.save()
             save_user_extra_permissions(user, request.POST)
+            save_user_sidebar_permissions(user, request.POST)
             log_activity('user', user.pk, request.user, 'user_created', f'User {user.username} created')
             messages.success(request, f'User {user.get_full_name()} created.')
             return redirect('accounts:user_detail', pk=user.pk)
@@ -103,7 +122,7 @@ def user_create(request):
 
 
 @login_required
-@require_global_permission('PERM_MANAGE_USERS')
+@require_global_permission('NAV_PERM_TEAM')
 def user_edit(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method == 'POST':
@@ -111,6 +130,7 @@ def user_edit(request, pk):
         if form.is_valid():
             user = form.save()
             save_user_extra_permissions(user, request.POST)
+            save_user_sidebar_permissions(user, request.POST)
             if user.role == UserRole.ADMIN:
                 user.is_staff = True
                 user.save(update_fields=['is_staff'])
@@ -183,7 +203,7 @@ def user_detail(request, pk):
 
 
 @login_required
-@require_global_permission('PERM_MANAGE_USERS')
+@require_global_permission('NAV_PERM_TEAM')
 def user_disable(request, pk):
     user_obj = get_object_or_404(User, pk=pk)
     if request.method == 'POST':

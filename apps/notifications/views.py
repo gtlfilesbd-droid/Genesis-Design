@@ -8,7 +8,7 @@ from .models import Notification
 
 
 @login_required
-@require_global_permission('VIS_PERM_NOTIFICATIONS')
+@require_global_permission('NAV_PERM_NOTIFICATIONS')
 def notification_list(request):
     notifications = Notification.objects.filter(user=request.user)[:50]
     from django.shortcuts import render
@@ -16,7 +16,7 @@ def notification_list(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_NOTIFICATIONS')
+@require_global_permission('NAV_PERM_NOTIFICATIONS')
 def mark_read(request, pk):
     notification = get_object_or_404(Notification, pk=pk, user=request.user)
     notification.read_at = timezone.now()
@@ -27,7 +27,7 @@ def mark_read(request, pk):
 
 
 @login_required
-@require_global_permission('VIS_PERM_NOTIFICATIONS')
+@require_global_permission('NAV_PERM_NOTIFICATIONS')
 def mark_all_read(request):
     Notification.objects.filter(user=request.user, read_at__isnull=True).update(
         read_at=timezone.now()

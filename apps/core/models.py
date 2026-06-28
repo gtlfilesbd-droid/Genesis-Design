@@ -186,3 +186,33 @@ class UserExtraPermission(models.Model):
             for field in PERMISSION_FIELD_LABELS
             if getattr(self, field, False)
         ]
+
+
+class UserSidebarPermission(models.Model):
+    """Per-user sidebar navigation visibility and page access."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sidebar_permissions',
+    )
+    nav_dashboard = models.BooleanField(default=True)
+    nav_projects = models.BooleanField(default=True)
+    nav_my_tasks = models.BooleanField(default=False)
+    nav_design_library = models.BooleanField(default=False)
+    nav_taskboard = models.BooleanField(default=False)
+    nav_reports = models.BooleanField(default=False)
+    nav_executive = models.BooleanField(default=False)
+    nav_leaderboard = models.BooleanField(default=False)
+    nav_workload = models.BooleanField(default=False)
+    nav_team = models.BooleanField(default=False)
+    nav_settings = models.BooleanField(default=False)
+    nav_profile = models.BooleanField(default=True)
+    nav_kpi = models.BooleanField(default=True)
+    nav_notifications = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = 'user sidebar permissions'
+
+    def __str__(self):
+        return f'Sidebar permissions for {self.user}'

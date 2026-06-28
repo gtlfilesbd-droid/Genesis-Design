@@ -51,6 +51,7 @@ class ProjectForm(forms.ModelForm):
 
 
 @login_required
+@require_global_permission('NAV_PERM_PROJECTS')
 def project_list(request):
     qs = PermissionService.get_user_projects(request.user).select_related('created_by')
 
@@ -93,6 +94,7 @@ def project_create(request):
 
 
 @login_required
+@require_global_permission('NAV_PERM_PROJECTS')
 def project_detail(request, pk):
     project = get_object_or_404(
         Project.objects.select_related('created_by'),

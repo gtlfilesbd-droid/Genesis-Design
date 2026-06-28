@@ -347,6 +347,7 @@ def detect_bottlenecks():
 
 
 @login_required
+@require_global_permission('NAV_PERM_DESIGN_LIBRARY')
 def smart_search(request):
     from apps.designs.models import DrawingType
     designs = PermissionService.filter_design_requests(
@@ -410,6 +411,7 @@ def smart_search(request):
 
 
 @login_required
+@require_global_permission('NAV_PERM_KPI')
 def kpi_dashboard(request):
     from .kpi_display import build_kpi_page_context
 
@@ -436,7 +438,7 @@ def kpi_dashboard(request):
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_LEADERBOARD')
 def leaderboard(request):
     from .reports_display import build_leaderboard_context
 
@@ -452,7 +454,7 @@ def leaderboard(request):
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_WORKLOAD')
 def workload_view(request):
     from .reports_display import build_workload_context
 
@@ -475,7 +477,7 @@ def workload_view(request):
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_EXECUTIVE')
 def executive_dashboard(request):
     from .reports_display import build_executive_context
 

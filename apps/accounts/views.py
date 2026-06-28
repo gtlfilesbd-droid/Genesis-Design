@@ -53,12 +53,13 @@ class GenesisPasswordResetDoneView(PasswordResetDoneView):
 
 @login_required
 def dashboard_redirect(request):
-    if not PermissionService.has_global_permission(request.user, 'VIS_PERM_DASHBOARD'):
+    if not PermissionService.has_global_permission(request.user, 'NAV_PERM_DASHBOARD'):
         return redirect('projects:list')
     return redirect(request.user.get_dashboard_url_name())
 
 
 @login_required
+@require_global_permission('NAV_PERM_PROFILE')
 def profile(request):
     user = request.user
     if request.method == 'POST':
@@ -104,7 +105,7 @@ def profile(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_DASHBOARD')
+@require_global_permission('NAV_PERM_DASHBOARD')
 def admin_dashboard(request):
     context = _base_dashboard_context(request)
     context.update({
@@ -122,7 +123,7 @@ def admin_dashboard(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_DASHBOARD')
+@require_global_permission('NAV_PERM_DASHBOARD')
 def requester_dashboard(request):
     projects = PermissionService.get_user_projects(request.user)
     designs = PermissionService.filter_design_requests(
@@ -142,7 +143,7 @@ def requester_dashboard(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_DASHBOARD')
+@require_global_permission('NAV_PERM_DASHBOARD')
 def hod_dashboard(request):
     designs = PermissionService.filter_design_requests(
         request.user,
@@ -188,7 +189,7 @@ def hod_dashboard(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_DASHBOARD')
+@require_global_permission('NAV_PERM_DASHBOARD')
 def designer_dashboard(request):
     latest_assignment = DesignAssignment.objects.filter(
         design=OuterRef('pk'),
@@ -215,7 +216,7 @@ def designer_dashboard(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_DASHBOARD')
+@require_global_permission('NAV_PERM_DASHBOARD')
 def verification_dashboard(request):
     designs = DesignRequest.objects.filter(
         status__in=[
@@ -255,7 +256,7 @@ def verification_dashboard(request):
 
 
 @login_required
-@require_global_permission('VIS_PERM_DASHBOARD')
+@require_global_permission('NAV_PERM_DASHBOARD')
 def compliance_dashboard(request):
     designs = DesignRequest.objects.filter(
         status__in=[

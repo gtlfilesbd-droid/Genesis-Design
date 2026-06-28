@@ -69,10 +69,10 @@ def user_permissions(request):
         'can_manage_users': ps.has_global_permission(user, 'PERM_MANAGE_USERS'),
         'can_create_project': ps.has_global_permission(user, 'PROJECT_PERM_CREATE'),
         'can_view_all_projects': ps.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS'),
-        'can_view_team': ps.has_global_permission(user, 'VIS_PERM_TEAM_PAGE'),
+        'can_view_team': ps.has_global_permission(user, 'NAV_PERM_TEAM'),
         'can_view_profiles': ps.has_global_permission(user, 'VIS_PERM_USER_PROFILES'),
-        'can_view_workflow': ps.has_global_permission(user, 'VIS_PERM_WORKFLOW_BOARD'),
-        'can_view_dashboard': ps.has_global_permission(user, 'VIS_PERM_DASHBOARD'),
+        'can_view_workflow': ps.has_global_permission(user, 'NAV_PERM_TASKBOARD'),
+        'can_view_dashboard': ps.has_global_permission(user, 'NAV_PERM_DASHBOARD'),
     }
 
     if project:

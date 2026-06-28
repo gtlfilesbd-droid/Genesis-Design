@@ -2,7 +2,13 @@ from django.db.models import Q
 from django.urls import reverse
 
 from apps.accounts.models import User, UserRole
-from apps.core.models import RolePermission
+from apps.accounts.sidebar_permissions import (
+    LEGACY_NAV_PERM_MAP,
+    NAV_PERM_FIELDS,
+    SIDEBAR_ITEMS,
+    get_default_sidebar_for_role,
+)
+from apps.core.models import RolePermission, UserSidebarPermission
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
 
@@ -91,26 +97,46 @@ class PermissionService:
         )
 
     @staticmethod
+    def _get_sidebar_perms(user):
+        if not user or not user.is_authenticated:
+            return None
+        cache_attr = '_cached_sidebar_perms'
+        if hasattr(user, cache_attr):
+            return getattr(user, cache_attr)
+        try:
+            perms = user.sidebar_permissions
+        except UserSidebarPermission.DoesNotExist:
+            defaults = get_default_sidebar_for_role(user.role)
+            perms = UserSidebarPermission(user=user, **defaults)
+        setattr(user, cache_attr, perms)
+        return perms
+
+    @staticmethod
+    def _sidebar_flag(user, field_name: str) -> bool:
+        perms = PermissionService._get_sidebar_perms(user)
+        if not perms:
+            return False
+        return bool(getattr(perms, field_name, False))
+
+    @staticmethod
+    def _nav_field_for_code(permission_code: str):
+        if permission_code in LEGACY_NAV_PERM_MAP:
+            return LEGACY_NAV_PERM_MAP[permission_code]
+        return NAV_PERM_FIELDS.get(permission_code)
+
+    @staticmethod
     def has_global_permission(user, permission_code: str) -> bool:
         if not user or not user.is_authenticated:
             return False
         if user.is_superuser:
             return True
 
+        nav_field = PermissionService._nav_field_for_code(permission_code)
+        if nav_field:
+            return PermissionService._sidebar_flag(user, nav_field)
+
         if permission_code == 'PERM_VIEW_ALL_PROJECTS':
             return PermissionService._is_admin_or_hod(user)
-
-        if permission_code in ('VIS_PERM_DASHBOARD', 'VIS_PERM_NOTIFICATIONS'):
-            return user.is_active and getattr(user, 'status', 'active') == 'active'
-
-        if permission_code == 'VIS_PERM_WORKFLOW_BOARD':
-            return (
-                user.role in (UserRole.ADMIN, UserRole.HEAD_OF_DESIGN)
-                or PermissionService._matrix_flag(user, 'can_assign_designer')
-            )
-
-        if permission_code == 'VIS_PERM_TEAM_PAGE':
-            return user.role == UserRole.ADMIN
 
         if permission_code == 'PERM_ADMIN_PANEL':
             return user.role == UserRole.ADMIN
@@ -309,39 +335,11 @@ class PermissionService:
         return PermissionService.has_project_permission(user, project, 'PROJECT_PERM_COMPLIANCE')
 
     @staticmethod
-    def _has_my_tasks(user) -> bool:
-        return user.role in (
-            UserRole.ADMIN,
-            UserRole.HEAD_OF_DESIGN,
-            UserRole.DESIGNER,
-            UserRole.VERIFICATION_TEAM,
-            UserRole.COMPLIANCE_TEAM,
-        )
-
-    @staticmethod
     def get_user_sidebar_items(user) -> list:
         items = []
-        if PermissionService.has_global_permission(user, 'VIS_PERM_DASHBOARD'):
-            items.append('dashboard')
-        items.append('projects')
-        if PermissionService._has_my_tasks(user):
-            items.append('my_tasks')
-        if (
-            PermissionService._can_see_design_requests(user)
-            or PermissionService._can_see_design_library(user)
-        ):
-            items.append('design_library')
-        if PermissionService.has_global_permission(user, 'VIS_PERM_WORKFLOW_BOARD'):
-            items.append('workflow')
-        if PermissionService.has_global_permission(user, 'PERM_VIEW_REPORTS'):
-            items.extend(['reports', 'executive', 'leaderboard', 'workload'])
-        if PermissionService.has_global_permission(user, 'VIS_PERM_TEAM_PAGE'):
-            items.append('team')
-        if PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL'):
-            items.append('settings')
-        items.extend(['profile', 'kpi'])
-        if PermissionService.has_global_permission(user, 'VIS_PERM_NOTIFICATIONS'):
-            items.append('notifications')
+        for item in SIDEBAR_ITEMS:
+            if PermissionService._sidebar_flag(user, item['field']):
+                items.append(item['key'])
         return items
 
     @staticmethod
@@ -396,11 +394,18 @@ class PermissionService:
                     extra_enabled.append({'field': field, 'label': label})
         except Exception:
             pass
+        sidebar_enabled = []
+        perms = PermissionService._get_sidebar_perms(user)
+        if perms:
+            for item in SIDEBAR_ITEMS:
+                if getattr(perms, item['field'], False):
+                    sidebar_enabled.append({'key': item['key'], 'label': item['label']})
         return {
             'role': user.role,
             'role_display': user.get_role_display(),
             'role_permissions': role_enabled,
             'extra_permissions': extra_enabled,
+            'sidebar_permissions': sidebar_enabled,
         }
 
     @staticmethod

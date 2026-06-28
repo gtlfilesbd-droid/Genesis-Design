@@ -45,7 +45,7 @@
         </div>
     </div>
     {% if permissions_profile.extra_permissions %}
-    <div>
+    <div class="mb-4">
         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Extra</p>
         <div class="flex flex-wrap gap-1.5">
             {% for perm in permissions_profile.extra_permissions %}
@@ -54,6 +54,16 @@
         </div>
     </div>
     {% endif %}
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Side Navigation</p>
+        <div class="flex flex-wrap gap-1.5">
+            {% for perm in permissions_profile.sidebar_permissions %}
+            <span class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">{{ perm.label }}</span>
+            {% empty %}
+            <span class="text-sm text-slate-500">No sidebar items enabled</span>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 {% endif %}
 

@@ -230,6 +230,7 @@ def design_request_list(request):
 
 
 @login_required
+@require_global_permission('NAV_PERM_MY_TASKS')
 def my_tasks(request):
     user = request.user
     terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]

@@ -66,7 +66,7 @@ def _deadline_compliance_data():
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_REPORTS')
 def reports_index(request):
     tab = request.GET.get('tab', 'performance')
     designer_filter = request.GET.get('designer')
@@ -105,7 +105,7 @@ def reports_index(request):
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_REPORTS')
 def export_csv(request, report_type):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{report_type}.csv"'
@@ -157,7 +157,7 @@ def export_csv(request, report_type):
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_REPORTS')
 def export_excel(request, report_type):
     try:
         import openpyxl
@@ -185,7 +185,7 @@ def export_excel(request, report_type):
 
 
 @login_required
-@require_global_permission('PERM_VIEW_REPORTS')
+@require_global_permission('NAV_PERM_REPORTS')
 def export_pdf(request, report_type):
     try:
         from reportlab.lib.pagesizes import A4

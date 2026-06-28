@@ -121,7 +121,7 @@ class SidebarAccessTests(TestCase):
         self.assertNotIn('settings', items)
 
     def test_hod_denied_team_and_manage_users_permissions(self):
-        self.assertFalse(PermissionService.has_global_permission(self.hod, 'VIS_PERM_TEAM_PAGE'))
+        self.assertFalse(PermissionService.has_global_permission(self.hod, 'NAV_PERM_TEAM'))
         self.assertFalse(PermissionService.has_global_permission(self.hod, 'PERM_MANAGE_USERS'))
         self.assertFalse(PermissionService.has_global_permission(self.hod, 'PERM_ADMIN_PANEL'))
 
@@ -129,6 +129,46 @@ class SidebarAccessTests(TestCase):
         items = PermissionService.get_user_sidebar_items(self.admin)
         self.assertIn('team', items)
         self.assertIn('settings', items)
+
+    def test_custom_sidebar_permissions(self):
+        from apps.core.models import UserSidebarPermission
+        from apps.accounts.sidebar_permissions import get_default_sidebar_for_role
+
+        defaults = get_default_sidebar_for_role(self.hod.role)
+        defaults['nav_team'] = True
+        UserSidebarPermission.objects.update_or_create(user=self.hod, defaults=defaults)
+        if hasattr(self.hod, '_cached_sidebar_perms'):
+            delattr(self.hod, '_cached_sidebar_perms')
+        items = PermissionService.get_user_sidebar_items(self.hod)
+        self.assertIn('team', items)
+        self.assertNotIn('settings', items)
+
+    def test_superuser_bypasses_sidebar_checks(self):
+        superuser = User.objects.create_superuser(
+            username='su', password='pass', email='su@test.com', employee_id='SU1',
+        )
+        self.assertTrue(PermissionService.has_global_permission(superuser, 'NAV_PERM_SETTINGS'))
+        self.assertTrue(PermissionService.has_global_permission(superuser, 'NAV_PERM_TEAM'))
+
+    def test_disabled_nav_blocks_page_access(self):
+        from apps.core.models import UserSidebarPermission
+
+        UserSidebarPermission.objects.update_or_create(
+            user=self.hod,
+            defaults={field: True for field in [
+                'nav_dashboard', 'nav_projects', 'nav_my_tasks', 'nav_design_library',
+                'nav_taskboard', 'nav_reports', 'nav_executive', 'nav_leaderboard',
+                'nav_workload', 'nav_team', 'nav_settings', 'nav_profile', 'nav_kpi',
+                'nav_notifications',
+            ]},
+        )
+        sidebar = self.hod.sidebar_permissions
+        sidebar.nav_reports = False
+        sidebar.save()
+        if hasattr(self.hod, '_cached_sidebar_perms'):
+            delattr(self.hod, '_cached_sidebar_perms')
+        self.assertFalse(PermissionService.has_global_permission(self.hod, 'NAV_PERM_REPORTS'))
+        self.assertNotIn('reports', PermissionService.get_user_sidebar_items(self.hod))
 
 
 class DesignTeamMembersTests(TestCase):

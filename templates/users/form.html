@@ -28,6 +28,19 @@
             {% endfor %}
 
             <div class="border-t border-slate-100 pt-6">
+                <h2 class="text-sm font-semibold text-slate-900 mb-1">Side Navigation</h2>
+                <p class="text-xs text-slate-500 mb-4">Select which sidebar items this user can see and access. Changing the role group will suggest defaults.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="sidebar-permission-fields">
+                    {% for item in sidebar_permission_items %}
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input type="checkbox" name="nav_{{ item.field }}" data-sidebar-field="{{ item.field }}" class="rounded sidebar-perm-checkbox" {% if item.checked %}checked{% endif %}>
+                        {{ item.label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-6">
                 <h2 class="text-sm font-semibold text-slate-900 mb-1">Extra Permissions (optional)</h2>
                 <p class="text-xs text-slate-500 mb-4">Tick only permissions this user needs <strong>in addition to</strong> their group.</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -71,6 +84,9 @@
 document.addEventListener('DOMContentLoaded', function () {
     const roleSelect = document.querySelector('#role-group-field select');
     const cards = document.querySelectorAll('.role-group-card');
+    const sidebarDefaults = {{ sidebar_defaults_json|safe }};
+    const sidebarCheckboxes = document.querySelectorAll('.sidebar-perm-checkbox');
+
     function highlightRole() {
         const val = roleSelect ? roleSelect.value : '';
         cards.forEach(card => {
@@ -80,8 +96,24 @@ document.addEventListener('DOMContentLoaded', function () {
             card.classList.toggle('ring-primary/20', active);
         });
     }
+
+    function applySidebarDefaults() {
+        if (!roleSelect) return;
+        const defaults = sidebarDefaults[roleSelect.value];
+        if (!defaults) return;
+        sidebarCheckboxes.forEach(cb => {
+            const field = cb.dataset.sidebarField;
+            if (field && Object.prototype.hasOwnProperty.call(defaults, field)) {
+                cb.checked = !!defaults[field];
+            }
+        });
+    }
+
     if (roleSelect) {
-        roleSelect.addEventListener('change', highlightRole);
+        roleSelect.addEventListener('change', function () {
+            highlightRole();
+            applySidebarDefaults();
+        });
         highlightRole();
     }
 });
