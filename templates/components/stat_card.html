@@ -1,7 +1,7 @@
 {% if url %}
-<a href="{{ url }}" class="g-stat-card g-stat-card-link {% if danger %}danger{% endif %}">
+<a href="{{ url }}" class="g-stat-card g-stat-card-link {% if danger %}danger{% endif %} {% if active %}g-stat-card-active{% endif %}">
 {% else %}
-<div class="g-stat-card {% if danger %}danger{% endif %}">
+<div class="g-stat-card {% if danger %}danger{% endif %} {% if active %}g-stat-card-active{% endif %}">
 {% endif %}
     <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ label }}</span>

@@ -84,6 +84,11 @@ a.g-stat-card-link:focus-visible {
   background: linear-gradient(90deg, #FEF2F2 0%, #FFFFFF 30%);
 }
 
+.g-stat-card-active {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 2px rgba(46, 117, 182, 0.15);
+}
+
 .g-card {
   background: var(--surface);
   border: 1px solid var(--border);

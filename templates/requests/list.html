@@ -18,10 +18,10 @@
 </div>
 
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-    {% include 'components/stat_card.html' with label='Total Requests' value=stats.total icon='files' icon_bg='bg-slate-50' icon_color='text-slate-600' url=requests_list_url %}
-    {% include 'components/stat_card.html' with label='Running' value=stats.running icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?running=1' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' subtext_class='text-red-600' danger=stats.overdue url=requests_list_url|add:'?overdue=1' %}
-    {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext_class='text-green-600' url=requests_list_url|add:'?completed_month=1' %}
+    {% include 'components/stat_card.html' with label='Total Requests' value=stats.total icon='files' icon_bg='bg-slate-50' icon_color='text-slate-600' url=requests_list_url active=stat_card_active.total %}
+    {% include 'components/stat_card.html' with label='Running' value=stats.running icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?running=1' active=stat_card_active.running %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' subtext_class='text-red-600' danger=stats.overdue url=requests_list_url|add:'?overdue=1' active=stat_card_active.overdue %}
+    {% include 'components/stat_card.html' with label='Completed This Month' value=stats.completed_month icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' subtext_class='text-green-600' url=requests_list_url|add:'?completed_month=1' active=stat_card_active.completed_month %}
 </div>
 
 <div class="flex flex-wrap gap-2 mb-6">

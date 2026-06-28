@@ -191,16 +191,6 @@ def design_request_list(request):
 
     terminal = [DesignStatus.COMPLETED, DesignStatus.CANCELLED]
     now = timezone.now()
-    stats = {
-        'total': base_qs.count(),
-        'running': base_qs.exclude(status__in=terminal).count(),
-        'overdue': base_qs.filter(due_date__lt=now).exclude(status__in=terminal).count(),
-        'completed_month': base_qs.filter(
-            status=DesignStatus.COMPLETED,
-            completion_date__month=now.month,
-            completion_date__year=now.year,
-        ).count(),
-    }
 
     designs = base_qs
     status = request.GET.get('status')
@@ -220,7 +210,7 @@ def design_request_list(request):
     if request.GET.get('running'):
         designs = designs.exclude(status__in=terminal)
     if request.GET.get('overdue'):
-        designs = designs.filter(due_date__lt=timezone.now()).exclude(status__in=terminal)
+        designs = designs.filter(due_date__lt=now).exclude(status__in=terminal)
     if request.GET.get('completed_month'):
         designs = designs.filter(
             status=DesignStatus.COMPLETED,
@@ -230,8 +220,19 @@ def design_request_list(request):
     if request.GET.get('mine'):
         designs = designs.filter(assigned_designer=request.user)
 
+    stats = {
+        'total': designs.count(),
+        'running': designs.exclude(status__in=terminal).count(),
+        'overdue': designs.filter(due_date__lt=now).exclude(status__in=terminal).count(),
+        'completed_month': designs.filter(
+            status=DesignStatus.COMPLETED,
+            completion_date__month=now.month,
+            completion_date__year=now.year,
+        ).count(),
+    }
+
     designs = designs.order_by('-created_at')
-    result_count = designs.count()
+    result_count = stats['total']
 
     status_labels = dict(DesignStatus.choices)
     project_labels = {
@@ -264,6 +265,25 @@ def design_request_list(request):
 
     has_filters = bool(active_filters)
 
+    active_stat = None
+    if request.GET.get('running'):
+        active_stat = 'running'
+    elif request.GET.get('overdue'):
+        active_stat = 'overdue'
+    elif request.GET.get('completed_month'):
+        active_stat = 'completed_month'
+    elif request.GET.get('mine'):
+        active_stat = 'mine'
+    elif not has_filters:
+        active_stat = 'total'
+
+    stat_card_active = {
+        'total': active_stat == 'total',
+        'running': active_stat == 'running',
+        'overdue': active_stat == 'overdue',
+        'completed_month': active_stat == 'completed_month',
+    }
+
     return render(request, 'requests/list.html', {
         'designs': designs[:100],
         'result_count': result_count,
@@ -273,6 +293,8 @@ def design_request_list(request):
         'stats': stats,
         'active_filters': active_filters,
         'has_filters': has_filters,
+        'active_stat': active_stat,
+        'stat_card_active': stat_card_active,
     })
 
 
