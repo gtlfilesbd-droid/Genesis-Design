@@ -301,11 +301,14 @@ def design_request_list(request):
 @login_required
 @require_global_permission('NAV_PERM_MY_TASKS')
 def my_tasks(request):
-    task_view, stats, querysets = get_my_tasks_context(request.user)
+    period = request.GET.get('period', 'all')
+    task_view, period, stats, querysets = get_my_tasks_context(request.user, period=period)
     return render(request, 'tasks/list.html', {
         'task_view': task_view,
+        'period': period,
         'stats': stats,
         'now': timezone.now(),
         'today': timezone.now().date(),
+        'user_obj': request.user,
         **querysets,
     })

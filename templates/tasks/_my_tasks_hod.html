@@ -1,0 +1,60 @@
+{% load genesis_ui %}
+<div class="g-card overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-4">
+        <div>
+            <h2 class="text-base font-semibold text-slate-900">My Work Queue</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Acknowledge, assign, review, and design work involving you</p>
+        </div>
+        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">{{ active_tasks|length }} active</span>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table g-table-pro w-full">
+            <thead>
+                <tr>
+                    <th>Design #</th>
+                    <th>Project</th>
+                    <th>Stage</th>
+                    <th>Role</th>
+                    <th>Due / Target</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in active_tasks %}
+                <tr class="{% if d.is_overdue or d.current_holder_id == user.pk and d.target_completion_date and d.target_completion_date < today %}bg-red-50/50{% endif %}">
+                    <td class="font-semibold text-primary-light">{{ d.design_number }}</td>
+                    <td>{{ d.project.code }}</td>
+                    <td>{% render_status_badge d.status %}</td>
+                    <td class="text-sm text-slate-600">
+                        {% if d.assigned_designer_id == user.pk %}Designer{% elif d.current_holder_id == user.pk %}Action required{% else %}—{% endif %}
+                    </td>
+                    <td class="text-sm">
+                        {% if d.assigned_designer_id == user.pk and d.due_date %}
+                        <span class="{% if d.is_overdue %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                            Due {{ d.due_date|date:"d M Y, h:i A" }}
+                        </span>
+                        {% elif d.target_completion_date %}
+                        <span class="{% if d.current_holder_id == user.pk and d.target_completion_date < today %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                            Target {{ d.target_completion_date|date:"d M Y" }}
+                        </span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="text-right">
+                        <a href="{% url 'requests:detail' d.pk %}" class="g-btn-primary text-xs px-3 py-1.5">Open</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-12">
+                        <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="check-circle" class="w-6 h-6 text-green-600"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-900">Queue is clear</p>
+                        <p class="text-xs text-slate-500 mt-1">No designs currently need your action.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

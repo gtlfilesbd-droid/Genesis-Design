@@ -24,6 +24,9 @@ class MyTasksStatsTests(TestCase):
         self.requester = User.objects.create_user(
             username='req', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R1',
         )
+        self.hod = User.objects.create_user(
+            username='hod', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H1',
+        )
         self.drawing_type = DrawingType.objects.create(name='Layout', code_prefix='LY', allowed_days=3)
         self.project_a = Project.objects.create(
             name='A', code='PA', client_name='Client A', start_date=date.today(),
@@ -51,11 +54,13 @@ class MyTasksStatsTests(TestCase):
         self._create_design(
             self.project_a,
             status=DesignStatus.COMPLETED,
+            completion_date=timezone.now() - timedelta(days=5),
             due_date=timezone.now() - timedelta(days=5),
         )
 
-        view_role, stats, _ = get_my_tasks_context(self.designer)
+        view_role, period, stats, _ = get_my_tasks_context(self.designer)
         self.assertEqual(view_role, 'designer')
+        self.assertEqual(period, 'all')
         self.assertEqual(stats['active_projects'], 2)
         self.assertEqual(stats['running_designs'], 2)
         self.assertEqual(stats['overdue_designs'], 1)
@@ -81,7 +86,7 @@ class MyTasksStatsTests(TestCase):
             verified_by=self.verifier,
         )
 
-        view_role, stats, querysets = get_my_tasks_context(self.verifier)
+        view_role, _, stats, querysets = get_my_tasks_context(self.verifier)
         self.assertEqual(view_role, 'verification')
         self.assertEqual(stats['active_projects'], 2)
         self.assertEqual(stats['running_designs'], 2)
@@ -104,10 +109,11 @@ class MyTasksStatsTests(TestCase):
         self._create_design(
             self.project_a,
             status=DesignStatus.COMPLETED,
+            completion_date=timezone.now() - timedelta(days=10),
             target_completion_date=today - timedelta(days=10),
         )
 
-        view_role, stats, _ = get_my_tasks_context(self.requester)
+        view_role, _, stats, _ = get_my_tasks_context(self.requester)
         self.assertEqual(view_role, 'requester')
         self.assertEqual(stats['projects_requested'], 2)
         self.assertEqual(stats['running_designs'], 2)
@@ -120,3 +126,79 @@ class MyTasksStatsTests(TestCase):
         self.assertTrue(
             PermissionService.has_global_permission(self.requester, 'NAV_PERM_MY_TASKS')
         )
+
+    def test_hod_stats_involvement_and_overdue(self):
+        today = timezone.now().date()
+        ack = self._create_design(
+            self.project_a,
+            status=DesignStatus.NEW_REQUEST,
+            assigned_designer=None,
+            current_holder=self.hod,
+            target_completion_date=today - timedelta(days=1),
+        )
+        self_work = self._create_design(
+            self.project_b,
+            status=DesignStatus.IN_PROGRESS,
+            assigned_designer=self.hod,
+            current_holder=self.hod,
+            assigned_by=self.hod,
+            due_date=timezone.now() - timedelta(hours=1),
+        )
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.COMPLETED,
+            completion_date=timezone.now() - timedelta(days=2),
+            assigned_by=self.hod,
+            assigned_designer=self.designer,
+        )
+
+        view_role, _, stats, querysets = get_my_tasks_context(self.hod)
+        self.assertEqual(view_role, 'hod')
+        self.assertEqual(stats['active_projects'], 2)
+        self.assertEqual(stats['running_designs'], 2)
+        self.assertEqual(stats['overdue_designs'], 2)
+        self.assertEqual(stats['finished_designs'], 1)
+        self.assertIn(ack, querysets['active_tasks'])
+        self.assertIn(self_work, querysets['active_tasks'])
+
+    def test_period_filter_scopes_finished_not_running(self):
+        old_completed = self._create_design(
+            self.project_a,
+            status=DesignStatus.COMPLETED,
+            completion_date=timezone.now() - timedelta(days=40),
+            due_date=timezone.now() - timedelta(days=40),
+        )
+        recent_completed = self._create_design(
+            self.project_b,
+            status=DesignStatus.COMPLETED,
+            completion_date=timezone.now() - timedelta(days=2),
+            due_date=timezone.now() - timedelta(days=2),
+        )
+        self._create_design(
+            self.project_a,
+            due_date=timezone.now() + timedelta(days=3),
+        )
+
+        _, _, stats_all, _ = get_my_tasks_context(self.designer, period='all')
+        _, _, stats_week, _ = get_my_tasks_context(self.designer, period='week')
+
+        self.assertEqual(stats_all['finished_designs'], 2)
+        self.assertEqual(stats_week['finished_designs'], 1)
+        self.assertEqual(stats_all['running_designs'], stats_week['running_designs'])
+        self.assertIn(old_completed.design_number, DesignRequest.objects.values_list('design_number', flat=True))
+        self.assertIn(recent_completed.design_number, DesignRequest.objects.values_list('design_number', flat=True))
+
+    def test_requester_period_scopes_projects_requested(self):
+        old = self._create_design(
+            self.project_a,
+            created_at=timezone.now() - timedelta(days=60),
+        )
+        DesignRequest.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=60))
+        recent = self._create_design(self.project_b)
+
+        _, _, stats_all, _ = get_my_tasks_context(self.requester, period='all')
+        _, _, stats_month, _ = get_my_tasks_context(self.requester, period='month')
+
+        self.assertEqual(stats_all['projects_requested'], 2)
+        self.assertEqual(stats_month['projects_requested'], 1)
+        self.assertEqual(recent.project_id, self.project_b.pk)

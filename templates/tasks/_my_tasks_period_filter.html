@@ -1,0 +1,7 @@
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="?period=week" class="g-filter-chip {% if period == 'week' %}active{% endif %}">This Week</a>
+    <a href="?period=month" class="g-filter-chip {% if period == 'month' %}active{% endif %}">This Month</a>
+    <a href="?period=year" class="g-filter-chip {% if period == 'year' %}active{% endif %}">This Year</a>
+    <a href="?period=all" class="g-filter-chip {% if period == 'all' %}active{% endif %}">All Time</a>
+</div>
+<p class="text-xs text-slate-500 mb-4">Active workload is live; Finished{% if task_view == 'requester' %} and Projects Requested{% endif %} reflect the selected period.</p>
