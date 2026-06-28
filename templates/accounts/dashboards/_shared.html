@@ -13,14 +13,6 @@
 
 {% url 'requests:list' as requests_list_url %}
 
-{% if stats.overdue_designs %}
-<div class="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
-    <i data-lucide="alert-triangle" class="w-5 h-5 shrink-0"></i>
-    <span><strong>{{ stats.overdue_designs }}</strong> design{{ stats.overdue_designs|pluralize }} are overdue —</span>
-    <a href="{{ requests_list_url }}?overdue=1" class="font-semibold underline">View Overdue Designs →</a>
-</div>
-{% endif %}
-
 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
     {% url 'projects:list' as projects_list_url %}
     {% include 'components/stat_card.html' with label='Active Projects' value=stats.active_projects icon='folder' icon_bg='bg-blue-50' icon_color='text-blue-600' subtext=stats.trend_active url=projects_list_url|add:'?status=active' %}
