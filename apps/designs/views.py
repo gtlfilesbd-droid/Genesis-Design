@@ -164,7 +164,12 @@ def design_create(request, pk):
             return redirect('projects:detail', pk=project.pk)
     else:
         form = DesignRequestForm(project=project)
-    return render(request, 'designs/create.html', {'form': form, 'project': project})
+    site_engineers = PermissionService.get_site_engineers()
+    return render(request, 'designs/create.html', {
+        'form': form,
+        'project': project,
+        'site_engineers_available': site_engineers.exists(),
+    })
 
 
 @login_required
