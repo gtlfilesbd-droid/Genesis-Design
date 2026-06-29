@@ -19,8 +19,8 @@ STATUS_TO_STEP_KEY = {
     DesignStatus.DRAFT: 'submitted',
     DesignStatus.ENGINEER_PENDING_ACK: 'submitted',
     DesignStatus.ENGINEER_IN_PROGRESS: 'site_engineer',
-    DesignStatus.NEW_REQUEST: 'hod_ack',
-    DesignStatus.ACKNOWLEDGED: 'assigned',
+    DesignStatus.NEW_REQUEST: 'site_engineer',
+    DesignStatus.ACKNOWLEDGED: 'hod_ack',
     DesignStatus.ASSIGNED: 'assigned',
     DesignStatus.IN_PROGRESS: 'in_progress',
     DesignStatus.SUBMITTED: 'under_review',
@@ -39,54 +39,27 @@ STATUS_TO_STEP_KEY = {
     DesignStatus.COMPLETED: 'completed',
 }
 
-STATUS_STEP_LABELS = {
-    DesignStatus.NEW_REQUEST: 'Awaiting HOD Acknowledgement',
-    DesignStatus.ACKNOWLEDGED: 'Pending Assignment',
-}
 
-
-def _step_index(step_key):
-    return STEP_KEYS.index(step_key)
-
-
-def _resolve_active_key(design):
-    """Active step from status, capped by actual workflow completion."""
-    key = STATUS_TO_STEP_KEY.get(design.status, 'submitted')
+def _resolve_current_index(design):
+    step_key = STATUS_TO_STEP_KEY.get(design.status, 'submitted')
+    try:
+        current_index = STEP_KEYS.index(step_key)
+    except ValueError:
+        current_index = 0
 
     if design.assigned_site_engineer_id and not design.engineer_submitted_at:
         if design.status == DesignStatus.ENGINEER_PENDING_ACK:
-            return 'submitted'
-        if design.status == DesignStatus.ENGINEER_IN_PROGRESS:
-            return 'site_engineer'
+            current_index = min(current_index, STEP_KEYS.index('submitted'))
+        elif design.status == DesignStatus.ENGINEER_IN_PROGRESS:
+            current_index = min(current_index, STEP_KEYS.index('site_engineer'))
 
-    return key
-
-
-def _is_step_done(design, step_key):
-    """A step is only completed when its work actually finished."""
-    if step_key == 'submitted':
-        return design.status not in (
-            DesignStatus.DRAFT,
-            DesignStatus.ENGINEER_PENDING_ACK,
-        )
-
-    if step_key == 'site_engineer':
+    if design.status == DesignStatus.NEW_REQUEST:
         if design.assigned_site_engineer_id:
-            return bool(design.engineer_submitted_at)
-        return design.status not in (
-            DesignStatus.DRAFT,
-            DesignStatus.ENGINEER_PENDING_ACK,
-            DesignStatus.ENGINEER_IN_PROGRESS,
-        )
+            current_index = STEP_KEYS.index('site_engineer')
+        else:
+            current_index = STEP_KEYS.index('submitted')
 
-    if step_key == 'hod_ack':
-        if design.deadline_start:
-            return True
-        status_key = STATUS_TO_STEP_KEY.get(design.status, 'submitted')
-        return _step_index(status_key) > _step_index('hod_ack')
-
-    active_key = _resolve_active_key(design)
-    return _step_index(step_key) < _step_index(active_key)
+    return current_index
 
 
 def build_progress_steps(design):
@@ -96,20 +69,16 @@ def build_progress_steps(design):
             for key, label in PROGRESS_STEPS
         ], True
 
-    active_key = _resolve_active_key(design)
-    override_label = STATUS_STEP_LABELS.get(design.status)
+    current_index = _resolve_current_index(design)
 
     progress_steps = []
-    for key, label in PROGRESS_STEPS:
-        if key == active_key:
-            state = 'active'
-            display_label = override_label or label
-        elif _is_step_done(design, key):
+    for index, (key, label) in enumerate(PROGRESS_STEPS):
+        if index < current_index:
             state = 'completed'
-            display_label = label
+        elif index == current_index:
+            state = 'active'
         else:
             state = 'upcoming'
-            display_label = label
-        progress_steps.append({'key': key, 'label': display_label, 'state': state})
+        progress_steps.append({'key': key, 'label': label, 'state': state})
 
     return progress_steps, False

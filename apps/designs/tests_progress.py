@@ -27,6 +27,16 @@ class ProgressStepsTests(TestCase):
         steps, _ = build_progress_steps(design)
         return next(s for s in steps if s['state'] == 'active')
 
+    def _assert_continuous_completed_line(self, steps):
+        active_index = next(i for i, s in enumerate(steps) if s['state'] == 'active')
+        for index, step in enumerate(steps):
+            if index < active_index:
+                self.assertEqual(step['state'], 'completed', msg=f"step {step['key']} should be completed")
+            elif index == active_index:
+                self.assertEqual(step['state'], 'active')
+            else:
+                self.assertEqual(step['state'], 'upcoming', msg=f"step {step['key']} should be upcoming")
+
     def test_engineer_pending_ack_shows_request_submitted(self):
         self.design.status = DesignStatus.ENGINEER_PENDING_ACK
         active = self._active_step(self.design)
@@ -39,16 +49,36 @@ class ProgressStepsTests(TestCase):
         self.assertEqual(active['key'], 'site_engineer')
         self.assertEqual(active['label'], 'Site Verification')
 
-    def test_new_request_shows_awaiting_hod_acknowledgement(self):
+    def test_new_request_waits_on_submitted_before_hod_ack(self):
         active = self._active_step(self.design)
-        self.assertEqual(active['key'], 'hod_ack')
-        self.assertEqual(active['label'], 'Awaiting HOD Acknowledgement')
+        self.assertEqual(active['key'], 'submitted')
+        self.assertEqual(active['label'], 'Request Submitted')
+        steps, _ = build_progress_steps(self.design)
+        hod_step = next(s for s in steps if s['key'] == 'hod_ack')
+        self.assertEqual(hod_step['state'], 'upcoming')
 
     def test_new_request_hod_ack_not_completed_before_acknowledge(self):
         steps, _ = build_progress_steps(self.design)
         hod_step = next(s for s in steps if s['key'] == 'hod_ack')
-        self.assertEqual(hod_step['state'], 'active')
+        self.assertEqual(hod_step['state'], 'upcoming')
         self.assertFalse(self.design.deadline_start)
+        self._assert_continuous_completed_line(steps)
+
+    def test_new_request_after_engineer_submit_waits_on_site_verification(self):
+        from django.utils import timezone
+        engineer = User.objects.create_user(
+            username='eng', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='E1',
+        )
+        self.design.assigned_site_engineer = engineer
+        self.design.engineer_submitted_at = timezone.now()
+        self.design.save()
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'site_engineer')
+        self.assertEqual(active['label'], 'Site Verification')
+        steps, _ = build_progress_steps(self.design)
+        hod_step = next(s for s in steps if s['key'] == 'hod_ack')
+        self.assertEqual(hod_step['state'], 'upcoming')
+        self._assert_continuous_completed_line(steps)
 
     def test_engineer_in_progress_hod_ack_is_upcoming(self):
         self.design.status = DesignStatus.ENGINEER_IN_PROGRESS
@@ -57,26 +87,35 @@ class ProgressStepsTests(TestCase):
         self.assertEqual(hod_step['state'], 'upcoming')
         site_step = next(s for s in steps if s['key'] == 'site_engineer')
         self.assertEqual(site_step['state'], 'active')
+        self._assert_continuous_completed_line(steps)
 
-    def test_acknowledged_marks_hod_ack_completed(self):
+    def test_acknowledged_shows_hod_acknowledgement_active(self):
         from django.utils import timezone
         self.design.status = DesignStatus.ACKNOWLEDGED
         self.design.deadline_start = timezone.now()
         steps, _ = build_progress_steps(self.design)
         hod_step = next(s for s in steps if s['key'] == 'hod_ack')
-        self.assertEqual(hod_step['state'], 'completed')
+        self.assertEqual(hod_step['state'], 'active')
+        self._assert_continuous_completed_line(steps)
 
-    def test_acknowledged_shows_pending_assignment(self):
+    def test_acknowledged_designer_assigned_is_upcoming(self):
         self.design.status = DesignStatus.ACKNOWLEDGED
+        steps, _ = build_progress_steps(self.design)
+        assigned_step = next(s for s in steps if s['key'] == 'assigned')
+        self.assertEqual(assigned_step['state'], 'upcoming')
         active = self._active_step(self.design)
-        self.assertEqual(active['key'], 'assigned')
-        self.assertEqual(active['label'], 'Pending Assignment')
+        self.assertEqual(active['key'], 'hod_ack')
+        self.assertEqual(active['label'], 'HOD Acknowledgement')
 
     def test_assigned_shows_designer_assigned(self):
         self.design.status = DesignStatus.ASSIGNED
         active = self._active_step(self.design)
         self.assertEqual(active['key'], 'assigned')
         self.assertEqual(active['label'], 'Designer Assigned')
+        steps, _ = build_progress_steps(self.design)
+        hod_step = next(s for s in steps if s['key'] == 'hod_ack')
+        self.assertEqual(hod_step['state'], 'completed')
+        self._assert_continuous_completed_line(steps)
 
     def test_correction_required_shows_under_review_active(self):
         self.design.status = DesignStatus.CORRECTION_REQUIRED
@@ -84,12 +123,14 @@ class ProgressStepsTests(TestCase):
         active = [s for s in steps if s['state'] == 'active']
         self.assertEqual(len(active), 1)
         self.assertEqual(active[0]['key'], 'under_review')
+        self._assert_continuous_completed_line(steps)
 
     def test_verification_correction_shows_verification_pending_active(self):
         self.design.status = DesignStatus.VERIFICATION_CORRECTION
         steps, _ = build_progress_steps(self.design)
         active = [s for s in steps if s['state'] == 'active'][0]
         self.assertEqual(active['key'], 'verification_pending')
+        self._assert_continuous_completed_line(steps)
 
     def test_completed_marks_all_prior_steps_done(self):
         self.design.status = DesignStatus.COMPLETED
@@ -97,6 +138,7 @@ class ProgressStepsTests(TestCase):
         self.assertEqual(len(steps), 10)
         self.assertEqual(steps[-1]['state'], 'active')
         self.assertTrue(all(step['state'] == 'completed' for step in steps[:-1]))
+        self._assert_continuous_completed_line(steps)
 
     def test_cancelled_grays_out_steps(self):
         self.design.status = DesignStatus.CANCELLED
