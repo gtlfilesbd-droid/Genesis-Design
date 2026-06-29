@@ -96,6 +96,9 @@ def get_deadline_timer_data(design):
     elif status in ACTION_SLA_STATUSES:
         start = get_action_anchor(design)
         due = get_action_due_at(design)
+    elif status == DesignStatus.ENGINEER_IN_PROGRESS:
+        start = design.engineer_acknowledged_at or design.engineer_assigned_at
+        due = design.engineer_due_date
     elif status in (DesignStatus.VERIFICATION_PENDING, DesignStatus.VERIFICATION_CORRECTION):
         start = design.verification_acknowledged_at or design.verification_assigned_at
         due = design.verification_due_date

@@ -146,9 +146,12 @@ class DeadlineConfiguration(models.Model):
     action_compliance_correction_hours = models.PositiveSmallIntegerField(default=0)
     action_mark_complete_days = models.PositiveSmallIntegerField(default=1)
     action_mark_complete_hours = models.PositiveSmallIntegerField(default=0)
+    action_engineer_acknowledge_days = models.PositiveSmallIntegerField(default=1)
+    action_engineer_acknowledge_hours = models.PositiveSmallIntegerField(default=0)
 
     ACTION_SLA_FIELD_GROUPS = (
         ('action_acknowledge', 'Acknowledge request (HoD)'),
+        ('action_engineer_acknowledge', 'Acknowledge engineer assignment'),
         ('action_assign_designer', 'Assign designer (HoD)'),
         ('action_accept_assignment', 'Accept assignment (Designer)'),
         ('action_hod_review', 'Review / send to verification (HoD)'),
@@ -205,6 +208,7 @@ class UserExtraPermission(models.Model):
     can_manage_users = models.BooleanField(default=False)
     can_view_reports = models.BooleanField(default=False)
     can_manage_settings = models.BooleanField(default=False)
+    can_site_engineer = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = 'user extra permissions'

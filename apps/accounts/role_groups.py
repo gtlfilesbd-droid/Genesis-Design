@@ -11,6 +11,7 @@ PERMISSION_FIELD_LABELS = {
     'can_manage_users': 'Manage Users',
     'can_view_reports': 'View Reports',
     'can_manage_settings': 'Manage Settings',
+    'can_site_engineer': 'Site Engineer',
 }
 
 ROLE_GROUP_ORDER = [

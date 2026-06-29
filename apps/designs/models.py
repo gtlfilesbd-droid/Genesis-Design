@@ -36,6 +36,8 @@ class DesignPriority(models.TextChoices):
 
 class DesignStatus(models.TextChoices):
     DRAFT = 'draft', 'Draft Request'
+    ENGINEER_PENDING_ACK = 'engineer_pending_acknowledgement', 'Engineer Pending Acknowledgement'
+    ENGINEER_IN_PROGRESS = 'engineer_in_progress', 'Engineer In Progress'
     NEW_REQUEST = 'new_request', 'New Request'
     ACKNOWLEDGED = 'acknowledged', 'Acknowledged'
     ASSIGNED = 'assigned', 'Assigned'
@@ -74,6 +76,8 @@ class PrimaryStatus(models.TextChoices):
 
 PRIMARY_STATUS_MAP = {
     DesignStatus.DRAFT: PrimaryStatus.NEW,
+    DesignStatus.ENGINEER_PENDING_ACK: PrimaryStatus.NEW,
+    DesignStatus.ENGINEER_IN_PROGRESS: PrimaryStatus.NEW,
     DesignStatus.NEW_REQUEST: PrimaryStatus.NEW,
     DesignStatus.ACKNOWLEDGED: PrimaryStatus.RUNNING,
     DesignStatus.ASSIGNED: PrimaryStatus.RUNNING,
@@ -167,6 +171,19 @@ class DesignRequest(models.Model):
         blank=True,
         related_name='compliance_assignments',
     )
+    assigned_site_engineer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='site_engineer_assignments',
+    )
+    engineer_due_date = models.DateTimeField(null=True, blank=True)
+    engineer_instructions = models.TextField(blank=True)
+    engineer_assigned_at = models.DateTimeField(null=True, blank=True)
+    engineer_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    engineer_submitted_at = models.DateTimeField(null=True, blank=True)
+    engineer_site_notes = models.TextField(blank=True)
     approved_by_compliance = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -258,6 +275,18 @@ class DesignRequest(models.Model):
         if self.status in [DesignStatus.COMPLETED, DesignStatus.CANCELLED]:
             return False
         return timezone.now() > self.due_date
+
+    @property
+    def is_engineer_work_overdue(self):
+        from django.utils import timezone
+        if not self.engineer_due_date:
+            return False
+        if self.status not in (
+            DesignStatus.ENGINEER_PENDING_ACK,
+            DesignStatus.ENGINEER_IN_PROGRESS,
+        ):
+            return False
+        return timezone.now() > self.engineer_due_date
 
     @property
     def verification_status(self):

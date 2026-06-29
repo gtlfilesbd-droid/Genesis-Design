@@ -14,6 +14,7 @@ from apps.designs.models import (
 from apps.workflow.deadline_utils import add_allowed_duration, get_deadline_config
 
 ACTION_SLA_CONFIG = {
+    DesignStatus.ENGINEER_PENDING_ACK: 'action_engineer_acknowledge',
     DesignStatus.NEW_REQUEST: 'action_acknowledge',
     DesignStatus.ACKNOWLEDGED: 'action_assign_designer',
     DesignStatus.ASSIGNED: 'action_accept_assignment',
@@ -42,6 +43,7 @@ HOD_ACTION_STATUSES = frozenset({
 })
 
 ACTION_DUE_LABELS = {
+    DesignStatus.ENGINEER_PENDING_ACK: 'Ack due',
     DesignStatus.NEW_REQUEST: 'Ack due',
     DesignStatus.ACKNOWLEDGED: 'Assign due',
     DesignStatus.ASSIGNED: 'Accept due',
@@ -102,6 +104,8 @@ def _compliance_approved_at(design):
 
 def get_action_anchor(design):
     status = design.status
+    if status == DesignStatus.ENGINEER_PENDING_ACK:
+        return design.engineer_assigned_at or design.created_at
     if status == DesignStatus.NEW_REQUEST:
         return design.created_at
     if status == DesignStatus.ACKNOWLEDGED:
@@ -167,10 +171,16 @@ def _compliance_is_responsible(design, user):
     return design.assigned_compliance_officer_id == user.pk
 
 
+def _engineer_is_responsible(design, user):
+    return design.assigned_site_engineer_id == user.pk
+
+
 def is_action_responsible_user(design, user):
     status = design.status
     if status in HOD_ACTION_STATUSES:
         return _hod_is_responsible(design, user)
+    if status == DesignStatus.ENGINEER_PENDING_ACK:
+        return _engineer_is_responsible(design, user)
     if status == DesignStatus.ASSIGNED:
         return _designer_is_responsible(design, user)
     if status == DesignStatus.VERIFICATION_PENDING_ACK:
@@ -313,6 +323,32 @@ def _compliance_action_overdue_q(now, config=None):
         status=DesignStatus.COMPLIANCE_PENDING_ACK,
         compliance_assigned_at__lt=cutoff,
     )
+
+
+def _engineer_action_overdue_q(now, config=None):
+    config = config or get_action_config()
+    cutoff = _cutoff_for_status(DesignStatus.ENGINEER_PENDING_ACK, now, config)
+    if not cutoff:
+        return Q(pk__in=[])
+    return Q(
+        status=DesignStatus.ENGINEER_PENDING_ACK,
+        engineer_assigned_at__lt=cutoff,
+    )
+
+
+def _engineer_work_overdue_q(now):
+    return Q(
+        status__in=[
+            DesignStatus.ENGINEER_PENDING_ACK,
+            DesignStatus.ENGINEER_IN_PROGRESS,
+        ],
+        engineer_due_date__isnull=False,
+        engineer_due_date__lt=now,
+    )
+
+
+def _engineer_overdue_q(now, config=None):
+    return _engineer_action_overdue_q(now, config) | _engineer_work_overdue_q(now)
 
 
 def reset_action_sla_breach(design):

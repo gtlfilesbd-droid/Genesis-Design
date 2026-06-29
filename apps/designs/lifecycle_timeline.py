@@ -15,12 +15,14 @@ HOD_ACTIONS = (
 
 ROLE_LABELS = {
     'hod': 'Head of Design',
+    'engineer': 'Site Engineer',
     'designer': 'Designer',
     'verifier': 'Verifier',
     'compliance': 'Compliance',
 }
 
 HAPPY_PATH_PENDING = [
+    ('engineer', 'Site Engineer'),
     ('hod', 'Assign'),
     ('designer', 'Designer'),
     ('hod', 'HOD Review'),
@@ -32,26 +34,30 @@ HAPPY_PATH_PENDING = [
 ]
 
 STATUS_PENDING_START = {
-    DesignStatus.NEW_REQUEST: 0,
-    DesignStatus.ACKNOWLEDGED: 1,
-    DesignStatus.ASSIGNED: 2,
-    DesignStatus.IN_PROGRESS: 3,
-    DesignStatus.CORRECTION_REQUIRED: 3,
-    DesignStatus.RESUBMITTED: 3,
-    DesignStatus.SUBMITTED: 4,
-    DesignStatus.UNDER_REVIEW: 4,
-    DesignStatus.VERIFICATION_PENDING_ACK: 5,
-    DesignStatus.VERIFICATION_PENDING: 5,
-    DesignStatus.VERIFICATION_CORRECTION: 6,
-    DesignStatus.AWAITING_COMPLIANCE: 6,
-    DesignStatus.COMPLIANCE_PENDING_ACK: 7,
-    DesignStatus.COMPLIANCE_PENDING: 7,
-    DesignStatus.COMPLIANCE_CORRECTION: 8,
-    DesignStatus.FINAL_APPROVAL_PENDING: 8,
-    DesignStatus.APPROVED: 9,
+    DesignStatus.ENGINEER_PENDING_ACK: 0,
+    DesignStatus.ENGINEER_IN_PROGRESS: 0,
+    DesignStatus.NEW_REQUEST: 1,
+    DesignStatus.ACKNOWLEDGED: 2,
+    DesignStatus.ASSIGNED: 3,
+    DesignStatus.IN_PROGRESS: 4,
+    DesignStatus.CORRECTION_REQUIRED: 4,
+    DesignStatus.RESUBMITTED: 4,
+    DesignStatus.SUBMITTED: 5,
+    DesignStatus.UNDER_REVIEW: 5,
+    DesignStatus.VERIFICATION_PENDING_ACK: 6,
+    DesignStatus.VERIFICATION_PENDING: 6,
+    DesignStatus.VERIFICATION_CORRECTION: 7,
+    DesignStatus.AWAITING_COMPLIANCE: 7,
+    DesignStatus.COMPLIANCE_PENDING_ACK: 8,
+    DesignStatus.COMPLIANCE_PENDING: 8,
+    DesignStatus.COMPLIANCE_CORRECTION: 9,
+    DesignStatus.FINAL_APPROVAL_PENDING: 9,
+    DesignStatus.APPROVED: 10,
 }
 
 STAGE_ROLE_LABELS = {
+    DesignStatus.ENGINEER_PENDING_ACK: ('engineer', 'Awaiting Acknowledgement'),
+    DesignStatus.ENGINEER_IN_PROGRESS: ('engineer', 'Site Engineer'),
     DesignStatus.NEW_REQUEST: ('hod', 'Awaiting Acknowledgement'),
     DesignStatus.ACKNOWLEDGED: ('hod', 'Assigning Designer'),
     DesignStatus.ASSIGNED: ('hod', 'Assigning Designer'),
@@ -73,6 +79,8 @@ STAGE_ROLE_LABELS = {
 }
 
 DELAY_STATUS_LABELS = {
+    DesignStatus.ENGINEER_PENDING_ACK: 'Site Engineer — Acknowledgement',
+    DesignStatus.ENGINEER_IN_PROGRESS: 'Site Engineer',
     DesignStatus.NEW_REQUEST: 'Head of Design — Acknowledgement',
     DesignStatus.ACKNOWLEDGED: 'Head of Design — Assignment',
     DesignStatus.ASSIGNED: 'Designer — Accept Assignment',

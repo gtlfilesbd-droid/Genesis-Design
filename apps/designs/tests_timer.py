@@ -46,8 +46,10 @@ class TimerHelpersTests(TestCase):
             status=DesignStatus.NEW_REQUEST,
         )
 
-    def test_deadline_timer_none_for_new_request(self):
-        self.assertIsNone(get_deadline_timer_data(self.design))
+    def test_deadline_timer_for_new_request_hod_ack_sla(self):
+        timer = get_deadline_timer_data(self.design)
+        self.assertIsNotNone(timer)
+        self.assertFalse(timer['is_overdue'])
 
     def test_deadline_timer_for_assigned_design(self):
         now = timezone.now()

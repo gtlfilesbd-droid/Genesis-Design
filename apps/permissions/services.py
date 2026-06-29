@@ -196,6 +196,9 @@ class PermissionService:
         if permission_code in ('DESIGN_PERM_WORK', 'DESIGN_PERM_UPLOAD', 'DESIGN_PERM_REVISE'):
             return user.role in (UserRole.DESIGNER, UserRole.HEAD_OF_DESIGN, UserRole.ADMIN)
 
+        if permission_code == 'DESIGN_PERM_SITE_ENGINEER':
+            return PermissionService.is_site_engineer(user)
+
         if permission_code in ROLE_PERM_FIELDS:
             return PermissionService.has_global_permission(user, permission_code)
 
@@ -217,6 +220,7 @@ class PermissionService:
         involved_project_ids = DesignRequest.objects.filter(
             Q(requested_by=user)
             | Q(assigned_designer=user)
+            | Q(assigned_site_engineer=user)
             | Q(current_holder=user)
             | Q(assigned_verifier=user)
             | Q(verified_by=user)
@@ -247,6 +251,7 @@ class PermissionService:
         return (
             Q(requested_by=user)
             | Q(assigned_designer=user)
+            | Q(assigned_site_engineer=user)
             | Q(current_holder=user)
             | Q(assigned_verifier=user)
             | Q(verified_by=user)
@@ -327,6 +332,23 @@ class PermissionService:
             is_active=True,
             status='active',
         ).distinct()
+
+    @staticmethod
+    def is_site_engineer(user) -> bool:
+        if not user or not user.is_authenticated:
+            return False
+        return PermissionService._extra_flag(user, 'can_site_engineer')
+
+    @staticmethod
+    def get_site_engineers():
+        """Active users with site engineer permission, excluding admin/HOD/designer roles."""
+        return User.objects.filter(
+            extra_permissions__can_site_engineer=True,
+            is_active=True,
+            status='active',
+        ).exclude(
+            role__in=(UserRole.ADMIN, UserRole.HEAD_OF_DESIGN, UserRole.DESIGNER),
+        ).order_by('first_name', 'last_name')
 
     @staticmethod
     def get_compliance_officers(project):

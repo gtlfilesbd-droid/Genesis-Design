@@ -56,6 +56,14 @@ class CommentForm(forms.Form):
     )
 
 
+class EngineerSubmitForm(forms.Form):
+    comments = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4, 'class': INPUT, 'placeholder': 'Site measurements, device locations, scenario notes...'}),
+        required=True,
+        label='Site Notes',
+    )
+
+
 class SendToVerificationForm(forms.Form):
     verifier = forms.ModelChoiceField(
         queryset=User.objects.none(),
@@ -121,6 +129,8 @@ ACTION_PERMISSIONS = {
     'resubmit': 'DESIGN_PERM_REVISE',
     'hod_fast_complete': 'PROJECT_PERM_COMPLETE',
     'complete': 'PROJECT_PERM_COMPLETE',
+    'acknowledge_engineer': 'DESIGN_PERM_SITE_ENGINEER',
+    'submit_engineer_review': 'DESIGN_PERM_SITE_ENGINEER',
 }
 
 
@@ -148,6 +158,11 @@ def _check_workflow_permission(request, design, action):
     if action == 'accept_compliance':
         return (
             design.assigned_compliance_officer_id == request.user.pk
+            and can_run_workflow_action(request.user, project, action, required)
+        )
+    if action in ('acknowledge_engineer', 'submit_engineer_review'):
+        return (
+            design.assigned_site_engineer_id == request.user.pk
             and can_run_workflow_action(request.user, project, action, required)
         )
     if action in ('accept_assignment', 'submit_work', 'resubmit'):
@@ -182,6 +197,7 @@ def workflow_action(request, pk, action):
         'send_to_compliance': lambda **kw: SendToComplianceForm(project=design.project, **kw),
         'verify_approved': CommentForm,
         'compliance_approved': CommentForm,
+        'submit_engineer_review': EngineerSubmitForm,
     }
 
     if request.method == 'GET' and action in form_actions:
@@ -246,6 +262,16 @@ def workflow_action(request, pk, action):
             ):
                 form = CommentForm(request.POST)
                 form.is_valid()
+                kwargs['comments'] = form.cleaned_data.get('comments', '')
+            elif action == 'submit_engineer_review':
+                form = EngineerSubmitForm(request.POST)
+                if not form.is_valid():
+                    from apps.core.models import CompanySettings
+                    company = CompanySettings.objects.first()
+                    return render(request, 'workflow/action_form.html', {
+                        'design': design, 'action': action, 'form': form,
+                        'file_sharing_policy': company.file_sharing_policy if company else '',
+                    })
                 kwargs['comments'] = form.cleaned_data.get('comments', '')
 
             transition(design, action, request.user, request=request, **kwargs)

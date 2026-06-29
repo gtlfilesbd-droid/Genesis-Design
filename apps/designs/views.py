@@ -20,6 +20,7 @@ from apps.core.my_tasks_helpers import (
     get_my_tasks_stat_cards,
     get_my_tasks_stats_for_scope,
     get_my_tasks_view_role,
+    get_site_engineer_tasks,
     normalize_period,
 )
 from apps.core.utils import log_activity
@@ -65,7 +66,11 @@ def design_detail(request, pk):
             return redirect('requests:detail', pk=pk)
         if (
             design.requested_by_id == request.user.pk
-            and design.status != DesignStatus.NEW_REQUEST
+            and design.status not in (
+                DesignStatus.NEW_REQUEST,
+                DesignStatus.ENGINEER_PENDING_ACK,
+                DesignStatus.ENGINEER_IN_PROGRESS,
+            )
         ):
             messages.error(
                 request,
@@ -137,11 +142,9 @@ def design_create(request, pk):
         if form.is_valid():
             design = create_design_request(project, request.user, form.cleaned_data)
             from apps.notifications.services import NotificationService
-            NotificationService.on_request_created(design)
-            from apps.workflow.services import get_head_of_design
-            hod = get_head_of_design()
-            design.current_holder = hod
-            design.save(update_fields=['current_holder'])
+            from apps.workflow.views import _warn_if_past_target
+            NotificationService.on_engineer_assigned(design)
+            _warn_if_past_target(request, design, form.cleaned_data.get('engineer_due_date'))
             from apps.core.activity_messages import (
                 build_project_activity_description,
                 build_workflow_activity_description,
@@ -422,5 +425,6 @@ def my_tasks(request):
         'now': timezone.now(),
         'today': timezone.now().date(),
         'user_obj': request.user,
+        'site_engineer_tasks': get_site_engineer_tasks(request.user, timezone.now()),
         **querysets,
     })

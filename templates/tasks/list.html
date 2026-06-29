@@ -153,4 +153,7 @@
     </div>
 </div>
 {% endif %}
+{% if site_engineer_tasks is not None %}
+{% include 'tasks/_my_tasks_site_engineer.html' %}
+{% endif %}
 {% endblock %}

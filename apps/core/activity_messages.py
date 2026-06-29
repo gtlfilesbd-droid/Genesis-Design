@@ -53,6 +53,8 @@ ACTIVITY_TITLES = {
     'hod_fast_complete': 'Design marked completed',
     'cancel': 'Design request cancelled',
     'cancelled': 'Design request cancelled',
+    'acknowledge_engineer': 'Site engineer acknowledged',
+    'submit_engineer_review': 'Site review submitted',
     'comment_added': 'Comment added',
 }
 
@@ -77,6 +79,12 @@ def build_workflow_activity_description(
 
     if action == 'acknowledge':
         return f'{actor} (Head of Design) acknowledged this request'
+
+    if action == 'acknowledge_engineer':
+        return f'{actor} acknowledged the site engineering assignment'
+
+    if action == 'submit_engineer_review':
+        return f'{actor} submitted site review notes for Head of Design review'
 
     if action == 'assign':
         designer = kwargs.get('designer') or design.assigned_designer

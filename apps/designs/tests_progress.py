@@ -23,11 +23,13 @@ class ProgressStepsTests(TestCase):
             status=DesignStatus.NEW_REQUEST,
         )
 
-    def test_new_request_shows_first_step_active(self):
+    def test_new_request_shows_hod_step_active(self):
         steps, cancelled = build_progress_steps(self.design)
         self.assertFalse(cancelled)
-        self.assertEqual(steps[0]['state'], 'active')
-        self.assertEqual(steps[0]['label'], 'New Request')
+        self.assertEqual(steps[0]['state'], 'completed')
+        self.assertEqual(steps[0]['label'], 'Site Engineer')
+        self.assertEqual(steps[1]['state'], 'active')
+        self.assertEqual(steps[1]['label'], 'New Request')
 
     def test_correction_required_shows_under_review_active(self):
         self.design.status = DesignStatus.CORRECTION_REQUIRED
@@ -45,7 +47,7 @@ class ProgressStepsTests(TestCase):
     def test_completed_marks_all_prior_steps_done(self):
         self.design.status = DesignStatus.COMPLETED
         steps, _ = build_progress_steps(self.design)
-        self.assertEqual(len(steps), 9)
+        self.assertEqual(len(steps), 10)
         self.assertEqual(steps[-1]['state'], 'active')
         self.assertTrue(all(step['state'] == 'completed' for step in steps[:-1]))
 

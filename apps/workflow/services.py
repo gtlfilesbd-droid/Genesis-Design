@@ -140,6 +140,26 @@ WORKFLOW_ACTIONS = {
         'to': DesignStatus.CANCELLED,
         'roles': [UserRole.HEAD_OF_DESIGN, UserRole.ADMIN],
     },
+    'acknowledge_engineer': {
+        'from': [DesignStatus.ENGINEER_PENDING_ACK],
+        'to': DesignStatus.ENGINEER_IN_PROGRESS,
+        'roles': [
+            UserRole.DESIGN_REQUESTER,
+            UserRole.VERIFICATION_TEAM,
+            UserRole.COMPLIANCE_TEAM,
+            UserRole.ADMIN,
+        ],
+    },
+    'submit_engineer_review': {
+        'from': [DesignStatus.ENGINEER_IN_PROGRESS],
+        'to': DesignStatus.NEW_REQUEST,
+        'roles': [
+            UserRole.DESIGN_REQUESTER,
+            UserRole.VERIFICATION_TEAM,
+            UserRole.COMPLIANCE_TEAM,
+            UserRole.ADMIN,
+        ],
+    },
 }
 
 _ASSIGNABLE_ROLES = frozenset({
@@ -205,9 +225,11 @@ def get_compliance_team():
     )
 
 
-def _check_permission(user, action_config):
+def _check_permission(user, action_config, design=None, action=None):
     if user.is_superuser or user.role == UserRole.ADMIN:
         return True
+    if action in ('acknowledge_engineer', 'submit_engineer_review'):
+        return design and design.assigned_site_engineer_id == user.pk
     return user.role in action_config['roles']
 
 
@@ -332,7 +354,7 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         raise WorkflowError(f'Unknown action: {action}')
 
     config = WORKFLOW_ACTIONS[action]
-    if not skip_permission and not _check_permission(user, config):
+    if not skip_permission and not _check_permission(user, config, design=design, action=action):
         raise WorkflowError('You do not have permission for this action.')
 
     if design.status not in config['from'] and action != 'cancel':
@@ -456,6 +478,20 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             raise WorkflowError('Only the assigned compliance officer can acknowledge this request.')
         design.compliance_acknowledged_at = timezone.now()
 
+    elif action == 'acknowledge_engineer':
+        if design.assigned_site_engineer_id != user.pk:
+            raise WorkflowError('Only the assigned site engineer can acknowledge this request.')
+        design.engineer_acknowledged_at = timezone.now()
+
+    elif action == 'submit_engineer_review':
+        if design.assigned_site_engineer_id != user.pk:
+            raise WorkflowError('Only the assigned site engineer can submit this review.')
+        if not comments.strip():
+            raise WorkflowError('Site notes are required before submitting.')
+        design.engineer_site_notes = comments.strip()
+        design.engineer_submitted_at = timezone.now()
+        design.current_holder = get_head_of_design()
+
     elif action == 'compliance_correction':
         design.current_holder = hod or user
         ComplianceReview.objects.create(
@@ -521,6 +557,7 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
     _STAGE_START_SKIP = frozenset({
         'send_to_verification', 'accept_design', 'send_to_compliance',
+        'submit_engineer_review',
     })
     if action not in _STAGE_START_SKIP:
         _start_stage(design, new_status, user)

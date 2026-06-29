@@ -22,7 +22,8 @@ def _project_label(design_request):
 
 def _format_due_date(design_request):
     due = (
-        design_request.due_date
+        design_request.engineer_due_date
+        or design_request.due_date
         or design_request.verification_due_date
         or design_request.compliance_due_date
     )
@@ -58,6 +59,38 @@ def designer_assigned_requester_message(design_request):
     return (
         f'{designer} has been assigned to your {_drawing_type(design_request)} request '
         f'for {_project_label(design_request)}'
+    )
+
+
+def engineer_assigned_message(design_request):
+    due = design_request.engineer_due_date
+    due_label = due.strftime('%d %b %Y') if due else '—'
+    return (
+        f"You've been assigned as site engineer for {_drawing_type(design_request)} "
+        f'for {_project_label(design_request)} · Due {due_label}'
+    )
+
+
+def engineer_assigned_requester_message(design_request):
+    engineer = _person_name(design_request.assigned_site_engineer)
+    return (
+        f'{engineer} has been assigned as site engineer for your '
+        f'{_drawing_type(design_request)} request for {_project_label(design_request)}'
+    )
+
+
+def engineer_acknowledged_message(design_request, engineer_name):
+    return (
+        f'{engineer_name} acknowledged the site engineering request for '
+        f'{_drawing_type(design_request)} ({_project_label(design_request)})'
+    )
+
+
+def engineer_submitted_message(design_request):
+    engineer = _person_name(design_request.assigned_site_engineer)
+    return (
+        f'{engineer} submitted site review for {_drawing_type(design_request)} '
+        f'({_project_label(design_request)}) — ready for Head of Design'
     )
 
 

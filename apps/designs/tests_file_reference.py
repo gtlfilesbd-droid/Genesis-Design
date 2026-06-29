@@ -4,8 +4,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from datetime import timedelta
 
 from apps.accounts.models import User, UserRole
+from apps.core.models import UserExtraPermission
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DesignSubmission, DrawingType, RequestAttachment
 from apps.projects.models import Project
@@ -25,6 +27,10 @@ class ReferenceOnlyFileStorageTests(TestCase):
         self.hod = User.objects.create_user(
             username='hodref', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='HR001',
         )
+        self.engineer = User.objects.create_user(
+            username='engref', password='pass', role=UserRole.VERIFICATION_TEAM, employee_id='ER001',
+        )
+        UserExtraPermission.objects.create(user=self.engineer, can_site_engineer=True)
         self.drawing_type = DrawingType.objects.create(
             name='Initial Drawing', code_prefix='ID', allowed_days=3,
         )
@@ -46,11 +52,15 @@ class ReferenceOnlyFileStorageTests(TestCase):
         self.client.login(username='reqref', password='pass')
         upload = SimpleUploadedFile('brief.pdf', b'pdf-content', content_type='application/pdf')
         url = reverse('projects:request_new', kwargs={'pk': self.project.pk})
+        due = timezone.localtime(timezone.now() + timedelta(days=3)).strftime('%Y-%m-%dT%H:%M')
         response = self.client.post(url, {
             'drawing_type': self.drawing_type.pk,
             'priority': 'medium',
             'request_message': 'Need drawing',
             'target_completion_date': '',
+            'assigned_site_engineer': self.engineer.pk,
+            'engineer_due_date': due,
+            'engineer_instructions': '',
             'attachments': upload,
         })
         self.assertEqual(response.status_code, 302)

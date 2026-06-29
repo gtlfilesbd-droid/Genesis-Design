@@ -1,6 +1,7 @@
 from apps.designs.models import DesignStatus
 
 PROGRESS_STEPS = [
+    ('site_engineer', 'Site Engineer'),
     ('new', 'New Request'),
     ('acknowledged', 'Acknowledged'),
     ('assigned', 'Assigned'),
@@ -13,7 +14,9 @@ PROGRESS_STEPS = [
 ]
 
 STATUS_TO_STEP_KEY = {
-    DesignStatus.DRAFT: 'new',
+    DesignStatus.DRAFT: 'site_engineer',
+    DesignStatus.ENGINEER_PENDING_ACK: 'site_engineer',
+    DesignStatus.ENGINEER_IN_PROGRESS: 'site_engineer',
     DesignStatus.NEW_REQUEST: 'new',
     DesignStatus.ACKNOWLEDGED: 'acknowledged',
     DesignStatus.ASSIGNED: 'assigned',

@@ -67,6 +67,21 @@
             {% endif %}
 
             {% endfor %}
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Site Engineer *</label>
+                {{ form.assigned_site_engineer }}
+                {% if form.assigned_site_engineer.errors %}<p class="text-red-600 text-xs mt-1">{{ form.assigned_site_engineer.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Engineer Due Date *</label>
+                {{ form.engineer_due_date }}
+                {% if form.engineer_due_date.errors %}<p class="text-red-600 text-xs mt-1">{{ form.engineer_due_date.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Instructions for Engineer</label>
+                {{ form.engineer_instructions }}
+                {% if form.engineer_instructions.errors %}<p class="text-red-600 text-xs mt-1">{{ form.engineer_instructions.errors.0 }}</p>{% endif %}
+            </div>
             <div class="flex items-center gap-3 pt-2">
 
                 <button type="submit" class="g-btn-primary">Submit Request</button>

@@ -10,6 +10,7 @@ from apps.designs.models import ComplianceReview, DesignRequest, DesignStatus, V
 from apps.workflow.action_sla import (
     _compliance_action_overdue_q,
     _designer_action_overdue_q,
+    _engineer_overdue_q,
     _hod_action_overdue_q,
     _verification_action_overdue_q,
 )
@@ -49,6 +50,11 @@ VERIFICATION_FINISHED_STATUSES = [
 COMPLIANCE_FINISHED_STATUSES = [
     DesignStatus.APPROVED,
     DesignStatus.COMPLETED,
+]
+
+SITE_ENGINEER_ACTIVE_STATUSES = [
+    DesignStatus.ENGINEER_PENDING_ACK,
+    DesignStatus.ENGINEER_IN_PROGRESS,
 ]
 
 DESIGNER_WORK_STATUSES = [
@@ -321,6 +327,27 @@ def _compliance_stats_and_querysets(user, now, period_start):
         ),
     }
     return stats, querysets
+
+
+def get_site_engineer_tasks(user, now):
+    """Active site engineer assignments for users with site engineer permission."""
+    from apps.permissions.services import PermissionService
+    if not PermissionService.is_site_engineer(user):
+        return []
+    active = DesignRequest.objects.filter(
+        assigned_site_engineer=user,
+        status__in=SITE_ENGINEER_ACTIVE_STATUSES,
+    ).select_related('project', 'drawing_type', 'requested_by').order_by(
+        Case(
+            When(status=DesignStatus.ENGINEER_PENDING_ACK, then=0),
+            default=1,
+            output_field=IntegerField(),
+        ),
+        'engineer_assigned_at',
+        '-priority',
+        'engineer_due_date',
+    )
+    return list(active)
 
 
 def _requester_stats_and_querysets(user, today, period_start):

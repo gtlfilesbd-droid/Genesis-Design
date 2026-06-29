@@ -126,6 +126,64 @@ class NotificationService:
         )
 
     @staticmethod
+    def on_engineer_assigned(design_request):
+        title = f'Site Engineer Assignment: {design_request.design_number}'
+        from apps.core.notification_messages import (
+            engineer_assigned_message,
+            engineer_assigned_requester_message,
+        )
+        message = engineer_assigned_message(design_request)
+        NotificationService.notify(
+            design_request.assigned_site_engineer,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+        requester_title = f'Site Engineer Assigned: {design_request.design_number}'
+        requester_message = engineer_assigned_requester_message(design_request)
+        NotificationService._notify_many(
+            NotificationService._requester_side_recipients(design_request),
+            NotificationType.WORKFLOW,
+            requester_title,
+            requester_message,
+            design_request,
+        )
+
+    @staticmethod
+    def on_engineer_acknowledged(design_request, actor):
+        from apps.core.notification_messages import engineer_acknowledged_message
+        recipients = NotificationService._merge_recipients(
+            NotificationService._requester_side_recipients(design_request),
+            exclude=actor,
+        )
+        title = f'Site Engineer Acknowledged: {design_request.design_number}'
+        message = engineer_acknowledged_message(design_request, actor.get_full_name())
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_engineer_submitted(design_request):
+        users = NotificationService._project_users(
+            design_request.project, 'PROJECT_PERM_ASSIGN',
+        )
+        from apps.core.notification_messages import engineer_submitted_message
+        title = f'Site Review Submitted: {design_request.design_number}'
+        message = engineer_submitted_message(design_request)
+        NotificationService._notify_many(
+            users, NotificationType.WORKFLOW, title, message, design_request,
+        )
+        requester_title = f'Site Review Complete: {design_request.design_number}'
+        NotificationService._notify_many(
+            NotificationService._requester_side_recipients(design_request),
+            NotificationType.WORKFLOW,
+            requester_title,
+            message,
+            design_request,
+        )
+
+    @staticmethod
     def on_request_acknowledged(design_request):
         title = f'Request Acknowledged: {design_request.design_number}'
         hod_name = design_request.current_holder.get_full_name() if design_request.current_holder else 'Head of Design'
@@ -415,6 +473,7 @@ def notify_workflow_transition(design, action, actor):
     design = DesignRequest.objects.select_related(
         'requested_by',
         'assigned_designer',
+        'assigned_site_engineer',
         'project',
         'project__created_by',
         'assigned_verifier',
@@ -425,6 +484,8 @@ def notify_workflow_transition(design, action, actor):
     handlers = {
         'submit_request': NotificationService.on_request_created,
         'acknowledge': NotificationService.on_request_acknowledged,
+        'acknowledge_engineer': NotificationService.on_engineer_acknowledged,
+        'submit_engineer_review': NotificationService.on_engineer_submitted,
         'assign': NotificationService.on_designer_assigned,
         'accept_assignment': NotificationService.on_assignment_accepted,
         'submit_work': NotificationService.on_work_submitted,
@@ -445,7 +506,10 @@ def notify_workflow_transition(design, action, actor):
     }
     handler = handlers.get(action)
     if handler:
-        if action in ('accept_assignment', 'accept_verification', 'accept_compliance'):
+        if action in (
+            'accept_assignment', 'accept_verification', 'accept_compliance',
+            'acknowledge_engineer',
+        ):
             handler(design, actor)
         else:
             handler(design)

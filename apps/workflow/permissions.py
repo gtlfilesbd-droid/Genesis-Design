@@ -91,6 +91,20 @@ def design_action_flags(user, design) -> dict:
                 user, project, 'accept_compliance', 'PROJECT_PERM_COMPLIANCE',
             )
         ),
+        'can_acknowledge_engineer': (
+            design.status == DesignStatus.ENGINEER_PENDING_ACK
+            and design.assigned_site_engineer_id == user.pk
+            and PermissionService.has_project_permission(
+                user, project, 'DESIGN_PERM_SITE_ENGINEER',
+            )
+        ),
+        'can_submit_engineer_review': (
+            design.status == DesignStatus.ENGINEER_IN_PROGRESS
+            and design.assigned_site_engineer_id == user.pk
+            and PermissionService.has_project_permission(
+                user, project, 'DESIGN_PERM_SITE_ENGINEER',
+            )
+        ),
         'can_forward_to_designer': can_run_workflow_action(
             user, project, 'forward_to_designer', 'PROJECT_PERM_ASSIGN',
         ),
@@ -101,8 +115,12 @@ def design_action_flags(user, design) -> dict:
             user, project, 'complete', 'PROJECT_PERM_COMPLETE',
         ),
         'can_cancel_request': (
-            design.status == DesignStatus.NEW_REQUEST
-            and design.requested_by_id == user.pk
+            design.requested_by_id == user.pk
+            and design.status in (
+                DesignStatus.NEW_REQUEST,
+                DesignStatus.ENGINEER_PENDING_ACK,
+                DesignStatus.ENGINEER_IN_PROGRESS,
+            )
             and PermissionService.has_project_permission(user, project, 'PROJECT_PERM_REQUEST')
         ) or (
             PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL')
