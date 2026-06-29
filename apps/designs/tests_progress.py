@@ -23,13 +23,38 @@ class ProgressStepsTests(TestCase):
             status=DesignStatus.NEW_REQUEST,
         )
 
-    def test_new_request_shows_hod_step_active(self):
-        steps, cancelled = build_progress_steps(self.design)
-        self.assertFalse(cancelled)
-        self.assertEqual(steps[0]['state'], 'completed')
-        self.assertEqual(steps[0]['label'], 'Site Engineer')
-        self.assertEqual(steps[1]['state'], 'active')
-        self.assertEqual(steps[1]['label'], 'New Request')
+    def _active_step(self, design):
+        steps, _ = build_progress_steps(design)
+        return next(s for s in steps if s['state'] == 'active')
+
+    def test_engineer_pending_ack_shows_request_submitted(self):
+        self.design.status = DesignStatus.ENGINEER_PENDING_ACK
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'submitted')
+        self.assertEqual(active['label'], 'Request Submitted')
+
+    def test_engineer_in_progress_shows_site_verification(self):
+        self.design.status = DesignStatus.ENGINEER_IN_PROGRESS
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'site_engineer')
+        self.assertEqual(active['label'], 'Site Verification')
+
+    def test_new_request_shows_hod_acknowledgement(self):
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'hod_ack')
+        self.assertEqual(active['label'], 'HOD Acknowledgement')
+
+    def test_acknowledged_shows_pending_assignment(self):
+        self.design.status = DesignStatus.ACKNOWLEDGED
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'assigned')
+        self.assertEqual(active['label'], 'Pending Assignment')
+
+    def test_assigned_shows_designer_assigned(self):
+        self.design.status = DesignStatus.ASSIGNED
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'assigned')
+        self.assertEqual(active['label'], 'Designer Assigned')
 
     def test_correction_required_shows_under_review_active(self):
         self.design.status = DesignStatus.CORRECTION_REQUIRED
@@ -56,3 +81,14 @@ class ProgressStepsTests(TestCase):
         steps, cancelled = build_progress_steps(self.design)
         self.assertTrue(cancelled)
         self.assertTrue(all(step['state'] == 'upcoming' for step in steps))
+
+    def test_early_pipeline_order(self):
+        self.design.status = DesignStatus.ENGINEER_PENDING_ACK
+        steps, _ = build_progress_steps(self.design)
+        labels = [s['label'] for s in steps[:4]]
+        self.assertEqual(labels, [
+            'Request Submitted',
+            'Site Verification',
+            'HOD Acknowledgement',
+            'Designer Assigned',
+        ])

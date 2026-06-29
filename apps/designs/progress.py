@@ -1,24 +1,24 @@
 from apps.designs.models import DesignStatus
 
 PROGRESS_STEPS = [
-    ('site_engineer', 'Site Engineer'),
-    ('new', 'New Request'),
-    ('acknowledged', 'Acknowledged'),
-    ('assigned', 'Assigned'),
-    ('in_progress', 'In Progress'),
-    ('under_review', 'Under Review'),
-    ('verification_pending', 'Verification Pending'),
-    ('compliance_pending', 'Compliance Pending'),
+    ('submitted', 'Request Submitted'),
+    ('site_engineer', 'Site Verification'),
+    ('hod_ack', 'HOD Acknowledgement'),
+    ('assigned', 'Designer Assigned'),
+    ('in_progress', 'Design In Progress'),
+    ('under_review', 'HOD Review'),
+    ('verification_pending', 'Verification'),
+    ('compliance_pending', 'Compliance'),
     ('approved', 'Approved'),
     ('completed', 'Completed'),
 ]
 
 STATUS_TO_STEP_KEY = {
-    DesignStatus.DRAFT: 'site_engineer',
-    DesignStatus.ENGINEER_PENDING_ACK: 'site_engineer',
+    DesignStatus.DRAFT: 'submitted',
+    DesignStatus.ENGINEER_PENDING_ACK: 'submitted',
     DesignStatus.ENGINEER_IN_PROGRESS: 'site_engineer',
-    DesignStatus.NEW_REQUEST: 'new',
-    DesignStatus.ACKNOWLEDGED: 'acknowledged',
+    DesignStatus.NEW_REQUEST: 'hod_ack',
+    DesignStatus.ACKNOWLEDGED: 'assigned',
     DesignStatus.ASSIGNED: 'assigned',
     DesignStatus.IN_PROGRESS: 'in_progress',
     DesignStatus.SUBMITTED: 'under_review',
@@ -37,6 +37,11 @@ STATUS_TO_STEP_KEY = {
     DesignStatus.COMPLETED: 'completed',
 }
 
+# Optional per-status label override when the default step label is not specific enough.
+STATUS_STEP_LABELS = {
+    DesignStatus.ACKNOWLEDGED: 'Pending Assignment',
+}
+
 
 def build_progress_steps(design):
     step_keys = [step[0] for step in PROGRESS_STEPS]
@@ -47,11 +52,13 @@ def build_progress_steps(design):
             for key, label in PROGRESS_STEPS
         ], True
 
-    step_key = STATUS_TO_STEP_KEY.get(design.status, 'new')
+    step_key = STATUS_TO_STEP_KEY.get(design.status, 'submitted')
     try:
         current_index = step_keys.index(step_key)
     except ValueError:
         current_index = 0
+
+    override_label = STATUS_STEP_LABELS.get(design.status)
 
     progress_steps = []
     for index, (key, label) in enumerate(PROGRESS_STEPS):
@@ -61,6 +68,7 @@ def build_progress_steps(design):
             state = 'active'
         else:
             state = 'upcoming'
-        progress_steps.append({'key': key, 'label': label, 'state': state})
+        display_label = override_label if state == 'active' and override_label else label
+        progress_steps.append({'key': key, 'label': display_label, 'state': state})
 
     return progress_steps, False
