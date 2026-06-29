@@ -1,0 +1,227 @@
+================================================================================
+GENESIS DESIGN — PRODUCTION SERVER SETUP (LAN)
+Server IP: 192.168.68.97
+Run mode: python manage.py runserver (same network access)
+================================================================================
+
+You said PostgreSQL database name, database user, and password are already
+created on the server with the SAME names as development. This guide assumes:
+
+  DB_NAME=genesis_design
+  DB_USER=genesis_admin
+  DB_PASSWORD=<your password>
+
+If your names differ, use your actual values in the .env file below.
+
+
+--------------------------------------------------------------------------------
+PART 1 — ONE-TIME SETUP ON SERVER (192.168.68.97)
+--------------------------------------------------------------------------------
+
+1) Install software on the server PC
+   - Python 3.11+ (or same version you use in development)
+   - Git
+   - PostgreSQL (already installed — you created DB + user)
+
+   Check Python:
+     python --version
+
+2) Get the latest code on the server
+
+   Option A — First time (clone):
+     cd C:\Projects
+     git clone https://github.com/gtlfilesbd-droid/Genesis-Design.git
+     cd Genesis-Design
+
+   Option B — Already cloned (update after each push):
+     cd C:\Projects\Genesis-Design
+     git pull origin main
+
+3) Create virtual environment (recommended)
+
+     python -m venv venv
+     venv\Scripts\activate
+
+   You should see (venv) in the command prompt.
+
+4) Install Python packages
+
+     pip install --upgrade pip
+     pip install -r requirements.txt
+
+5) Create .env file in project root (same folder as manage.py)
+
+   Copy from example:
+     copy .env.example .env
+
+   Edit .env with Notepad and set AT LEAST these values:
+
+     DEBUG=False
+     SECRET_KEY=put-a-long-random-secret-key-here
+     ALLOWED_HOSTS=localhost,127.0.0.1,192.168.68.97
+
+     DB_NAME=genesis_design
+     DB_USER=genesis_admin
+     DB_PASSWORD=YOUR_DB_PASSWORD
+     DB_HOST=localhost
+     DB_PORT=5432
+
+     # Required when DEBUG=False so uploaded files (avatars etc.) work via Django
+     SERVE_MEDIA=True
+
+   Notes:
+   - DB_HOST=localhost because PostgreSQL runs ON THE SAME SERVER as Django.
+   - Other PCs on the LAN open http://192.168.68.97:8000 in browser.
+   - Generate SECRET_KEY (example):
+       python -c "import secrets; print(secrets.token_urlsafe(50))"
+
+6) Test database connection
+
+     python manage.py check
+
+   If you see "System check identified no issues" — connection is OK.
+   If connection error — fix DB_NAME / DB_USER / DB_PASSWORD / PostgreSQL service.
+
+
+--------------------------------------------------------------------------------
+PART 2 — MIGRATE DATABASE (RUN EVERY TIME CODE HAS NEW MIGRATIONS)
+--------------------------------------------------------------------------------
+
+On the server, inside project folder with venv activated:
+
+  cd C:\Projects\Genesis-Design
+  venv\Scripts\activate
+  git pull origin main
+  pip install -r requirements.txt
+  python manage.py migrate
+  python manage.py collectstatic --noinput
+
+What migrate does:
+  - Creates/updates all Django tables in your PostgreSQL database
+  - Safe to run multiple times
+  - Does NOT delete your existing users or design data
+
+Check migration status (optional):
+
+  python manage.py showmigrations
+
+All apps should show [X] for applied migrations.
+
+If this is a BRAND NEW empty database (no tables yet), also run ONCE:
+
+  python manage.py seed_data
+
+Skip seed_data if you already loaded data or copied data from another server.
+
+
+--------------------------------------------------------------------------------
+PART 3 — CREATE ADMIN USER (ONLY IF NO USERS EXIST YET)
+--------------------------------------------------------------------------------
+
+  python manage.py createsuperuser
+
+Or if you use seed_data, demo users from README are created automatically.
+
+
+--------------------------------------------------------------------------------
+PART 4 — START SERVER FOR LAN ACCESS
+--------------------------------------------------------------------------------
+
+IMPORTANT: Do NOT use only "runserver" — that binds to 127.0.0.1 and other PCs
+cannot connect. Use 0.0.0.0 so the whole LAN can reach it:
+
+  python manage.py runserver 0.0.0.0:8000
+
+Open from any PC on same network:
+  http://192.168.68.97:8000/
+
+Django admin:
+  http://192.168.68.97:8000/django-admin/
+
+
+--------------------------------------------------------------------------------
+PART 5 — WINDOWS FIREWALL (IF OTHER PCs CANNOT OPEN THE SITE)
+--------------------------------------------------------------------------------
+
+On server 192.168.68.97, allow inbound TCP port 8000:
+
+  1. Windows Security → Firewall → Advanced settings
+  2. Inbound Rules → New Rule
+  3. Port → TCP → 8000 → Allow → apply to Domain/Private (same LAN)
+
+Or PowerShell (Run as Administrator):
+
+  New-NetFirewallRule -DisplayName "Genesis Design 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
+
+
+--------------------------------------------------------------------------------
+PART 6 — AFTER EACH NEW GIT PUSH (YOUR WORKFLOW)
+--------------------------------------------------------------------------------
+
+On server:
+
+  cd C:\Projects\Genesis-Design
+  venv\Scripts\activate
+  git pull origin main
+  pip install -r requirements.txt
+  python manage.py migrate
+  python manage.py collectstatic --noinput
+  python manage.py runserver 0.0.0.0:8000
+
+That is the full update + migrate cycle.
+
+
+--------------------------------------------------------------------------------
+PART 7 — OPTIONAL: KEEP SERVER RUNNING IN BACKGROUND
+--------------------------------------------------------------------------------
+
+runserver stops when you close the terminal. For a simple LAN server you can:
+
+  A) Keep the CMD/PowerShell window open, or
+  B) Use a new window:
+       start cmd /k "cd C:\Projects\Genesis-Design && venv\Scripts\activate && python manage.py runserver 0.0.0.0:8000"
+
+For true 24/7 production, use IIS or waitress + Windows Service later.
+For now, runserver on LAN is fine for internal team use.
+
+
+--------------------------------------------------------------------------------
+PART 8 — TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+Problem: "DisallowedHost at /"
+Fix: Add 192.168.68.97 to ALLOWED_HOSTS in .env and restart runserver.
+
+Problem: "connection refused" from other PCs
+Fix: Use runserver 0.0.0.0:8000 + open firewall port 8000.
+
+Problem: Static CSS/JS missing (DEBUG=False)
+Fix: Run collectstatic --noinput and restart server.
+
+Problem: Images/avatars not loading (DEBUG=False)
+Fix: Set SERVE_MEDIA=True in .env OR serve /media/ via nginx/IIS.
+
+Problem: migrate says "No migrations to apply" but site errors on new features
+Fix: git pull may have failed — run git pull origin main again, then migrate.
+
+Problem: PostgreSQL authentication failed
+Fix: Verify password in .env matches PostgreSQL user genesis_admin.
+
+
+--------------------------------------------------------------------------------
+QUICK REFERENCE — COPY/PASTE BLOCK (SERVER)
+--------------------------------------------------------------------------------
+
+cd C:\Projects\Genesis-Design
+venv\Scripts\activate
+git pull origin main
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py collectstatic --noinput
+python manage.py runserver 0.0.0.0:8000
+
+Browser URL (any PC on LAN): http://192.168.68.97:8000/
+
+================================================================================
+END OF GUIDE
+================================================================================
