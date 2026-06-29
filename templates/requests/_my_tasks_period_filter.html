@@ -1,6 +1,13 @@
 <div class="flex flex-wrap gap-2 mb-6">
+    {% if my_tasks_period_urls %}
+    <a href="{{ my_tasks_period_urls.week }}" class="g-filter-chip {% if period == 'week' %}active{% endif %}">This Week</a>
+    <a href="{{ my_tasks_period_urls.month }}" class="g-filter-chip {% if period == 'month' %}active{% endif %}">This Month</a>
+    <a href="{{ my_tasks_period_urls.year }}" class="g-filter-chip {% if period == 'year' %}active{% endif %}">This Year</a>
+    <a href="{{ my_tasks_period_urls.all }}" class="g-filter-chip {% if period == 'all' %}active{% endif %}">All Time</a>
+    {% else %}
     <a href="?scope={{ my_tasks_scope }}&stat={{ my_tasks_stat }}&period=week" class="g-filter-chip {% if period == 'week' %}active{% endif %}">This Week</a>
     <a href="?scope={{ my_tasks_scope }}&stat={{ my_tasks_stat }}&period=month" class="g-filter-chip {% if period == 'month' %}active{% endif %}">This Month</a>
     <a href="?scope={{ my_tasks_scope }}&stat={{ my_tasks_stat }}&period=year" class="g-filter-chip {% if period == 'year' %}active{% endif %}">This Year</a>
     <a href="?scope={{ my_tasks_scope }}&stat={{ my_tasks_stat }}" class="g-filter-chip {% if period == 'all' %}active{% endif %}">All Time</a>
+    {% endif %}
 </div>

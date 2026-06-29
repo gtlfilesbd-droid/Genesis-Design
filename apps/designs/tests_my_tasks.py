@@ -240,6 +240,8 @@ class MyTasksStatsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, overdue_ack.design_number)
         self.assertNotContains(response, at_verification.design_number)
+        self.assertTrue(response.context['my_tasks_mode'])
+        self.assertFalse(response.context['my_tasks_scope'])
 
     def test_hod_ack_action_sla_overdue_not_target_date(self):
         target_only = self._create_design(
@@ -261,6 +263,32 @@ class MyTasksStatsTests(TestCase):
         filtered = filter_my_tasks_stat(DesignRequest.objects.all(), self.hod, 'hod', 'overdue')
         self.assertNotIn(target_only, filtered)
         self.assertIn(ack_overdue, filtered)
+
+    def test_hod_my_tasks_overdue_differs_from_dashboard_pipeline(self):
+        pipeline_only = self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            assigned_designer=self.designer,
+            current_holder=self.designer,
+            assigned_by=self.hod,
+            due_date=timezone.now() - timedelta(days=1),
+        )
+        ack_overdue = self._create_design(
+            self.project_b,
+            status=DesignStatus.NEW_REQUEST,
+            assigned_designer=None,
+            current_holder=self.hod,
+        )
+        DesignRequest.objects.filter(pk=ack_overdue.pk).update(
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        self.client.login(username='hod', password='pass')
+        my_tasks_response = self.client.get(build_my_tasks_request_url('hod', 'overdue'))
+        dashboard_response = self.client.get(reverse('requests:list') + '?overdue=1')
+        self.assertContains(my_tasks_response, ack_overdue.design_number)
+        self.assertNotContains(my_tasks_response, pipeline_only.design_number)
+        self.assertContains(dashboard_response, pipeline_only.design_number)
+        self.assertNotContains(dashboard_response, ack_overdue.design_number)
 
     def test_designer_assigned_action_sla_overdue(self):
         assigned = self._create_design(
@@ -344,8 +372,7 @@ class MyTasksStatsTests(TestCase):
         _, _, mt_stats, _ = get_my_tasks_context(self.designer)
         self.assertEqual(mt_stats['overdue_designs'], 1)
         self.assertEqual(response.context['stats']['overdue_designs'], mt_stats['overdue_designs'])
-        self.assertIn('scope=designer', response.context['dashboard_overdue_url'])
-        self.assertIn('stat=overdue', response.context['dashboard_overdue_url'])
+        self.assertEqual(response.context['dashboard_overdue_url'], reverse('requests:list') + '?overdue=1')
         self.assertNotIn(at_verification, filter_my_tasks_stat(
             DesignRequest.objects.all(), self.designer, 'designer', 'overdue',
         ))
@@ -364,9 +391,7 @@ class MyTasksStatsTests(TestCase):
         self.assertEqual(response.context['overdue_label'], 'Target Overdue')
         _, _, mt_stats, _ = get_my_tasks_context(self.requester)
         self.assertEqual(response.context['stats']['overdue_designs'], mt_stats['target_overdue'])
-        self.assertIn('scope=requester', response.context['dashboard_overdue_url'])
-        self.assertIn('stat=target_overdue', response.context['dashboard_overdue_url'])
-        self.assertNotIn('overdue=1', response.context['dashboard_overdue_url'])
+        self.assertEqual(response.context['dashboard_overdue_url'], reverse('requests:list') + '?overdue=1')
 
     def test_requester_target_overdue_list_matches_dashboard_count(self):
         today = timezone.now().date()
@@ -396,6 +421,8 @@ class MyTasksStatsTests(TestCase):
             list_response.context['result_count'],
             dashboard.context['stats']['overdue_designs'],
         )
+        self.assertTrue(list_response.context['has_filters'])
+        self.assertFalse(list_response.context['my_tasks_scope'])
 
     def test_period_filter_scopes_finished_not_running(self):
         old_completed = self._create_design(
@@ -439,14 +466,15 @@ class MyTasksStatsTests(TestCase):
         self.assertEqual(stats_month['projects_requested'], 1)
         self.assertEqual(recent.project_id, self.project_b.pk)
 
-    def test_stat_cards_link_to_design_requests_with_scope_and_stat(self):
+    def test_stat_cards_link_to_design_requests_with_my_tasks_params(self):
         _, _, stats, _ = get_my_tasks_context(self.designer, period='month')
         cards = get_my_tasks_stat_cards('designer', stats, period='month')
         self.assertEqual(len(cards), 4)
         running = next(c for c in cards if c['key'] == 'running')
-        self.assertIn('scope=designer', running['url'])
-        self.assertIn('stat=running', running['url'])
+        self.assertIn('my_tasks=1', running['url'])
+        self.assertIn('running=1', running['url'])
         self.assertIn('period=month', running['url'])
+        self.assertNotIn('scope=', running['url'])
 
     def test_filter_my_tasks_stat_matches_running_count(self):
         self._create_design(self.project_a, due_date=timezone.now() + timedelta(days=2))
@@ -460,7 +488,7 @@ class MyTasksStatsTests(TestCase):
         filtered = filter_my_tasks_stat(qs, self.designer, 'designer', 'running')
         self.assertEqual(filtered.count(), 2)
 
-    def test_design_request_list_scoped_filter(self):
+    def test_design_request_list_my_tasks_filter(self):
         self.client.login(username='des', password='pass')
         running = self._create_design(self.project_a, due_date=timezone.now() + timedelta(days=2))
         self._create_design(
@@ -472,4 +500,7 @@ class MyTasksStatsTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, running.design_number)
-        self.assertNotContains(response, 'Completed this month')
+        self.assertEqual(response.context['result_count'], 1)
+        self.assertTrue(response.context['my_tasks_mode'])
+        self.assertFalse(response.context['my_tasks_scope'])
+        self.assertTrue(response.context['has_filters'])

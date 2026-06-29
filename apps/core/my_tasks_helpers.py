@@ -534,11 +534,66 @@ def filter_my_tasks_stat(qs, user, scope, stat, period='all'):
     return qs
 
 
-def build_my_tasks_request_url(scope, stat, period='all'):
-    params = {'scope': scope, 'stat': stat}
+def filter_role_overdue_for_list(qs, user, now=None, my_tasks=False):
+    """Apply role-appropriate overdue filtering for Design Requests ?overdue=1."""
+    now = now or timezone.now()
+    view_role = get_my_tasks_view_role(user)
+    terminal = TERMINAL_STATUSES
+
+    if view_role == 'requester':
+        return filter_my_tasks_stat(qs, user, 'requester', 'target_overdue')
+    if view_role == 'hod':
+        if my_tasks:
+            return filter_my_tasks_stat(qs, user, 'hod', 'overdue')
+        return qs.filter(due_date__lt=now).exclude(status__in=terminal)
+    if view_role in ('designer', 'verification', 'compliance'):
+        return filter_my_tasks_stat(qs, user, view_role, 'overdue')
+    return qs.filter(due_date__lt=now).exclude(status__in=terminal)
+
+
+def filter_role_running_for_list(qs, user):
+    view_role = get_my_tasks_view_role(user)
+    if view_role == 'default':
+        return qs.exclude(status__in=TERMINAL_STATUSES)
+    return filter_my_tasks_stat(qs, user, view_role, 'running')
+
+
+def filter_role_finished_for_list(qs, user, period='all'):
+    view_role = get_my_tasks_view_role(user)
+    period_start = get_period_start(period)
+    if view_role == 'default':
+        return _finished_queryset(qs, period_start)
+    return filter_my_tasks_stat(qs, user, view_role, 'finished', period)
+
+
+def filter_role_requested_for_list(qs, user, period='all'):
+    return filter_my_tasks_stat(qs, user, 'requester', 'projects_requested', period)
+
+
+def _my_tasks_list_query(stat, period='all'):
+    params = {'my_tasks': '1'}
+    if stat in ('active_projects', 'running'):
+        params['running'] = '1'
+    elif stat in ('overdue', 'target_overdue'):
+        params['overdue'] = '1'
+    elif stat == 'finished':
+        params['finished'] = '1'
+    elif stat == 'projects_requested':
+        params['requested'] = '1'
     if period and period != 'all':
         params['period'] = period
-    return f"{reverse('requests:list')}?{urlencode(params)}"
+    return urlencode(params)
+
+
+def build_my_tasks_request_url(scope, stat, period='all'):
+    return f"{reverse('requests:list')}?{_my_tasks_list_query(stat, period)}"
+
+
+def build_my_tasks_period_urls(stat, active_period='all'):
+    urls = {}
+    for period in ('week', 'month', 'year', 'all'):
+        urls[period] = build_my_tasks_request_url('', stat, period)
+    return urls
 
 
 MY_TASKS_STAT_CARD_DEFS = {

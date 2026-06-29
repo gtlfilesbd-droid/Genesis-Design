@@ -10,10 +10,16 @@ from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.core.my_tasks_helpers import (
     MY_TASKS_STAT_CARD_DEFS,
+    build_my_tasks_period_urls,
     filter_my_tasks_stat,
+    filter_role_finished_for_list,
+    filter_role_overdue_for_list,
+    filter_role_requested_for_list,
+    filter_role_running_for_list,
     get_my_tasks_context,
     get_my_tasks_stat_cards,
     get_my_tasks_stats_for_scope,
+    get_my_tasks_view_role,
     normalize_period,
 )
 from apps.core.utils import log_activity
@@ -201,8 +207,9 @@ def design_request_list(request):
 
     my_tasks_scope = request.GET.get('scope')
     my_tasks_stat = request.GET.get('stat')
+    my_tasks_mode = request.GET.get('my_tasks')
     period = normalize_period(request.GET.get('period', 'all'))
-    scoped_mode = my_tasks_scope in MY_TASKS_STAT_CARD_DEFS
+    scoped_mode = my_tasks_scope in MY_TASKS_STAT_CARD_DEFS and not my_tasks_mode
 
     designs = base_qs
     status = request.GET.get('status')
@@ -223,18 +230,32 @@ def design_request_list(request):
             designs = designs.filter(
                 Q(design_number__icontains=search) | Q(project__code__icontains=search)
             )
-        if request.GET.get('running'):
-            designs = designs.exclude(status__in=terminal)
-        if request.GET.get('overdue'):
-            designs = designs.filter(due_date__lt=now).exclude(status__in=terminal)
-        if request.GET.get('completed_month'):
-            designs = designs.filter(
-                status=DesignStatus.COMPLETED,
-                completion_date__month=now.month,
-                completion_date__year=now.year,
-            )
-        if request.GET.get('mine'):
-            designs = designs.filter(assigned_designer=request.user)
+        if my_tasks_mode:
+            if request.GET.get('running'):
+                designs = filter_role_running_for_list(designs, request.user)
+            elif request.GET.get('overdue'):
+                designs = filter_role_overdue_for_list(
+                    designs, request.user, now, my_tasks=True,
+                )
+            elif request.GET.get('finished'):
+                designs = filter_role_finished_for_list(designs, request.user, period)
+            elif request.GET.get('requested'):
+                designs = filter_role_requested_for_list(designs, request.user, period)
+        else:
+            if request.GET.get('running'):
+                designs = designs.exclude(status__in=terminal)
+            if request.GET.get('overdue'):
+                designs = filter_role_overdue_for_list(
+                    designs, request.user, now, my_tasks=False,
+                )
+            if request.GET.get('completed_month'):
+                designs = designs.filter(
+                    status=DesignStatus.COMPLETED,
+                    completion_date__month=now.month,
+                    completion_date__year=now.year,
+                )
+            if request.GET.get('mine'):
+                designs = designs.filter(assigned_designer=request.user)
 
     if scoped_mode:
         scoped_stats = get_my_tasks_stats_for_scope(request.user, my_tasks_scope, period=period)
@@ -273,6 +294,23 @@ def design_request_list(request):
             'running': active_stat == 'running',
             'overdue': active_stat == 'overdue',
             'completed_month': active_stat == 'completed_month',
+        }
+
+    my_tasks_period_stat = None
+    my_tasks_period_urls = {}
+    if my_tasks_mode:
+        if request.GET.get('finished'):
+            my_tasks_period_stat = 'finished'
+        elif request.GET.get('requested'):
+            my_tasks_period_stat = 'projects_requested'
+        if my_tasks_period_stat:
+            my_tasks_period_urls = build_my_tasks_period_urls(my_tasks_period_stat, period)
+        stat_card_active = {
+            'total': False,
+            'running': bool(request.GET.get('running')),
+            'overdue': bool(request.GET.get('overdue')),
+            'completed_month': bool(request.GET.get('finished')),
+            'mine': bool(request.GET.get('requested')),
         }
 
     designs = designs.order_by('-created_at')
@@ -319,14 +357,34 @@ def design_request_list(request):
     if project:
         active_filters.append({'param': 'project', 'label': project_labels.get(project, f'Project #{project}')})
     if not scoped_mode:
-        if request.GET.get('running'):
-            active_filters.append({'param': 'running', 'label': 'Running only'})
-        if request.GET.get('overdue'):
-            active_filters.append({'param': 'overdue', 'label': 'Overdue only'})
-        if request.GET.get('completed_month'):
-            active_filters.append({'param': 'completed_month', 'label': 'Completed this month'})
-        if request.GET.get('mine'):
-            active_filters.append({'param': 'mine', 'label': 'Assigned to me'})
+        if my_tasks_mode:
+            if request.GET.get('running'):
+                active_filters.append({'param': 'running', 'label': 'My running'})
+            elif request.GET.get('overdue'):
+                overdue_label = (
+                    'Target overdue' if get_my_tasks_view_role(request.user) == 'requester'
+                    else 'My overdue'
+                )
+                active_filters.append({'param': 'overdue', 'label': overdue_label})
+            elif request.GET.get('finished'):
+                active_filters.append({'param': 'finished', 'label': 'Finished'})
+            elif request.GET.get('requested'):
+                active_filters.append({'param': 'requested', 'label': 'Projects requested'})
+            if period != 'all':
+                active_filters.append({'param': 'period', 'label': f'Period: {period}'})
+        else:
+            if request.GET.get('running'):
+                active_filters.append({'param': 'running', 'label': 'Running only'})
+            if request.GET.get('overdue'):
+                overdue_label = (
+                    'Target overdue' if get_my_tasks_view_role(request.user) == 'requester'
+                    else 'Overdue only'
+                )
+                active_filters.append({'param': 'overdue', 'label': overdue_label})
+            if request.GET.get('completed_month'):
+                active_filters.append({'param': 'completed_month', 'label': 'Completed this month'})
+            if request.GET.get('mine'):
+                active_filters.append({'param': 'mine', 'label': 'Assigned to me'})
 
     has_filters = bool(active_filters)
 
@@ -343,6 +401,9 @@ def design_request_list(request):
         'my_tasks_scope': my_tasks_scope if scoped_mode else None,
         'my_tasks_stat': my_tasks_stat,
         'my_tasks_stat_cards': my_tasks_stat_cards,
+        'my_tasks_mode': bool(my_tasks_mode),
+        'my_tasks_period_stat': my_tasks_period_stat,
+        'my_tasks_period_urls': my_tasks_period_urls,
         'period': period,
     })
 

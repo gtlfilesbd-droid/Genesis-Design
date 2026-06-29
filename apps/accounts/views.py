@@ -310,7 +310,6 @@ def _base_dashboard_context(request):
             'Your action overdue' if stats['overdue_designs'] else 'On track'
         )
         my_tasks_overdue_url = build_my_tasks_request_url(view_role, 'overdue')
-        dashboard_overdue_url = my_tasks_overdue_url
     elif view_role == 'requester':
         mt_stats = get_my_tasks_stats_for_scope(request.user, 'requester')
         stats['overdue_designs'] = mt_stats['target_overdue']
@@ -319,7 +318,6 @@ def _base_dashboard_context(request):
         )
         overdue_label = 'Target Overdue'
         my_tasks_overdue_url = build_my_tasks_request_url('requester', 'target_overdue')
-        dashboard_overdue_url = my_tasks_overdue_url
 
     return {
         'user_obj': request.user,
