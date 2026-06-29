@@ -13,6 +13,7 @@ from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
+from apps.reports.audit_report import get_audit_report_for_design_number
 
 
 def _designer_performance_data(designer_id=None, project_id=None):
@@ -91,7 +92,47 @@ def _report_export_urls(request, report_type, *filter_keys):
     }
 
 
-def _write_csv_rows(writer, report_type, designer_filter=None, project_filter=None):
+def _format_audit_timestamp(ts):
+    if not ts:
+        return ''
+    return timezone.localtime(ts).strftime('%Y-%m-%d %H:%M')
+
+
+def _write_audit_report_rows(writer, report):
+    writer.writerow(['Design Number', report['design_number']])
+    writer.writerow(['Project', f"{report['project_code']} — {report['project']}"])
+    writer.writerow(['Requested By', report['requested_by']])
+    writer.writerow([
+        'Target Completion Date',
+        report['target_completion_date'].isoformat() if report['target_completion_date'] else '',
+    ])
+    writer.writerow(['Status', report['status']])
+    if report.get('delay_summary'):
+        summary = report['delay_summary']
+        writer.writerow(['Primary Delay Source', summary.get('primary_source', '')])
+        writer.writerow(['Primary Delay Days', summary.get('primary_days', '')])
+    writer.writerow([])
+    writer.writerow([
+        'Stage', 'Actor', 'Role', 'Timestamp', 'Duration (days)', 'Notes',
+        'Delayed', 'Delayed By', 'Delay Days', 'Delay Type', 'Delay Note',
+    ])
+    for row in report['rows']:
+        writer.writerow([
+            row['stage'],
+            row['actor'],
+            row['role'],
+            _format_audit_timestamp(row['timestamp']),
+            row.get('duration_days', ''),
+            row.get('notes', ''),
+            'Yes' if row.get('is_delayed') else 'No',
+            row.get('delayed_by', ''),
+            row.get('delay_days', ''),
+            row.get('delay_type', ''),
+            row.get('delay_note', ''),
+        ])
+
+
+def _write_csv_rows(writer, report_type, designer_filter=None, project_filter=None, design_filter=None):
     if report_type == 'designer_performance':
         writer.writerow([
             'Designer', 'Assigned', 'Completed', 'On-Time', 'Completion Rate %',
@@ -136,6 +177,12 @@ def _write_csv_rows(writer, report_type, designer_filter=None, project_filter=No
                 d.verified_by.get_full_name() if d.verified_by else '',
                 d.get_status_display(), d.revision_count,
             ])
+    elif report_type == 'design_workflow_audit':
+        report = get_audit_report_for_design_number(design_filter)
+        if not report:
+            writer.writerow(['Error', f'Design not found: {design_filter or ""}'])
+            return
+        _write_audit_report_rows(writer, report)
     else:
         writer.writerow(['Metric', 'Value'])
         deadline_stats = _deadline_compliance_data()
@@ -147,7 +194,7 @@ def _write_csv_rows(writer, report_type, designer_filter=None, project_filter=No
         writer.writerow(['Deadline Compliance %', deadline_stats['compliance_rate']])
 
 
-def _write_excel_rows(ws, report_type, designer_filter=None, project_filter=None):
+def _write_excel_rows(ws, report_type, designer_filter=None, project_filter=None, design_filter=None):
     if report_type == 'designer_performance':
         ws.append([
             'Designer', 'Assigned', 'Completed', 'On-Time', 'Completion Rate %',
@@ -192,6 +239,42 @@ def _write_excel_rows(ws, report_type, designer_filter=None, project_filter=None
                 d.verified_by.get_full_name() if d.verified_by else '',
                 d.get_status_display(), d.revision_count,
             ])
+    elif report_type == 'design_workflow_audit':
+        report = get_audit_report_for_design_number(design_filter)
+        if not report:
+            ws.append(['Error', f'Design not found: {design_filter or ""}'])
+            return
+        ws.append(['Design Number', report['design_number']])
+        ws.append(['Project', f"{report['project_code']} — {report['project']}"])
+        ws.append(['Requested By', report['requested_by']])
+        ws.append([
+            'Target Completion Date',
+            report['target_completion_date'].isoformat() if report['target_completion_date'] else '',
+        ])
+        ws.append(['Status', report['status']])
+        if report.get('delay_summary'):
+            summary = report['delay_summary']
+            ws.append(['Primary Delay Source', summary.get('primary_source', '')])
+            ws.append(['Primary Delay Days', summary.get('primary_days', '')])
+        ws.append([])
+        ws.append([
+            'Stage', 'Actor', 'Role', 'Timestamp', 'Duration (days)', 'Notes',
+            'Delayed', 'Delayed By', 'Delay Days', 'Delay Type', 'Delay Note',
+        ])
+        for row in report['rows']:
+            ws.append([
+                row['stage'],
+                row['actor'],
+                row['role'],
+                _format_audit_timestamp(row['timestamp']),
+                row.get('duration_days', ''),
+                row.get('notes', ''),
+                'Yes' if row.get('is_delayed') else 'No',
+                row.get('delayed_by', ''),
+                row.get('delay_days', ''),
+                row.get('delay_type', ''),
+                row.get('delay_note', ''),
+            ])
     else:
         deadline_stats = _deadline_compliance_data()
         ws.append(['Metric', 'Value'])
@@ -203,7 +286,7 @@ def _write_excel_rows(ws, report_type, designer_filter=None, project_filter=None
         ws.append(['Deadline Compliance %', deadline_stats['compliance_rate']])
 
 
-def _write_pdf_lines(p, report_type, designer_filter=None, project_filter=None):
+def _write_pdf_lines(p, report_type, designer_filter=None, project_filter=None, design_filter=None):
     p.setFont('Helvetica-Bold', 14)
     p.drawString(50, 800, f'Genesis Design - {report_type.replace("_", " ").title()}')
     p.setFont('Helvetica', 10)
@@ -244,6 +327,30 @@ def _write_pdf_lines(p, report_type, designer_filter=None, project_filter=None):
             next_line(
                 f"{d.design_number}: {d.delay_source} ({d.delay_duration_days} days)"
             )
+    elif report_type == 'design_workflow_audit':
+        report = get_audit_report_for_design_number(design_filter)
+        if not report:
+            next_line(f'Design not found: {design_filter or ""}')
+            return
+        next_line(f"Design: {report['design_number']} · {report['project_code']}")
+        next_line(f"Requested by: {report['requested_by']}")
+        if report['target_completion_date']:
+            next_line(f"Target: {report['target_completion_date'].isoformat()}")
+        if report.get('delay_summary'):
+            summary = report['delay_summary']
+            next_line(
+                f"Primary delay: {summary.get('primary_source', '')} "
+                f"({summary.get('primary_days', '')} days)"
+            )
+        next_line('')
+        for row in report['rows']:
+            delay = ''
+            if row.get('is_delayed'):
+                delay = f" · DELAY: {row.get('delayed_by', '')} ({row.get('delay_note', '')})"
+            next_line(
+                f"{_format_audit_timestamp(row['timestamp'])} · {row['stage']} · "
+                f"{row['actor']} ({row['role']}){delay}"
+            )
     else:
         deadline_stats = _deadline_compliance_data()
         for line in [
@@ -261,6 +368,8 @@ def reports_index(request):
     tab = request.GET.get('tab', 'performance')
     designer_filter = request.GET.get('designer')
     project_filter = request.GET.get('project')
+    design_filter = (request.GET.get('design') or '').strip()
+    audit_report = get_audit_report_for_design_number(design_filter) if design_filter else None
     delay_data = DesignRequest.objects.exclude(delay_source='').values(
         'design_number', 'delay_source', 'delay_duration_days', 'status'
     )[:50]
@@ -285,6 +394,7 @@ def reports_index(request):
     deadline_exports = _report_export_urls(request, 'deadline_compliance')
     delay_exports = _report_export_urls(request, 'delay_analysis')
     summary_exports = _report_export_urls(request, 'management_summary')
+    audit_exports = _report_export_urls(request, 'design_workflow_audit', 'design') if audit_report else None
 
     report_catalog = [
         {
@@ -331,6 +441,19 @@ def reports_index(request):
                 'pdf': summary_exports['pdf'],
             },
         },
+        {
+            'title': 'Design Workflow Audit',
+            'description': 'Per-request stage timeline with actors, timestamps, and delay attribution.',
+            'icon': 'clipboard-list',
+            'icon_bg': 'bg-violet-50',
+            'icon_color': 'text-violet-600',
+            'exports': audit_exports or {
+                'csv': '',
+                'excel': '',
+                'pdf': '',
+            },
+            'requires_design': True,
+        },
     ]
 
     return render(request, 'reports/index.html', {
@@ -353,6 +476,9 @@ def reports_index(request):
         'deadline_exports': deadline_exports,
         'delay_exports': delay_exports,
         'summary_exports': summary_exports,
+        'audit_exports': audit_exports,
+        'audit_report': audit_report,
+        'design_filter': design_filter,
         'report_catalog': report_catalog,
     })
 
@@ -362,10 +488,14 @@ def reports_index(request):
 def export_csv(request, report_type):
     designer_filter = request.GET.get('designer')
     project_filter = request.GET.get('project')
+    design_filter = request.GET.get('design')
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}.csv"'
+    filename = report_type
+    if report_type == 'design_workflow_audit' and design_filter:
+        filename = f'design_workflow_audit_{design_filter}'
+    response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
     writer = csv.writer(response)
-    _write_csv_rows(writer, report_type, designer_filter, project_filter)
+    _write_csv_rows(writer, report_type, designer_filter, project_filter, design_filter)
     return response
 
 
@@ -374,6 +504,7 @@ def export_csv(request, report_type):
 def export_excel(request, report_type):
     designer_filter = request.GET.get('designer')
     project_filter = request.GET.get('project')
+    design_filter = request.GET.get('design')
     try:
         import openpyxl
     except ImportError:
@@ -382,12 +513,15 @@ def export_excel(request, report_type):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = report_type[:31]
-    _write_excel_rows(ws, report_type, designer_filter, project_filter)
+    _write_excel_rows(ws, report_type, designer_filter, project_filter, design_filter)
 
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
-    response['Content-Disposition'] = f'attachment; filename="{report_type}.xlsx"'
+    filename = report_type
+    if report_type == 'design_workflow_audit' and design_filter:
+        filename = f'design_workflow_audit_{design_filter}'
+    response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
     wb.save(response)
     return response
 
@@ -397,6 +531,7 @@ def export_excel(request, report_type):
 def export_pdf(request, report_type):
     designer_filter = request.GET.get('designer')
     project_filter = request.GET.get('project')
+    design_filter = request.GET.get('design')
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.pdfgen import canvas
@@ -405,10 +540,13 @@ def export_pdf(request, report_type):
 
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
-    _write_pdf_lines(p, report_type, designer_filter, project_filter)
+    _write_pdf_lines(p, report_type, designer_filter, project_filter, design_filter)
     p.showPage()
     p.save()
     buffer.seek(0)
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{report_type}.pdf"'
+    filename = report_type
+    if report_type == 'design_workflow_audit' and design_filter:
+        filename = f'design_workflow_audit_{design_filter}'
+    response['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
     return response

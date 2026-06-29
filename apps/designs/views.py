@@ -113,6 +113,7 @@ def design_detail(request, pk):
     progress_steps, progress_cancelled = build_progress_steps(design)
     action_flags = design_action_flags(request.user, design)
     company = CompanySettings.objects.first()
+    can_view_reports = PermissionService.has_global_permission(request.user, 'NAV_PERM_REPORTS')
 
     return render(request, 'designs/detail.html', {
         'design': design,
@@ -129,6 +130,7 @@ def design_detail(request, pk):
         'lifecycle': lifecycle,
         'progress_steps': progress_steps,
         'progress_cancelled': progress_cancelled,
+        'can_view_reports': can_view_reports,
         **action_flags,
     })
 

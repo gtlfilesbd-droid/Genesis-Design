@@ -306,7 +306,16 @@
         {% endif %}
 
         <div class="g-card p-5 rounded-xl border border-[#E2E8F0] bg-white" id="activity-log-section">
-            <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Activity History</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Activity History</h2>
+                {% if can_view_reports %}
+                <a href="{% url 'reports:index' %}?tab=audit&design={{ design.design_number|urlencode }}"
+                   class="g-btn-secondary text-xs inline-flex items-center gap-1.5 shrink-0">
+                    <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i>
+                    Workflow Audit Report
+                </a>
+                {% endif %}
+            </div>
             {% include 'components/activity_timeline.html' with logs=logs %}
         </div>
     </div>

@@ -34,6 +34,9 @@
     <a href="?tab=delay" class="g-filter-chip {% if tab == 'delay' %}active{% endif %}">
         <i data-lucide="timer" class="w-3.5 h-3.5"></i> Delays
     </a>
+    <a href="?tab=audit" class="g-filter-chip {% if tab == 'audit' %}active{% endif %}">
+        <i data-lucide="clipboard-list" class="w-3.5 h-3.5"></i> Workflow Audit
+    </a>
     <a href="?tab=export" class="g-filter-chip {% if tab == 'export' %}active{% endif %}">
         <i data-lucide="download" class="w-3.5 h-3.5"></i> Export
     </a>
@@ -252,6 +255,99 @@
 </div>
 {% endif %}
 
+{% if tab == 'audit' %}
+<form method="get" class="g-card p-5 mb-4">
+    <input type="hidden" name="tab" value="audit">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Design Number</label>
+            <input type="text" name="design" value="{{ design_filter }}" class="g-input" placeholder="e.g. Colosia-RP-001">
+        </div>
+        <div class="flex gap-2 sm:col-span-2">
+            <button type="submit" class="g-btn-primary inline-flex items-center gap-2 flex-1 justify-center">
+                <i data-lucide="search" class="w-4 h-4"></i> Load audit report
+            </button>
+            <a href="?tab=audit" class="g-btn-secondary shrink-0">Reset</a>
+        </div>
+    </div>
+</form>
+
+{% if audit_report %}
+<div class="g-card overflow-hidden mb-4">
+    <div class="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+            <h2 class="font-semibold text-slate-900">{{ audit_report.design_number }}</h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+                {{ audit_report.project_code }} · {{ audit_report.project }}
+                {% if audit_report.target_completion_date %}
+                · Target {{ audit_report.target_completion_date|date:"d M Y" }}
+                {% endif %}
+            </p>
+            <p class="text-xs text-slate-500 mt-1">
+                Requested by {{ audit_report.requested_by }} · Status: {{ audit_report.status }}
+            </p>
+            {% if audit_report.delay_summary %}
+            <p class="text-xs text-red-600 font-medium mt-1">
+                Primary delay: {{ audit_report.delay_summary.primary_source }}
+                {% if audit_report.delay_summary.primary_days is not None %}
+                ({{ audit_report.delay_summary.primary_days }} days)
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+        {% if audit_exports %}
+        {% include 'components/report_export_buttons.html' with csv_url=audit_exports.csv excel_url=audit_exports.excel pdf_url=audit_exports.pdf %}
+        {% endif %}
+    </div>
+    <div class="overflow-x-auto">
+        <table class="g-table w-full g-table-pro">
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Actor</th>
+                    <th>Role</th>
+                    <th>Timestamp</th>
+                    <th>Duration</th>
+                    <th>Notes</th>
+                    <th>Delay</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in audit_report.rows %}
+            <tr class="{% if row.is_delayed %}bg-red-50/60{% endif %}">
+                <td class="font-medium text-slate-900">{{ row.stage }}</td>
+                <td>{{ row.actor }}</td>
+                <td>{{ row.role }}</td>
+                <td class="whitespace-nowrap text-sm text-slate-600">{{ row.timestamp|date:"d M Y, H:i" }}</td>
+                <td>{% if row.duration_days is not None %}{{ row.duration_days }}d{% else %}—{% endif %}</td>
+                <td class="text-sm text-slate-600 max-w-xs">{{ row.notes }}</td>
+                <td>
+                    {% if row.is_delayed %}
+                    <span class="inline-flex flex-col gap-0.5">
+                        <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">{{ row.delayed_by }}</span>
+                        <span class="text-xs text-red-600">{{ row.delay_note }}</span>
+                    </span>
+                    {% else %}
+                    <span class="text-slate-400">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif design_filter %}
+<div class="g-card p-8 text-center text-slate-500">
+    No design found matching <span class="font-semibold text-slate-700">{{ design_filter }}</span>.
+</div>
+{% else %}
+<div class="g-card p-8 text-center text-slate-500">
+    Enter a design number above to view the full workflow audit trail.
+</div>
+{% endif %}
+{% endif %}
+
 {% if tab == 'export' %}
 <div class="mb-4">
     <h2 class="text-lg font-semibold text-slate-900">Export Center</h2>
@@ -270,7 +366,11 @@
             </div>
         </div>
         <div class="mt-auto pt-4 border-t border-slate-100">
+            {% if report.requires_design %}
+            <p class="text-xs text-slate-500 mb-3">Search a design on the Workflow Audit tab first, then export from there.</p>
+            {% else %}
             {% include 'components/report_export_buttons.html' with csv_url=report.exports.csv excel_url=report.exports.excel pdf_url=report.exports.pdf %}
+            {% endif %}
         </div>
     </div>
     {% endfor %}
