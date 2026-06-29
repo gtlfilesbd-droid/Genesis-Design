@@ -384,8 +384,12 @@ class SiteEngineerLifecycleTests(TestCase):
         self.assertIn('Site Engineer Acknowledgement', labels)
         self.assertEqual(data['current_stage_label'], 'Site Engineer Acknowledgement')
         ack_seg = next(s for s in data['segments'] if s['label'] == 'Site Engineer Acknowledgement')
+        self.assertEqual(ack_seg['bar_label'], 'Eng. Ack')
         self.assertTrue(ack_seg['is_ongoing'])
         self.assertEqual(ack_seg['role'], 'engineer')
+        self.assertGreaterEqual(ack_seg['grow'], 1.0)
+        engineer_person = next(p for p in data['people'] if p['user_id'] == self.engineer.pk)
+        self.assertEqual(engineer_person['user'], self.engineer)
 
     def test_engineer_in_progress_shows_site_verification_ongoing(self):
         self.design.status = DesignStatus.ENGINEER_IN_PROGRESS
@@ -393,6 +397,7 @@ class SiteEngineerLifecycleTests(TestCase):
         self.design.save()
         data = build_lifecycle_data(self.design)
         verification_seg = next(s for s in data['segments'] if s['label'] == 'Site Verification')
+        self.assertEqual(verification_seg['bar_label'], 'Site Verify')
         self.assertTrue(verification_seg['is_ongoing'])
         self.assertEqual(data['current_stage_label'], 'Site Verification')
 
@@ -408,6 +413,7 @@ class SiteEngineerLifecycleTests(TestCase):
         verification_seg = next(s for s in data['segments'] if s['label'] == 'Site Verification')
         self.assertFalse(verification_seg['is_ongoing'])
         ack_seg = next(s for s in data['segments'] if s['label'] == 'Acknowledgement')
+        self.assertEqual(ack_seg['bar_label'], 'HOD Ack')
         self.assertTrue(ack_seg['is_ongoing'])
         self.assertEqual(ack_seg['start'], self.design.engineer_submitted_at)
 
@@ -421,6 +427,7 @@ class SiteEngineerLifecycleTests(TestCase):
         ack_seg = next(s for s in data['segments'] if s['label'] == 'Acknowledgement')
         self.assertFalse(ack_seg['is_ongoing'])
         assign_seg = next(s for s in data['segments'] if s['label'] == 'Assignment')
+        self.assertEqual(assign_seg['bar_label'], 'Assign')
         self.assertTrue(assign_seg['is_ongoing'])
         self.assertEqual(data['current_stage_label'], 'Assignment')
 

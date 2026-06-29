@@ -40,12 +40,12 @@
   </div>
 
   <div class="lc-legend">
-    <span><span class="dot" style="background:#185FA5"></span>Head of Design</span>
-    <span><span class="dot" style="background:#7C3AED"></span>Site Engineer</span>
-    <span><span class="dot" style="background:#1D9E75"></span>Designer</span>
-    <span><span class="dot" style="background:#BA7517"></span>Verifier</span>
-    <span><span class="dot" style="background:#993556"></span>Compliance</span>
-    <span><span class="dot" style="background:#A32D2D"></span>Delay</span>
+    <span title="Head of Design"><span class="dot" style="background:#185FA5"></span>HOD</span>
+    <span title="Site Engineer"><span class="dot" style="background:#7C3AED"></span>Engineer</span>
+    <span title="Designer"><span class="dot" style="background:#1D9E75"></span>Designer</span>
+    <span title="Verifier"><span class="dot" style="background:#BA7517"></span>Verifier</span>
+    <span title="Compliance"><span class="dot" style="background:#993556"></span>Compliance</span>
+    <span title="Delay"><span class="dot" style="background:#A32D2D"></span>Delay</span>
   </div>
 
   <div class="lc-scroll">
@@ -55,7 +55,7 @@
           <div class="seg seg-{{ seg.role }} {% if seg.is_ongoing %}seg-ongoing{% endif %} {% if seg.is_delay %}seg-delay{% endif %}"
                style="flex-grow: {{ seg.grow }};"
                title="{{ seg.label }}{% if seg.person %} — {{ seg.person }}{% endif %}">
-            <span class="seg-title">{{ seg.label }}</span>
+            <span class="seg-title">{{ seg.bar_label|default:seg.label }}</span>
             <span class="seg-sub">{% if seg.days is not None %}{{ seg.days }}d{% if seg.note %}, {{ seg.note }}{% endif %}{% endif %}</span>
           </div>
         {% endfor %}
@@ -72,7 +72,11 @@
   <div class="lc-people">
     {% for p in lifecycle.people %}
       <span class="person-chip">
-        <span class="avatar" style="background:{{ p.bg }};color:{{ p.fg }};">{{ p.initials }}</span>
+        {% if p.user.avatar %}
+          {% render_user_avatar p.user size_class='w-[18px] h-[18px]' %}
+        {% else %}
+          <span class="avatar" style="background:{{ p.bg }};color:{{ p.fg }};">{{ p.initials }}</span>
+        {% endif %}
         {{ p.display_name }}
       </span>
     {% endfor %}

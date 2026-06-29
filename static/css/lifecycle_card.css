@@ -45,35 +45,39 @@
 
 .lc-legend {
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
   margin-bottom: 10px;
-  font-size: 11px;
+  font-size: 10px;
   color: #64748B;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.lc-legend::-webkit-scrollbar { display: none; }
 .lc-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .lc-legend .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
 .lc-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px 4px; }
 .lc-track-wrap { position: relative; min-width: max-content; padding-top: 18px; }
-.lc-track { display: flex; height: 40px; border-radius: 8px; overflow: hidden; }
+.lc-track { display: flex; height: 44px; border-radius: 8px; overflow: hidden; }
 
 .lc-card .seg {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 84px;
-  padding: 0 12px;
+  min-width: 64px;
+  flex-shrink: 0;
+  padding: 0 10px;
   border-right: 2px solid #FFFFFF;
   position: relative;
 }
 .lc-card .seg:last-child { border-right: none; }
-.lc-card .seg-title { font-size: 11px; font-weight: 600; white-space: nowrap; }
-.lc-card .seg-sub { font-size: 10px; white-space: nowrap; margin-top: 1px; opacity: 0.9; }
+.lc-card .seg-title { font-size: 9px; font-weight: 600; white-space: nowrap; }
+.lc-card .seg-sub { font-size: 9px; white-space: nowrap; margin-top: 1px; opacity: 0.9; }
 
 .lc-card .seg-hod        { background: #B5D4F4; color: #042C53; }
-.lc-card .seg-engineer   { background: #DDD6FE; color: #3B0764; }
+.lc-card .seg-engineer   { background: #A78BFA; color: #2E1065; }
 .lc-card .seg-designer   { background: #9FE1CB; color: #04342C; }
 .lc-card .seg-verifier   { background: #FAC775; color: #412402; }
 .lc-card .seg-compliance { background: #F4C0D1; color: #4B1528; }

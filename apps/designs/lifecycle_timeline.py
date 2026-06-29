@@ -692,6 +692,22 @@ def get_initials(full_name):
     return (parts[0][0] + parts[-1][0]).upper()
 
 
+def _bar_stage_label(label):
+    mapping = {
+        'Site Eng Ack': 'Eng. Ack',
+        'Site Verification': 'Site Verify',
+        'Ack': 'HOD Ack',
+        'Assign': 'Assign',
+        'HOD': 'HOD Review',
+        'Verifier': 'Verifier',
+        'Compliance': 'Compliance',
+        'Completed': 'Done',
+    }
+    if label.startswith('Designer V'):
+        return label
+    return mapping.get(label, label)
+
+
 def _display_stage_label(label):
     mapping = {
         'Ack': 'Acknowledgement',
@@ -734,7 +750,7 @@ def _add_workflow_person(people, user, role_key):
     role_label = ROLE_LABELS[role_key]
     palette = {
         'hod': ('#B5D4F4', '#042C53'),
-        'engineer': ('#DDD6FE', '#3B0764'),
+        'engineer': ('#A78BFA', '#2E1065'),
         'designer': ('#9FE1CB', '#04342C'),
         'verifier': ('#FAC775', '#412402'),
         'compliance': ('#F4C0D1', '#4B1528'),
@@ -747,6 +763,7 @@ def _add_workflow_person(people, user, role_key):
         'fg': fg,
         'role_label': role_label,
         'display_name': format_person_display(name, role_label),
+        'user': user,
         'user_id': user.pk,
     }
 
@@ -769,11 +786,12 @@ def build_lifecycle_data(design):
         days = round(((end or now_time) - start).total_seconds() / 86400, 1)
         segments.append({
             'label': label,
+            'bar_label': _bar_stage_label(label),
             'role': role,
             'person': person,
             'person_id': person_id,
             'days': days,
-            'grow': max(days, 0.3),
+            'grow': max(days, 1.0),
             'is_ongoing': is_ongoing,
             'is_delay': False,
             'note': note,
@@ -891,6 +909,7 @@ def build_lifecycle_data(design):
     if design.completion_date:
         segments.append({
             'label': 'Completed',
+            'bar_label': 'Done',
             'role': 'endcap',
             'person': None,
             'person_id': None,
@@ -909,6 +928,8 @@ def build_lifecycle_data(design):
 
     for seg in segments:
         if seg.get('label'):
+            if not seg.get('bar_label'):
+                seg['bar_label'] = _bar_stage_label(seg['label'])
             seg['label'] = _display_stage_label(seg['label'])
 
     is_overdue = bool(
