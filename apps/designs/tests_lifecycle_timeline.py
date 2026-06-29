@@ -344,3 +344,97 @@ class LifecycleTimelineTests(TestCase):
             self.design.target_completion_date,
         )
         self.assertEqual(data['completed_late_target_summary'], expected)
+
+
+class SiteEngineerLifecycleTests(TestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(
+            username='req', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R001',
+        )
+        self.hod = User.objects.create_user(
+            username='hod', password='pass', role=UserRole.HEAD_OF_DESIGN, employee_id='H001',
+            first_name='Head', last_name='Design',
+        )
+        self.engineer = User.objects.create_user(
+            username='eng', password='pass', role=UserRole.VERIFICATION_TEAM, employee_id='E001',
+            first_name='Site', last_name='Engineer',
+        )
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.engineer, can_site_engineer=True)
+        self.project = Project.objects.create(
+            name='Test Project', code='TST', client_name='Test Client',
+            start_date=date.today(), created_by=self.requester,
+        )
+        self.drawing_type = DrawingType.objects.create(
+            name='Floor Plan', code_prefix='FP', allowed_days=5,
+        )
+        self.design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            status=DesignStatus.ENGINEER_PENDING_ACK,
+            assigned_site_engineer=self.engineer,
+            engineer_assigned_at=timezone.now() - timedelta(days=1),
+            target_completion_date=date.today() + timedelta(days=10),
+        )
+
+    def test_engineer_pending_ack_shows_site_engineer_acknowledgement(self):
+        data = build_lifecycle_data(self.design)
+        labels = [s['label'] for s in data['segments']]
+        self.assertIn('Site Engineer Acknowledgement', labels)
+        self.assertEqual(data['current_stage_label'], 'Site Engineer Acknowledgement')
+        ack_seg = next(s for s in data['segments'] if s['label'] == 'Site Engineer Acknowledgement')
+        self.assertTrue(ack_seg['is_ongoing'])
+        self.assertEqual(ack_seg['role'], 'engineer')
+
+    def test_engineer_in_progress_shows_site_verification_ongoing(self):
+        self.design.status = DesignStatus.ENGINEER_IN_PROGRESS
+        self.design.engineer_acknowledged_at = timezone.now() - timedelta(hours=2)
+        self.design.save()
+        data = build_lifecycle_data(self.design)
+        verification_seg = next(s for s in data['segments'] if s['label'] == 'Site Verification')
+        self.assertTrue(verification_seg['is_ongoing'])
+        self.assertEqual(data['current_stage_label'], 'Site Verification')
+
+    def test_new_request_after_engineer_submit_shows_hod_acknowledgement_ongoing(self):
+        self.design.status = DesignStatus.NEW_REQUEST
+        self.design.engineer_acknowledged_at = timezone.now() - timedelta(days=1)
+        self.design.engineer_submitted_at = timezone.now() - timedelta(hours=1)
+        self.design.save()
+        data = build_lifecycle_data(self.design)
+        labels = [s['label'] for s in data['segments']]
+        self.assertIn('Site Verification', labels)
+        self.assertIn('Acknowledgement', labels)
+        verification_seg = next(s for s in data['segments'] if s['label'] == 'Site Verification')
+        self.assertFalse(verification_seg['is_ongoing'])
+        ack_seg = next(s for s in data['segments'] if s['label'] == 'Acknowledgement')
+        self.assertTrue(ack_seg['is_ongoing'])
+        self.assertEqual(ack_seg['start'], self.design.engineer_submitted_at)
+
+    def test_acknowledged_shows_hod_ack_complete_and_assignment_ongoing(self):
+        self.design.status = DesignStatus.ACKNOWLEDGED
+        self.design.engineer_acknowledged_at = timezone.now() - timedelta(days=2)
+        self.design.engineer_submitted_at = timezone.now() - timedelta(days=1)
+        self.design.deadline_start = timezone.now() - timedelta(hours=6)
+        self.design.save()
+        data = build_lifecycle_data(self.design)
+        ack_seg = next(s for s in data['segments'] if s['label'] == 'Acknowledgement')
+        self.assertFalse(ack_seg['is_ongoing'])
+        assign_seg = next(s for s in data['segments'] if s['label'] == 'Assignment')
+        self.assertTrue(assign_seg['is_ongoing'])
+        self.assertEqual(data['current_stage_label'], 'Assignment')
+
+    def test_non_engineer_new_request_has_hod_ack_from_created_at(self):
+        design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            status=DesignStatus.NEW_REQUEST,
+            target_completion_date=date.today() + timedelta(days=10),
+        )
+        data = build_lifecycle_data(design)
+        labels = [s['label'] for s in data['segments']]
+        self.assertNotIn('Site Engineer Acknowledgement', labels)
+        ack_seg = next(s for s in data['segments'] if s['label'] == 'Acknowledgement')
+        self.assertTrue(ack_seg['is_ongoing'])
+        self.assertEqual(ack_seg['start'], design.created_at)

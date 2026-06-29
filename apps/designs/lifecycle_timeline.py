@@ -306,6 +306,8 @@ def _resolve_person_waiting_since(design, role_key, fallback_since=None):
         assignment = design.assignments.order_by('-assigned_at').first()
         if assignment:
             return assignment.assigned_at
+    if role_key == 'engineer' and design.engineer_assigned_at:
+        return design.engineer_acknowledged_at or design.engineer_assigned_at
     if role_key == 'verifier' and design.verification_assigned_at:
         return design.verification_acknowledged_at or design.verification_assigned_at
     if role_key == 'compliance' and design.compliance_assigned_at:
@@ -338,7 +340,14 @@ def _waiting_since_for_status(design):
     if duration:
         return duration.started_at, duration.responsible_user
 
+    if status == DesignStatus.ENGINEER_PENDING_ACK:
+        return design.engineer_assigned_at or design.created_at, design.assigned_site_engineer
+    if status == DesignStatus.ENGINEER_IN_PROGRESS:
+        return design.engineer_acknowledged_at or design.engineer_assigned_at, design.assigned_site_engineer
+
     if status == DesignStatus.NEW_REQUEST:
+        if design.engineer_submitted_at:
+            return design.engineer_submitted_at, None
         return design.created_at, None
     if status == DesignStatus.ACKNOWLEDGED:
         return design.deadline_start or design.created_at, None
@@ -396,6 +405,9 @@ def get_current_delay_info(design):
                       DesignStatus.COMPLIANCE_CORRECTION, DesignStatus.FINAL_APPROVAL_PENDING,
                       DesignStatus.APPROVED):
             person, person_id = get_hod_name_and_id(design)
+        elif status in (DesignStatus.ENGINEER_PENDING_ACK, DesignStatus.ENGINEER_IN_PROGRESS):
+            person = _person_name(design.assigned_site_engineer)
+            person_id = design.assigned_site_engineer_id
         elif status in (DesignStatus.IN_PROGRESS, DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED):
             person = _person_name(design.assigned_designer)
             person_id = design.assigned_designer_id
@@ -498,6 +510,19 @@ def _segments_from_durations(design):
 
 def _synthetic_initial_segment(design):
     now_time = timezone.now()
+    if design.status == DesignStatus.ENGINEER_PENDING_ACK:
+        engineer_start = design.engineer_assigned_at or design.created_at
+        return {
+            'label': 'Site Engineer',
+            'role': 'engineer',
+            'person': _person_name(design.assigned_site_engineer),
+            'days': _days_between(engineer_start, now_time),
+            'is_ongoing': True,
+            'is_done': False,
+            'is_pending': False,
+            'is_endcap': False,
+            'is_current_delay_source': False,
+        }
     if design.status not in (DesignStatus.NEW_REQUEST, DesignStatus.DRAFT):
         return None
     return {
@@ -672,6 +697,8 @@ def _display_stage_label(label):
         'Ack': 'Acknowledgement',
         'Assign': 'Assignment',
         'HOD': 'HOD Review',
+        'Site Eng Ack': 'Site Engineer Acknowledgement',
+        'Site Verification': 'Site Verification',
     }
     return mapping.get(label, label)
 
@@ -707,6 +734,7 @@ def _add_workflow_person(people, user, role_key):
     role_label = ROLE_LABELS[role_key]
     palette = {
         'hod': ('#B5D4F4', '#042C53'),
+        'engineer': ('#DDD6FE', '#3B0764'),
         'designer': ('#9FE1CB', '#04342C'),
         'verifier': ('#FAC775', '#412402'),
         'compliance': ('#F4C0D1', '#4B1528'),
@@ -753,7 +781,28 @@ def build_lifecycle_data(design):
             'end': end,
         })
 
-    add_segment('Ack', 'hod', ack_person, design.created_at, design.deadline_start, person_id=ack_id)
+    if design.assigned_site_engineer_id:
+        engineer_name = _person_name(design.assigned_site_engineer)
+        engineer_start = design.engineer_assigned_at or design.created_at
+        add_segment(
+            'Site Eng Ack', 'engineer', engineer_name, engineer_start,
+            design.engineer_acknowledged_at, person_id=design.assigned_site_engineer_id,
+        )
+        if design.engineer_acknowledged_at:
+            add_segment(
+                'Site Verification', 'engineer', engineer_name,
+                design.engineer_acknowledged_at, design.engineer_submitted_at,
+                person_id=design.assigned_site_engineer_id,
+            )
+        _add_workflow_person(people, design.assigned_site_engineer, 'engineer')
+        if design.engineer_submitted_at:
+            add_segment(
+                'Ack', 'hod', ack_person, design.engineer_submitted_at,
+                design.deadline_start, person_id=ack_id,
+            )
+    else:
+        add_segment('Ack', 'hod', ack_person, design.created_at, design.deadline_start, person_id=ack_id)
+
     add_segment('Assign', 'hod', assign_person, design.deadline_start, design.assigned_at, person_id=assign_id)
 
     revisions = list(design.submissions.order_by('version_number'))
