@@ -142,7 +142,7 @@
 .stat-card:nth-child(2) { animation-delay: 0.1s; }
 .stat-card:nth-child(3) { animation-delay: 0.15s; }
 
-.stat-card:hover {
+.stat-card:not(.is-kpi-alert):hover {
   box-shadow: var(--kpi-shadow-hover);
   transform: translateY(-1px);
 }
@@ -152,6 +152,38 @@
   border-left: 4px solid #DC2626;
   border-radius: 12px;
   background: #FEF2F2;
+}
+
+@keyframes kpiPulseGlow {
+  0%, 100% {
+    background: linear-gradient(145deg, #fff8f8 0%, #ffebee 35%, #ffffff 100%);
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.12);
+    transform: translateY(0) scale(1);
+    border-color: #FECACA;
+  }
+  50% {
+    background: linear-gradient(145deg, #fecaca 0%, #ffebee 40%, #ffffff 100%);
+    box-shadow: 0 10px 28px rgba(220, 38, 38, 0.35);
+    transform: translateY(-4px) scale(1.03);
+    border-color: #FCA5A5;
+  }
+}
+
+.stat-card.is-kpi-alert {
+  animation: kpiPulseGlow 1.35s ease-in-out infinite;
+  will-change: transform, box-shadow;
+  transition: none;
+}
+
+.stat-card.is-kpi-alert:hover {
+  box-shadow: 0 12px 32px rgba(220, 38, 38, 0.4);
+  border-color: #FCA5A5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card.is-kpi-alert {
+    animation: none;
+  }
 }
 
 .stat-icon {

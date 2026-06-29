@@ -343,3 +343,43 @@ class KpiDisplayTests(TestCase):
     def test_build_headline_inverted_tone_for_overdue_rate(self):
         headline = _build_headline('Overdue rate', 15, 'test context', inverted=True)
         self.assertEqual(headline['value_color'], TONE_COLORS['good']['text'])
+
+    def test_kpi_alert_only_on_overdue_stat_cards(self):
+        kpis = {
+            'total_requests': 10,
+            'completed_requests': 4,
+            'in_progress': 5,
+            'pending_requests': 1,
+            'cancelled_requests': 0,
+            'overdue_requests': 3,
+            'overdue_rate': 20.0,
+            'completion_rate': 40.0,
+        }
+        context = build_kpi_page_context(UserRole.DESIGN_REQUESTER, kpis)
+        stat_cards = [
+            card for section in context['sections']
+            for card in section['cards']
+            if 'is_danger' in card
+        ]
+        overdue_card = next(c for c in stat_cards if c['label'] == 'Overdue')
+        self.assertTrue(overdue_card['is_kpi_alert'])
+        self.assertTrue(overdue_card['is_danger'])
+
+        verifier_kpis = {
+            'total_verified': 8,
+            'approved': 5,
+            'pending': 3,
+            'corrections_sent': 4,
+            'accuracy_rate': 75.0,
+            'correction_rate': 25.0,
+            'avg_verification_hours': 2.5,
+        }
+        verifier_context = build_kpi_page_context(UserRole.VERIFICATION_TEAM, verifier_kpis)
+        verifier_cards = [
+            card for section in verifier_context['sections']
+            for card in section['cards']
+            if 'is_danger' in card
+        ]
+        corrections_card = next(c for c in verifier_cards if 'Correction' in c['label'])
+        self.assertFalse(corrections_card.get('is_kpi_alert'))
+        self.assertTrue(corrections_card['is_danger'])

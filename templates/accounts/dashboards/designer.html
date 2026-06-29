@@ -14,7 +14,7 @@
     {% include 'components/stat_card.html' with label='Corrections' value=corrections icon='rotate-ccw' icon_bg='bg-orange-50' icon_color='text-orange-600' url=requests_list_url|add:'?status=correction_required&mine=1' %}
     {% include 'components/stat_card.html' with label='Rework' value=rework_count icon='repeat' icon_bg='bg-amber-50' icon_color='text-amber-600' url=requests_list_url|add:'?mine=1' %}
     {% include 'components/stat_card.html' with label='Completed' value=completed icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' url=requests_list_url|add:'?status=completed&mine=1' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs url=dashboard_overdue_url %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs kpi_alert=stats.overdue_designs url=dashboard_overdue_url %}
 </div>
 
 <div class="g-card p-6 mb-8">

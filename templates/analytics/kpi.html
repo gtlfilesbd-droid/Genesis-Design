@@ -42,8 +42,8 @@
       {% if section.type == "volume" %}
         <div class="grid-3{% if section.cards|length == 3 %} grid-3--triple{% elif section.cards|length >= 4 %} grid-3--quad{% endif %}">
           {% for card in section.cards %}
-            <div class="stat-card {% if card.is_danger %}is-danger{% endif %}">
-              <div class="stat-icon" style="background: {{ card.icon_bg }}; color: {{ card.icon_fg }};">
+            <div class="stat-card {% if card.is_danger %}is-danger{% endif %}{% if card.is_kpi_alert %} is-kpi-alert{% endif %}">
+              <div class="stat-icon{% if card.is_kpi_alert %} stat-icon-pulse{% endif %}" style="background: {{ card.icon_bg }}; color: {{ card.icon_fg }};">
                 <i class="ti {{ card.icon }}" aria-hidden="true"></i>
               </div>
               <p class="stat-label">{{ card.label }}</p>

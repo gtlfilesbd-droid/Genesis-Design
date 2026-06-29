@@ -72,7 +72,7 @@
     {% include 'components/stat_card.html' with label='Total Assigned' value=kpis.total_assigned icon='clipboard-list' %}
     {% include 'components/stat_card.html' with label='Completed' value=kpis.total_completed icon='check-circle' icon_bg='bg-green-50' icon_color='text-green-600' %}
     {% include 'components/stat_card.html' with label='Running' value=running_tasks icon='loader' icon_bg='bg-amber-50' icon_color='text-amber-600' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=overdue_tasks icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_tasks %}
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue_tasks icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_tasks kpi_alert=overdue_tasks %}
 </div>
 {% endif %}
 

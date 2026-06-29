@@ -1,11 +1,11 @@
 {% if url %}
-<a href="{{ url }}" class="g-stat-card g-stat-card-link {% if danger %}danger{% endif %} {% if active %}g-stat-card-active{% endif %}">
+<a href="{{ url }}" class="g-stat-card g-stat-card-link {% if danger %}danger{% endif %}{% if kpi_alert and value %} g-stat-card-kpi-alert{% endif %} {% if active %}g-stat-card-active{% endif %}">
 {% else %}
-<div class="g-stat-card {% if danger %}danger{% endif %} {% if active %}g-stat-card-active{% endif %}">
+<div class="g-stat-card {% if danger %}danger{% endif %}{% if kpi_alert and value %} g-stat-card-kpi-alert{% endif %} {% if active %}g-stat-card-active{% endif %}">
 {% endif %}
     <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ label }}</span>
-        <div class="w-8 h-8 rounded-lg {{ icon_bg|default:'bg-blue-50' }} flex items-center justify-center">
+        <div class="w-8 h-8 rounded-lg {{ icon_bg|default:'bg-blue-50' }} flex items-center justify-center{% if kpi_alert and value %} g-stat-icon-pulse{% endif %}">
             <i data-lucide="{{ icon|default:'activity' }}" class="w-4 h-4 {{ icon_color|default:'text-blue-600' }}"></i>
         </div>
     </div>

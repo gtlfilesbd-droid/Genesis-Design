@@ -21,6 +21,10 @@ DANGER_STAT_KEYS = frozenset({
     'my_total_corrections', 'my_overdue',
 })
 
+KPI_ALERT_STAT_KEYS = frozenset({
+    'overdue', 'overdue_requests', 'my_overdue',
+})
+
 TONE_COLORS = {
     'good': {'text': '#3B6D11', 'fill': '#639922'},
     'medium': {'text': '#854F0B', 'fill': '#EF9F27'},
@@ -116,7 +120,7 @@ def _build_rate_card(label, value, inverted=False, unit='%', fill_percent=None, 
     }
 
 
-def _build_stat_card(key, label, value, is_danger=False):
+def _build_stat_card(key, label, value, is_danger=False, is_kpi_alert=False):
     icon_key = STAT_KEY_TO_ICON.get(key, 'total')
     icon_info = ICON_MAP.get(icon_key, {'icon': 'ti-chart-bar', 'bg': '#F1F5F9', 'fg': '#475569'})
     return {
@@ -126,6 +130,7 @@ def _build_stat_card(key, label, value, is_danger=False):
         'icon_bg': icon_info['bg'],
         'icon_fg': icon_info['fg'],
         'is_danger': is_danger,
+        'is_kpi_alert': is_kpi_alert,
     }
 
 
@@ -190,6 +195,15 @@ def _headline_context(role, kpis):
 
 def _stat_is_danger(key, value):
     if key not in DANGER_STAT_KEYS:
+        return False
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _stat_is_kpi_alert(key, value):
+    if key not in KPI_ALERT_STAT_KEYS:
         return False
     try:
         return float(value) > 0
@@ -458,6 +472,7 @@ def build_kpi_page_context(role, kpis):
                 cards.append(_build_stat_card(
                     key, card_def['label'], value,
                     is_danger=_stat_is_danger(key, value),
+                    is_kpi_alert=_stat_is_kpi_alert(key, value),
                 ))
             else:
                 section_type = 'rate'

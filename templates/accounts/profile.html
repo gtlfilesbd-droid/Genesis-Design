@@ -108,7 +108,7 @@
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
     {% include 'components/stat_card.html' with label='Running' value=running_tasks icon='loader' %}
     {% include 'components/stat_card.html' with label='Pending' value=pending_tasks icon='clock' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=overdue_tasks icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_tasks %}
+    {% include 'components/stat_card.html' with label='Overdue' value=overdue_tasks icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=overdue_tasks kpi_alert=overdue_tasks %}
 </div>
 
 <a href="{% url 'analytics:kpi' %}" class="g-btn-primary inline-flex items-center gap-2">

@@ -476,6 +476,36 @@ class MyTasksStatsTests(TestCase):
         self.assertIn('period=month', running['url'])
         self.assertNotIn('scope=', running['url'])
 
+    def test_stat_cards_set_kpi_alert_for_overdue_only(self):
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            assigned_designer=self.designer,
+            current_holder=self.designer,
+            due_date=timezone.now() - timedelta(days=1),
+        )
+        _, _, stats, _ = get_my_tasks_context(self.designer)
+        cards = get_my_tasks_stat_cards('designer', stats, period='all')
+        overdue = next(c for c in cards if c['key'] == 'overdue')
+        running = next(c for c in cards if c['key'] == 'running')
+        self.assertGreater(stats['overdue_designs'], 0)
+        self.assertTrue(overdue['kpi_alert'])
+        self.assertFalse(running.get('kpi_alert'))
+
+    def test_stat_cards_kpi_alert_false_when_overdue_zero(self):
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            assigned_designer=self.designer,
+            current_holder=self.designer,
+            due_date=timezone.now() + timedelta(days=5),
+        )
+        _, _, stats, _ = get_my_tasks_context(self.designer)
+        cards = get_my_tasks_stat_cards('designer', stats, period='all')
+        overdue = next(c for c in cards if c['key'] == 'overdue')
+        self.assertEqual(stats['overdue_designs'], 0)
+        self.assertFalse(overdue['kpi_alert'])
+
     def test_filter_my_tasks_stat_matches_running_count(self):
         self._create_design(self.project_a, due_date=timezone.now() + timedelta(days=2))
         self._create_design(self.project_b, due_date=timezone.now() + timedelta(days=3))

@@ -651,5 +651,6 @@ def get_my_tasks_stat_cards(scope, stats, period='all', active_stat=None):
             'url': build_my_tasks_request_url(scope, key, period),
             'active': active_stat == key,
             'danger': key in ('overdue', 'target_overdue') and stats.get(value_key, 0),
+            'kpi_alert': key in ('overdue', 'target_overdue') and stats.get(value_key, 0),
         })
     return cards
