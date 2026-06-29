@@ -322,6 +322,81 @@ class MyTasksStatsTests(TestCase):
         self.assertIn('overdue=1', response.context['dashboard_overdue_url'])
         self.assertNotIn('scope=hod', response.context['dashboard_overdue_url'])
 
+    def test_designer_dashboard_overdue_matches_my_tasks(self):
+        work_overdue = self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            assigned_designer=self.designer,
+            current_holder=self.designer,
+            due_date=timezone.now() - timedelta(days=1),
+        )
+        at_verification = self._create_design(
+            self.project_b,
+            status=DesignStatus.VERIFICATION_PENDING,
+            assigned_designer=self.designer,
+            assigned_verifier=self.verifier,
+            current_holder=self.verifier,
+            due_date=timezone.now() - timedelta(days=2),
+        )
+        self.client.login(username='des', password='pass')
+        response = self.client.get(reverse('accounts:designer_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        _, _, mt_stats, _ = get_my_tasks_context(self.designer)
+        self.assertEqual(mt_stats['overdue_designs'], 1)
+        self.assertEqual(response.context['stats']['overdue_designs'], mt_stats['overdue_designs'])
+        self.assertIn('scope=designer', response.context['dashboard_overdue_url'])
+        self.assertIn('stat=overdue', response.context['dashboard_overdue_url'])
+        self.assertNotIn(at_verification, filter_my_tasks_stat(
+            DesignRequest.objects.all(), self.designer, 'designer', 'overdue',
+        ))
+
+    def test_requester_dashboard_uses_target_overdue_label(self):
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            requested_by=self.requester,
+            assigned_designer=self.designer,
+            target_completion_date=timezone.now().date() - timedelta(days=1),
+        )
+        self.client.login(username='req', password='pass')
+        response = self.client.get(reverse('accounts:requester_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['overdue_label'], 'Target Overdue')
+        _, _, mt_stats, _ = get_my_tasks_context(self.requester)
+        self.assertEqual(response.context['stats']['overdue_designs'], mt_stats['target_overdue'])
+        self.assertIn('scope=requester', response.context['dashboard_overdue_url'])
+        self.assertIn('stat=target_overdue', response.context['dashboard_overdue_url'])
+        self.assertNotIn('overdue=1', response.context['dashboard_overdue_url'])
+
+    def test_requester_target_overdue_list_matches_dashboard_count(self):
+        today = timezone.now().date()
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            requested_by=self.requester,
+            assigned_designer=self.designer,
+            target_completion_date=today - timedelta(days=2),
+        )
+        other_requester = User.objects.create_user(
+            username='req2', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='R2',
+        )
+        self._create_design(
+            self.project_a,
+            status=DesignStatus.IN_PROGRESS,
+            requested_by=other_requester,
+            assigned_designer=self.designer,
+            due_date=timezone.now() - timedelta(days=3),
+            target_completion_date=today - timedelta(days=3),
+        )
+        self.client.login(username='req', password='pass')
+        dashboard = self.client.get(reverse('accounts:requester_dashboard'))
+        list_response = self.client.get(dashboard.context['dashboard_overdue_url'])
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(
+            list_response.context['result_count'],
+            dashboard.context['stats']['overdue_designs'],
+        )
+
     def test_period_filter_scopes_finished_not_running(self):
         old_completed = self._create_design(
             self.project_a,

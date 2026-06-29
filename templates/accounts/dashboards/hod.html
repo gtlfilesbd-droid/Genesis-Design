@@ -18,7 +18,7 @@
     {% include 'components/stat_card.html' with label='Verification' value=waiting_verification icon='shield-check' icon_bg='bg-purple-50' icon_color='text-purple-600' url=requests_list_url|add:'?status=verification_pending' %}
     {% include 'components/stat_card.html' with label='Compliance' value=waiting_compliance icon='scale' icon_bg='bg-violet-50' icon_color='text-violet-600' url=requests_list_url|add:'?status=compliance_pending' %}
     {% include 'components/stat_card.html' with label='Final Approval' value=waiting_approval icon='stamp' icon_bg='bg-cyan-50' icon_color='text-cyan-600' url=requests_list_url|add:'?status=final_approval_pending' %}
-    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs url=dashboard_overdue_url|default:requests_list_url|add:'?overdue=1' %}
+    {% include 'components/stat_card.html' with label='Overdue' value=stats.overdue_designs icon='alert-triangle' icon_bg='bg-red-50' icon_color='text-red-600' danger=stats.overdue_designs url=dashboard_overdue_url %}
 </div>
 
 <div class="g-card p-6 mb-8">

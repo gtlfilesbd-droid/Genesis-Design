@@ -205,9 +205,6 @@ def designer_dashboard(request):
         'running': designs.filter(status=DesignStatus.IN_PROGRESS).count(),
         'corrections': designs.filter(status=DesignStatus.CORRECTION_REQUIRED).count(),
         'completed': designs.filter(status=DesignStatus.COMPLETED).count(),
-        'overdue': designs.filter(
-            due_date__lt=timezone.now()
-        ).exclude(status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]).count(),
         'rework_count': designs.filter(revision_count__gt=0).count(),
         'productivity': get_designer_productivity(request.user),
         'my_designs': designs.order_by('-updated_at')[:25],
@@ -301,19 +298,26 @@ def _base_dashboard_context(request):
     view_role = get_my_tasks_view_role(request.user)
     my_tasks_overdue_url = None
     dashboard_overdue_url = f"{reverse('requests:list')}?overdue=1"
+    overdue_label = 'Overdue'
     if view_role == 'hod':
-        # HoD dashboard: pipeline-wide due_date overdue; My Tasks keeps actionable scope.
-        pass
+        stats['trend_overdue'] = (
+            'Pipeline overdue' if stats['overdue_designs'] else 'On track'
+        )
     elif view_role in ('designer', 'verification', 'compliance'):
         mt_stats = get_my_tasks_stats_for_scope(request.user, view_role)
         stats['overdue_designs'] = mt_stats['overdue_designs']
-        stats['trend_overdue'] = 'Action required' if stats['overdue_designs'] else 'On track'
+        stats['trend_overdue'] = (
+            'Your action overdue' if stats['overdue_designs'] else 'On track'
+        )
         my_tasks_overdue_url = build_my_tasks_request_url(view_role, 'overdue')
         dashboard_overdue_url = my_tasks_overdue_url
     elif view_role == 'requester':
         mt_stats = get_my_tasks_stats_for_scope(request.user, 'requester')
         stats['overdue_designs'] = mt_stats['target_overdue']
-        stats['trend_overdue'] = 'Action required' if stats['overdue_designs'] else 'On track'
+        stats['trend_overdue'] = (
+            'Past target date' if stats['overdue_designs'] else 'On track'
+        )
+        overdue_label = 'Target Overdue'
         my_tasks_overdue_url = build_my_tasks_request_url('requester', 'target_overdue')
         dashboard_overdue_url = my_tasks_overdue_url
 
@@ -324,6 +328,8 @@ def _base_dashboard_context(request):
             status__in=[DesignStatus.COMPLETED, DesignStatus.CANCELLED]
         ).count(),
         'stats': stats,
+        'view_role': view_role,
+        'overdue_label': overdue_label,
         'my_tasks_overdue_url': my_tasks_overdue_url,
         'dashboard_overdue_url': dashboard_overdue_url,
         'recent_activity': get_recent_activity(),
