@@ -28,6 +28,10 @@ class WorkflowAuditReportTests(TestCase):
             username='eng', password='pass', role=UserRole.VERIFICATION_TEAM, employee_id='E001',
             first_name='Site', last_name='Engineer',
         )
+        self.designer = User.objects.create_user(
+            username='des', password='pass', role=UserRole.DESIGNER, employee_id='D001',
+            first_name='Design', last_name='User',
+        )
         UserExtraPermission.objects.create(user=self.engineer, can_site_engineer=True)
         self.admin = User.objects.create_user(
             username='admin', password='pass', role=UserRole.ADMIN, employee_id='A001',
@@ -57,6 +61,66 @@ class WorkflowAuditReportTests(TestCase):
         self.assertEqual(report['requested_by'], 'Request User')
         self.assertEqual(report['project_code'], 'Colosia')
         self.assertTrue(report['rows'])
+        self.assertEqual(report['key_dates']['requester_target'], self.design.target_completion_date)
+        self.assertEqual(report['key_dates']['engineer_due'], self.design.engineer_due_date)
+
+    def test_request_row_shows_requester_target_due(self):
+        report = build_workflow_audit_report(self.design)
+        submit_rows = [r for r in report['rows'] if r.get('action') == 'design_requested']
+        self.assertEqual(len(submit_rows), 1)
+        self.assertEqual(submit_rows[0]['due_label'], 'Requester Target')
+        self.assertEqual(submit_rows[0]['due_at'], self.design.target_completion_date)
+
+    def test_engineer_ack_late_vs_engineer_due(self):
+        self.design.engineer_due_date = timezone.now() - timedelta(days=1)
+        self.design.save(update_fields=['engineer_due_date'])
+        transition(self.design, 'acknowledge_engineer', self.engineer)
+
+        report = build_workflow_audit_report(self.design)
+        ack_rows = [r for r in report['rows'] if r.get('action') == 'acknowledge_engineer']
+        self.assertEqual(len(ack_rows), 1)
+        self.assertEqual(ack_rows[0]['due_label'], 'Engineer Due')
+        self.assertEqual(ack_rows[0]['on_time_status'], 'late')
+        self.assertEqual(ack_rows[0]['delay_type'], 'due_breach')
+        self.assertTrue(ack_rows[0]['is_delayed'])
+
+    def test_assign_row_shows_designer_due_set(self):
+        transition(self.design, 'acknowledge_engineer', self.engineer)
+        transition(self.design, 'submit_engineer_review', self.engineer, comments='Done')
+        transition(self.design, 'acknowledge', self.hod)
+        designer_due = timezone.now() + timedelta(days=4)
+        transition(
+            self.design, 'assign', self.hod,
+            designer=self.designer, due_date=designer_due, instructions='Please complete',
+        )
+
+        report = build_workflow_audit_report(self.design)
+        assign_rows = [r for r in report['rows'] if r.get('action') == 'assign']
+        self.assertEqual(len(assign_rows), 1)
+        self.assertEqual(assign_rows[0]['due_label'], 'Designer Due (HOD)')
+        self.assertEqual(assign_rows[0]['on_time_status'], 'due_set')
+        self.assertEqual(
+            timezone.localtime(assign_rows[0]['due_at']).replace(second=0, microsecond=0),
+            timezone.localtime(designer_due).replace(second=0, microsecond=0),
+        )
+
+    def test_submit_work_late_vs_designer_due(self):
+        transition(self.design, 'acknowledge_engineer', self.engineer)
+        transition(self.design, 'submit_engineer_review', self.engineer, comments='Done')
+        transition(self.design, 'acknowledge', self.hod)
+        designer_due = timezone.now() - timedelta(hours=2)
+        transition(
+            self.design, 'assign', self.hod,
+            designer=self.designer, due_date=designer_due, instructions='Work',
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+        transition(self.design, 'submit_work', self.designer, comments='Submitted files')
+
+        report = build_workflow_audit_report(self.design)
+        submit_rows = [r for r in report['rows'] if r.get('action') == 'submit_work']
+        self.assertEqual(len(submit_rows), 1)
+        self.assertEqual(submit_rows[0]['on_time_status'], 'late')
+        self.assertEqual(submit_rows[0]['delay_type'], 'due_breach')
 
     def test_build_report_chronological_stages(self):
         transition(self.design, 'acknowledge_engineer', self.engineer)
@@ -129,5 +193,6 @@ class WorkflowAuditReportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         self.assertIn(self.design.design_number, content)
-        self.assertIn('Stage', content)
+        self.assertIn('Due Label', content)
+        self.assertIn('On Time Status', content)
         self.assertIn('Delayed By', content)

@@ -279,9 +279,6 @@
             <h2 class="font-semibold text-slate-900">{{ audit_report.design_number }}</h2>
             <p class="text-xs text-slate-500 mt-0.5">
                 {{ audit_report.project_code }} · {{ audit_report.project }}
-                {% if audit_report.target_completion_date %}
-                · Target {{ audit_report.target_completion_date|date:"d M Y" }}
-                {% endif %}
             </p>
             <p class="text-xs text-slate-500 mt-1">
                 Requested by {{ audit_report.requested_by }} · Status: {{ audit_report.status }}
@@ -293,6 +290,35 @@
                 ({{ audit_report.delay_summary.primary_days }} days)
                 {% endif %}
             </p>
+            {% endif %}
+            {% if audit_report.key_dates %}
+            <div class="flex flex-wrap gap-2 mt-3">
+                {% if audit_report.key_dates.requester_target %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-xs text-slate-700">
+                    <span class="font-semibold">Requester Target:</span> {{ audit_report.key_dates.requester_target|date:"d M Y" }}
+                </span>
+                {% endif %}
+                {% if audit_report.key_dates.engineer_due %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-100 text-xs text-violet-800">
+                    <span class="font-semibold">Engineer Due:</span> {{ audit_report.key_dates.engineer_due|date:"d M Y, H:i" }}
+                </span>
+                {% endif %}
+                {% if audit_report.key_dates.designer_due %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-100 text-xs text-blue-800">
+                    <span class="font-semibold">Designer Due (HOD):</span> {{ audit_report.key_dates.designer_due|date:"d M Y, H:i" }}
+                </span>
+                {% endif %}
+                {% if audit_report.key_dates.verification_due %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 text-xs text-amber-800">
+                    <span class="font-semibold">Verification Due:</span> {{ audit_report.key_dates.verification_due|date:"d M Y, H:i" }}
+                </span>
+                {% endif %}
+                {% if audit_report.key_dates.compliance_due %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-100 text-xs text-teal-800">
+                    <span class="font-semibold">Compliance Due:</span> {{ audit_report.key_dates.compliance_due|date:"d M Y, H:i" }}
+                </span>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
         {% if audit_exports %}
@@ -306,20 +332,49 @@
                     <th>Stage</th>
                     <th>Actor</th>
                     <th>Role</th>
-                    <th>Timestamp</th>
+                    <th>Due</th>
+                    <th>Completed</th>
                     <th>Duration</th>
+                    <th>Status</th>
                     <th>Notes</th>
                     <th>Delay</th>
                 </tr>
             </thead>
             <tbody>
             {% for row in audit_report.rows %}
-            <tr class="{% if row.is_delayed %}bg-red-50/60{% endif %}">
+            <tr class="{% if row.is_delayed %}bg-red-50/60{% elif row.on_time_status == 'on_time' %}bg-green-50/40{% elif row.on_time_status == 'due_set' %}bg-blue-50/40{% endif %}">
                 <td class="font-medium text-slate-900">{{ row.stage }}</td>
                 <td>{{ row.actor }}</td>
                 <td>{{ row.role }}</td>
+                <td class="text-sm whitespace-nowrap">
+                    {% if row.due_label %}
+                    <div class="font-medium text-slate-700">{{ row.due_label }}</div>
+                    {% if row.due_at %}
+                    <div class="text-slate-600">{{ row.due_at_display }}</div>
+                    {% endif %}
+                    {% if row.sla_due_at %}
+                    <div class="text-xs text-slate-500 mt-0.5">{{ row.sla_label }}: {{ row.sla_due_at_display }}</div>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-slate-400">—</span>
+                    {% endif %}
+                </td>
                 <td class="whitespace-nowrap text-sm text-slate-600">{{ row.timestamp|date:"d M Y, H:i" }}</td>
                 <td>{% if row.duration_days is not None %}{{ row.duration_days }}d{% else %}—{% endif %}</td>
+                <td>
+                    {% if row.on_time_status == 'late' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Late</span>
+                    {% elif row.on_time_status == 'on_time' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">On Time</span>
+                    {% elif row.on_time_status == 'due_set' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Due Set</span>
+                    {% else %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">N/A</span>
+                    {% endif %}
+                    {% if row.status_note %}
+                    <div class="text-xs text-slate-500 mt-0.5 max-w-[140px]">{{ row.status_note }}</div>
+                    {% endif %}
+                </td>
                 <td class="text-sm text-slate-600 max-w-xs">{{ row.notes }}</td>
                 <td>
                     {% if row.is_delayed %}

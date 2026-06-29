@@ -13,7 +13,7 @@ from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
 from apps.designs.models import DesignRequest, DesignStatus
 from apps.projects.models import Project
-from apps.reports.audit_report import get_audit_report_for_design_number
+from apps.reports.audit_report import format_audit_due_value, get_audit_report_for_design_number
 
 
 def _designer_performance_data(designer_id=None, project_id=None):
@@ -98,7 +98,49 @@ def _format_audit_timestamp(ts):
     return timezone.localtime(ts).strftime('%Y-%m-%d %H:%M')
 
 
-def _write_audit_report_rows(writer, report):
+AUDIT_TABLE_HEADERS = [
+    'Stage', 'Actor', 'Role', 'Due Label', 'Due At', 'SLA Due At', 'Completed At',
+    'Duration (days)', 'On Time Status', 'Status Note', 'Notes',
+    'Delayed', 'Delayed By', 'Delay Days', 'Delay Type', 'Delay Note',
+]
+
+
+def _audit_status_display(row):
+    status = row.get('on_time_status', 'n/a')
+    mapping = {
+        'late': 'LATE',
+        'on_time': 'On Time',
+        'due_set': 'Due Set',
+        'n/a': 'N/A',
+    }
+    return mapping.get(status, status)
+
+
+def _audit_row_values(row):
+    stage = row['stage']
+    if row.get('is_delayed'):
+        stage = f'[LATE] {stage}'
+    return [
+        stage,
+        row['actor'],
+        row['role'],
+        row.get('due_label', ''),
+        format_audit_due_value(row.get('due_at')),
+        format_audit_due_value(row.get('sla_due_at')),
+        _format_audit_timestamp(row['timestamp']),
+        row.get('duration_days', ''),
+        _audit_status_display(row),
+        row.get('status_note', ''),
+        row.get('notes', ''),
+        'Yes' if row.get('is_delayed') else 'No',
+        row.get('delayed_by', ''),
+        row.get('delay_days', ''),
+        row.get('delay_type', ''),
+        row.get('delay_note', ''),
+    ]
+
+
+def _write_audit_report_header_rows(writer, report):
     writer.writerow(['Design Number', report['design_number']])
     writer.writerow(['Project', f"{report['project_code']} — {report['project']}"])
     writer.writerow(['Requested By', report['requested_by']])
@@ -106,30 +148,99 @@ def _write_audit_report_rows(writer, report):
         'Target Completion Date',
         report['target_completion_date'].isoformat() if report['target_completion_date'] else '',
     ])
+    key_dates = report.get('key_dates') or {}
+    writer.writerow([
+        'Engineer Due',
+        format_audit_due_value(key_dates.get('engineer_due')),
+    ])
+    writer.writerow([
+        'Designer Due (HOD)',
+        format_audit_due_value(key_dates.get('designer_due')),
+    ])
+    writer.writerow([
+        'Verification Due',
+        format_audit_due_value(key_dates.get('verification_due')),
+    ])
+    writer.writerow([
+        'Compliance Due',
+        format_audit_due_value(key_dates.get('compliance_due')),
+    ])
     writer.writerow(['Status', report['status']])
     if report.get('delay_summary'):
         summary = report['delay_summary']
         writer.writerow(['Primary Delay Source', summary.get('primary_source', '')])
         writer.writerow(['Primary Delay Days', summary.get('primary_days', '')])
-    writer.writerow([])
-    writer.writerow([
-        'Stage', 'Actor', 'Role', 'Timestamp', 'Duration (days)', 'Notes',
-        'Delayed', 'Delayed By', 'Delay Days', 'Delay Type', 'Delay Note',
+
+
+def _style_audit_excel_row(ws, row_idx, on_time_status):
+    try:
+        from openpyxl.styles import Font, PatternFill
+    except ImportError:
+        return
+    fills = {
+        'late': PatternFill(start_color='FEE2E2', end_color='FEE2E2', fill_type='solid'),
+        'on_time': PatternFill(start_color='DCFCE7', end_color='DCFCE7', fill_type='solid'),
+        'due_set': PatternFill(start_color='DBEAFE', end_color='DBEAFE', fill_type='solid'),
+    }
+    fill = fills.get(on_time_status)
+    status_font = Font(color='B91C1C', bold=True) if on_time_status == 'late' else None
+    for col in range(1, len(AUDIT_TABLE_HEADERS) + 1):
+        cell = ws.cell(row=row_idx, column=col)
+        if fill:
+            cell.fill = fill
+        if status_font and col == 9:
+            cell.font = status_font
+
+
+def _write_audit_excel_report(ws, report):
+    rows = [
+        ['Design Number', report['design_number']],
+        ['Project', f"{report['project_code']} — {report['project']}"],
+        ['Requested By', report['requested_by']],
+        [
+            'Target Completion Date',
+            report['target_completion_date'].isoformat() if report['target_completion_date'] else '',
+        ],
+    ]
+    key_dates = report.get('key_dates') or {}
+    rows.extend([
+        ['Engineer Due', format_audit_due_value(key_dates.get('engineer_due'))],
+        ['Designer Due (HOD)', format_audit_due_value(key_dates.get('designer_due'))],
+        ['Verification Due', format_audit_due_value(key_dates.get('verification_due'))],
+        ['Compliance Due', format_audit_due_value(key_dates.get('compliance_due'))],
+        ['Status', report['status']],
     ])
+    if report.get('delay_summary'):
+        summary = report['delay_summary']
+        rows.append(['Primary Delay Source', summary.get('primary_source', '')])
+        rows.append(['Primary Delay Days', summary.get('primary_days', '')])
+    for row in rows:
+        ws.append(row)
+    ws.append([])
+    header_row_idx = ws.max_row
+    ws.append(AUDIT_TABLE_HEADERS)
+    try:
+        from openpyxl.styles import Font, PatternFill
+        header_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+        header_font = Font(bold=True)
+        for col in range(1, len(AUDIT_TABLE_HEADERS) + 1):
+            cell = ws.cell(row=header_row_idx, column=col)
+            cell.fill = header_fill
+            cell.font = header_font
+        ws.freeze_panes = ws.cell(row=header_row_idx + 1, column=1)
+    except ImportError:
+        pass
     for row in report['rows']:
-        writer.writerow([
-            row['stage'],
-            row['actor'],
-            row['role'],
-            _format_audit_timestamp(row['timestamp']),
-            row.get('duration_days', ''),
-            row.get('notes', ''),
-            'Yes' if row.get('is_delayed') else 'No',
-            row.get('delayed_by', ''),
-            row.get('delay_days', ''),
-            row.get('delay_type', ''),
-            row.get('delay_note', ''),
-        ])
+        ws.append(_audit_row_values(row))
+        _style_audit_excel_row(ws, ws.max_row, row.get('on_time_status', 'n/a'))
+
+
+def _write_audit_report_rows(writer, report):
+    _write_audit_report_header_rows(writer, report)
+    writer.writerow([])
+    writer.writerow(AUDIT_TABLE_HEADERS)
+    for row in report['rows']:
+        writer.writerow(_audit_row_values(row))
 
 
 def _write_csv_rows(writer, report_type, designer_filter=None, project_filter=None, design_filter=None):
@@ -244,37 +355,7 @@ def _write_excel_rows(ws, report_type, designer_filter=None, project_filter=None
         if not report:
             ws.append(['Error', f'Design not found: {design_filter or ""}'])
             return
-        ws.append(['Design Number', report['design_number']])
-        ws.append(['Project', f"{report['project_code']} — {report['project']}"])
-        ws.append(['Requested By', report['requested_by']])
-        ws.append([
-            'Target Completion Date',
-            report['target_completion_date'].isoformat() if report['target_completion_date'] else '',
-        ])
-        ws.append(['Status', report['status']])
-        if report.get('delay_summary'):
-            summary = report['delay_summary']
-            ws.append(['Primary Delay Source', summary.get('primary_source', '')])
-            ws.append(['Primary Delay Days', summary.get('primary_days', '')])
-        ws.append([])
-        ws.append([
-            'Stage', 'Actor', 'Role', 'Timestamp', 'Duration (days)', 'Notes',
-            'Delayed', 'Delayed By', 'Delay Days', 'Delay Type', 'Delay Note',
-        ])
-        for row in report['rows']:
-            ws.append([
-                row['stage'],
-                row['actor'],
-                row['role'],
-                _format_audit_timestamp(row['timestamp']),
-                row.get('duration_days', ''),
-                row.get('notes', ''),
-                'Yes' if row.get('is_delayed') else 'No',
-                row.get('delayed_by', ''),
-                row.get('delay_days', ''),
-                row.get('delay_type', ''),
-                row.get('delay_note', ''),
-            ])
+        _write_audit_excel_report(ws, report)
     else:
         deadline_stats = _deadline_compliance_data()
         ws.append(['Metric', 'Value'])
@@ -334,8 +415,17 @@ def _write_pdf_lines(p, report_type, designer_filter=None, project_filter=None, 
             return
         next_line(f"Design: {report['design_number']} · {report['project_code']}")
         next_line(f"Requested by: {report['requested_by']}")
-        if report['target_completion_date']:
-            next_line(f"Target: {report['target_completion_date'].isoformat()}")
+        key_dates = report.get('key_dates') or {}
+        if key_dates.get('requester_target'):
+            next_line(f"Requester target: {key_dates['requester_target'].isoformat()}")
+        if key_dates.get('engineer_due'):
+            next_line(f"Engineer due: {format_audit_due_value(key_dates['engineer_due'])}")
+        if key_dates.get('designer_due'):
+            next_line(f"Designer due (HOD): {format_audit_due_value(key_dates['designer_due'])}")
+        if key_dates.get('verification_due'):
+            next_line(f"Verification due: {format_audit_due_value(key_dates['verification_due'])}")
+        if key_dates.get('compliance_due'):
+            next_line(f"Compliance due: {format_audit_due_value(key_dates['compliance_due'])}")
         if report.get('delay_summary'):
             summary = report['delay_summary']
             next_line(
@@ -343,14 +433,44 @@ def _write_pdf_lines(p, report_type, designer_filter=None, project_filter=None, 
                 f"({summary.get('primary_days', '')} days)"
             )
         next_line('')
+        try:
+            from reportlab.lib import colors
+        except ImportError:
+            colors = None
         for row in report['rows']:
+            status = row.get('on_time_status', 'n/a')
+            due_part = ''
+            if row.get('due_label'):
+                due_part = f" · Due: {row['due_label']}"
+                if row.get('due_at'):
+                    due_part += f" {format_audit_due_value(row['due_at'])}"
             delay = ''
-            if row.get('is_delayed'):
+            suffix = ''
+            if row.get('is_delayed') or status == 'late':
                 delay = f" · DELAY: {row.get('delayed_by', '')} ({row.get('delay_note', '')})"
-            next_line(
-                f"{_format_audit_timestamp(row['timestamp'])} · {row['stage']} · "
-                f"{row['actor']} ({row['role']}){delay}"
+                prefix = '** LATE ** '
+            elif status == 'on_time':
+                prefix = ''
+                suffix = ' [OK]'
+            elif status == 'due_set':
+                prefix = ''
+                suffix = ' [Due Set]'
+            else:
+                prefix = ''
+            line = (
+                f"{prefix}{_format_audit_timestamp(row['timestamp'])} · {row['stage']} · "
+                f"{row['actor']} ({row['role']}){due_part}{delay}{suffix}"
             )
+            if colors and (row.get('is_delayed') or status == 'late'):
+                p.setFillColor(colors.HexColor('#B91C1C'))
+                next_line(line)
+                p.setFillColor(colors.black)
+            elif colors and status == 'on_time':
+                p.setFillColor(colors.HexColor('#15803D'))
+                next_line(line)
+                p.setFillColor(colors.black)
+            else:
+                next_line(line)
     else:
         deadline_stats = _deadline_compliance_data()
         for line in [
