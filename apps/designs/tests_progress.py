@@ -39,10 +39,32 @@ class ProgressStepsTests(TestCase):
         self.assertEqual(active['key'], 'site_engineer')
         self.assertEqual(active['label'], 'Site Verification')
 
-    def test_new_request_shows_hod_acknowledgement(self):
+    def test_new_request_shows_awaiting_hod_acknowledgement(self):
         active = self._active_step(self.design)
         self.assertEqual(active['key'], 'hod_ack')
-        self.assertEqual(active['label'], 'HOD Acknowledgement')
+        self.assertEqual(active['label'], 'Awaiting HOD Acknowledgement')
+
+    def test_new_request_hod_ack_not_completed_before_acknowledge(self):
+        steps, _ = build_progress_steps(self.design)
+        hod_step = next(s for s in steps if s['key'] == 'hod_ack')
+        self.assertEqual(hod_step['state'], 'active')
+        self.assertFalse(self.design.deadline_start)
+
+    def test_engineer_in_progress_hod_ack_is_upcoming(self):
+        self.design.status = DesignStatus.ENGINEER_IN_PROGRESS
+        steps, _ = build_progress_steps(self.design)
+        hod_step = next(s for s in steps if s['key'] == 'hod_ack')
+        self.assertEqual(hod_step['state'], 'upcoming')
+        site_step = next(s for s in steps if s['key'] == 'site_engineer')
+        self.assertEqual(site_step['state'], 'active')
+
+    def test_acknowledged_marks_hod_ack_completed(self):
+        from django.utils import timezone
+        self.design.status = DesignStatus.ACKNOWLEDGED
+        self.design.deadline_start = timezone.now()
+        steps, _ = build_progress_steps(self.design)
+        hod_step = next(s for s in steps if s['key'] == 'hod_ack')
+        self.assertEqual(hod_step['state'], 'completed')
 
     def test_acknowledged_shows_pending_assignment(self):
         self.design.status = DesignStatus.ACKNOWLEDGED

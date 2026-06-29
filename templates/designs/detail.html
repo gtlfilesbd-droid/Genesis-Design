@@ -218,7 +218,7 @@
                 <form method="post" action="{% url 'workflow:action' design.pk 'acknowledge_engineer' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge Site Assignment</button></form>
                 {% endif %}
                 {% if design.status == 'engineer_in_progress' and can_submit_engineer_review %}
-                <a href="{% url 'workflow:action' design.pk 'submit_engineer_review' %}" class="g-btn-primary w-full block text-center">Submit Site Review</a>
+                <a href="{% url 'workflow:action' design.pk 'submit_engineer_review' %}" class="g-btn-primary w-full block text-center">Submit Design</a>
                 {% endif %}
                 {% if design.status == 'new_request' and can_acknowledge %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'acknowledge' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge</button></form>
