@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 80" role="img" aria-label="Genesis Design workflow">
+  <defs>
+    <style>
+      .b{font:700 11px Segoe UI,system-ui,sans-serif;fill:#fff}
+    </style>
+  </defs>
+  <rect x="0" y="24" width="90" height="32" rx="16" fill="#475569"/><text class="b" x="45" y="44" text-anchor="middle">Requester</text>
+  <path d="M94 40h14" stroke="#94A3B8" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="112" y="24" width="100" height="32" rx="16" fill="#7C3AED"/><text class="b" x="162" y="44" text-anchor="middle">Site Engineer</text>
+  <path d="M216 40h14" stroke="#94A3B8" stroke-width="2"/>
+  <rect x="234" y="24" width="70" height="32" rx="16" fill="#185FA5"/><text class="b" x="269" y="44" text-anchor="middle">HOD</text>
+  <path d="M308 40h14" stroke="#94A3B8" stroke-width="2"/>
+  <rect x="326" y="24" width="80" height="32" rx="16" fill="#1D9E75"/><text class="b" x="366" y="44" text-anchor="middle">Designer</text>
+  <path d="M410 40h14" stroke="#94A3B8" stroke-width="2"/>
+  <rect x="428" y="24" width="70" height="32" rx="16" fill="#BA7517"/><text class="b" x="463" y="44" text-anchor="middle">Verifier</text>
+  <path d="M502 40h14" stroke="#94A3B8" stroke-width="2"/>
+  <rect x="520" y="24" width="90" height="32" rx="16" fill="#993556"/><text class="b" x="565" y="44" text-anchor="middle">Compliance</text>
+  <path d="M614 40h14" stroke="#94A3B8" stroke-width="2"/>
+  <rect x="632" y="24" width="70" height="32" rx="16" fill="#0F766E"/><text class="b" x="667" y="44" text-anchor="middle">Done</text>
+</svg>
