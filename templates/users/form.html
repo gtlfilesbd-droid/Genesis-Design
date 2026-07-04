@@ -20,10 +20,16 @@
                 {{ field }}
                 {% if field.name == 'role' %}
                 <p class="text-xs text-slate-500 mt-1">The group defines default permissions. See summary below.</p>
+                {% elif field.name == 'password' and field.help_text %}
+                <p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>
                 {% elif field.name == 'avatar' %}
                 <p class="text-xs text-slate-400 mt-1">JPG, PNG or WebP. Leave empty to keep current photo.</p>
                 {% endif %}
-                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
+                {% if field.errors %}
+                {% for err in field.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ err }}</p>
+                {% endfor %}
+                {% endif %}
             </div>
             {% endfor %}
 

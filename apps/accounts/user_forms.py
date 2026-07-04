@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 from .models import Team, UserRole
 
@@ -10,7 +11,11 @@ AVATAR = forms.FileInput(attrs={'class': INPUT, 'accept': 'image/*'})
 
 
 class UserCreateForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': INPUT}), label='Password')
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': INPUT, 'minlength': '8', 'autocomplete': 'new-password'}),
+        label='Password',
+        help_text='At least 8 characters. Avoid common passwords and personal info.',
+    )
 
     class Meta:
         model = User
@@ -35,11 +40,19 @@ class UserCreateForm(forms.ModelForm):
             'avatar': AVATAR,
         }
 
+    def _post_clean(self):
+        super()._post_clean()
+        password = self.cleaned_data.get('password')
+        if not password:
+            return
+        try:
+            validate_password(password, self.instance)
+        except ValidationError as error:
+            self.add_error('password', error)
+
     def save(self, commit=True):
         user = super().save(commit=False)
-        password = self.cleaned_data['password']
-        validate_password(password, user)
-        user.set_password(password)
+        user.set_password(self.cleaned_data['password'])
         if user.role == UserRole.ADMIN:
             user.is_staff = True
         if commit:
