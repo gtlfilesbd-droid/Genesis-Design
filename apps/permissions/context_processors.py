@@ -57,11 +57,19 @@ def user_permissions(request):
 
     nav_main, nav_management, nav_account = ps.get_navigation(user, request)
 
+    from apps.core.manual_views import manual_anchor_for_user
+
+    manual_url = reverse('manual:index')
+    anchor = manual_anchor_for_user(user)
+    if anchor:
+        manual_url = f'{manual_url}#{anchor}'
+
     ctx = {
         'sidebar_items': ps.get_user_sidebar_items(user),
         'nav_main': nav_main,
         'nav_management': nav_management,
         'nav_account': nav_account,
+        'manual_url': manual_url,
         'breadcrumbs': _build_breadcrumbs(request),
         'user_permission_labels': ps.get_user_permission_labels(user),
         'can_admin': ps.has_global_permission(user, 'PERM_ADMIN_PANEL'),

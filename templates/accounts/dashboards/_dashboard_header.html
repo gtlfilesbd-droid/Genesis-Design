@@ -6,9 +6,16 @@
         </h1>
         <p class="text-sm text-slate-500 mt-1">Overview of your design operations · {{ today|date:"l, d F Y, h:i A" }}</p>
     </div>
-    {% if can_admin %}
-    <a href="{% url 'admin:index' %}" class="g-btn-primary inline-flex items-center gap-2 shrink-0 self-start">
-        <i data-lucide="shield" class="w-4 h-4"></i> Admin Panel
-    </a>
-    {% endif %}
+    <div class="flex flex-wrap items-center gap-2 shrink-0 self-start">
+        {% if manual_url %}
+        <a href="{{ manual_url }}" target="_blank" rel="noopener" class="g-btn-secondary inline-flex items-center gap-2">
+            <i data-lucide="book-open" class="w-4 h-4"></i> User Manual
+        </a>
+        {% endif %}
+        {% if can_admin %}
+        <a href="{% url 'admin:index' %}" class="g-btn-primary inline-flex items-center gap-2">
+            <i data-lucide="shield" class="w-4 h-4"></i> Admin Panel
+        </a>
+        {% endif %}
+    </div>
 </div>

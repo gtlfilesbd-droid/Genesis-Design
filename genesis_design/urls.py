@@ -19,6 +19,7 @@ urlpatterns = [
     path('reports/', include('apps.reports.urls')),
     path('analytics/', include('apps.analytics.urls')),
     path('settings/', include('apps.core.settings_urls')),
+    path('docs/', include('apps.core.manual_urls')),
     path('api/', include('apps.api.urls')),
 ]
 
