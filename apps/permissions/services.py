@@ -192,7 +192,7 @@ class PermissionService:
             if PermissionService._is_admin_or_hod(user):
                 return True
             if PermissionService._extra_flag(user, 'can_edit_project'):
-                return PermissionService.get_editable_projects(user).filter(pk=project.pk).exists()
+                return True
             return False
 
         if permission_code == 'PROJECT_PERM_COMMENT':
@@ -232,23 +232,6 @@ class PermissionService:
             | Q(assigned_compliance_officer=user)
         ).values_list('project_id', flat=True).distinct()
 
-        created_ids = Project.objects.filter(created_by=user).values_list('pk', flat=True)
-        all_ids = set(involved_project_ids) | set(created_ids)
-        return Project.objects.filter(pk__in=all_ids)
-
-    @staticmethod
-    def get_editable_projects(user):
-        """Projects a user may edit when granted the Edit Projects extra permission."""
-        if not user or not user.is_authenticated:
-            return Project.objects.none()
-        if PermissionService._is_admin_or_hod(user):
-            return Project.objects.all()
-        if not PermissionService._extra_flag(user, 'can_edit_project'):
-            return Project.objects.none()
-
-        involved_project_ids = DesignRequest.objects.filter(
-            PermissionService._design_participation_q(user),
-        ).values_list('project_id', flat=True).distinct()
         created_ids = Project.objects.filter(created_by=user).values_list('pk', flat=True)
         all_ids = set(involved_project_ids) | set(created_ids)
         return Project.objects.filter(pk__in=all_ids)

@@ -56,6 +56,8 @@ ACTIVITY_TITLES = {
     'acknowledge_engineer': 'Site engineer acknowledged',
     'submit_engineer_review': 'Site review submitted',
     'comment_added': 'Comment added',
+    'project_created': 'Project created',
+    'project_updated': 'Project updated',
 }
 
 

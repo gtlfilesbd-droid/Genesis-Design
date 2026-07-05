@@ -27,6 +27,13 @@ class Project(models.Model):
         on_delete=models.PROTECT,
         related_name='created_projects',
     )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='updated_projects',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     health_score = models.PositiveSmallIntegerField(default=100)

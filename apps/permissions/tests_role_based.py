@@ -260,11 +260,43 @@ class EditProjectExtraPermissionTests(TestCase):
             )
         )
 
-    def test_requester_with_extra_cannot_edit_foreign_project(self):
+    def test_requester_with_extra_can_edit_foreign_project(self):
         from apps.core.models import UserExtraPermission
         UserExtraPermission.objects.create(user=self.requester, can_edit_project=True)
-        self.assertFalse(
+        self.assertTrue(
             PermissionService.has_project_permission(
                 self.requester, self.foreign_project, 'PROJECT_PERM_EDIT',
             )
         )
+
+
+class RequesterProjectVisibilityTests(TestCase):
+    def setUp(self):
+        ensure_role_permissions()
+        self.requester = User.objects.create_user(
+            username='reqview', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RV1',
+        )
+        self.other = User.objects.create_user(
+            username='otherview', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RV2',
+        )
+        Project.objects.create(
+            name='Mine', code='MINE1', client_name='Mine', start_date=date.today(),
+            created_by=self.requester,
+        )
+        Project.objects.create(
+            name='Theirs', code='THEIR1', client_name='Theirs', start_date=date.today(),
+            created_by=self.other,
+        )
+
+    def test_requester_with_submit_requests_sees_all_projects(self):
+        visible = PermissionService.get_user_projects(self.requester)
+        self.assertEqual(visible.count(), 2)
+
+    def test_requester_without_submit_requests_sees_only_own(self):
+        rp = RolePermission.objects.get(role=UserRole.DESIGN_REQUESTER)
+        rp.can_create_request = False
+        rp.save()
+        self.requester._cached_role_perms = None
+        visible = PermissionService.get_user_projects(self.requester)
+        self.assertEqual(visible.count(), 1)
+        self.assertEqual(visible.first().code, 'MINE1')

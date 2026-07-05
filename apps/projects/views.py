@@ -6,12 +6,20 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from apps.permissions.decorators import require_global_permission, require_project_permission
 from apps.permissions.services import PermissionService
 from apps.core.models import ActivityLog
+from apps.core.middleware import log_audit
 from apps.core.utils import log_activity
 
+from .audit_helpers import (
+    format_project_timestamp,
+    project_audit_snapshot,
+    project_changed_fields,
+    project_user_display,
+)
 from .models import Project, ProjectStatus
 
 
@@ -81,9 +89,24 @@ def project_create(request):
             project = form.save(commit=False)
             project.created_by = request.user
             project.save()
+            now = timezone.now()
+            actor = project_user_display(request.user)
+            description = (
+                f'Project {project.code} created by {actor} on '
+                f'{format_project_timestamp(now)}'
+            )
+            snapshot = project_audit_snapshot(project)
             log_activity(
                 'project', project.pk, request.user,
-                'project_created', f'Project {project.code} created',
+                'project_created', description,
+                metadata={'after': snapshot},
+            )
+            log_audit(
+                request.user, 'project_created',
+                entity_type='project', entity_id=project.pk,
+                after=snapshot,
+                comment=description,
+                request=request,
             )
             messages.success(request, f'Project {project.code} created successfully.')
             return redirect('projects:detail', pk=project.pk)
@@ -97,7 +120,7 @@ def project_create(request):
 @require_global_permission('NAV_PERM_PROJECTS')
 def project_detail(request, pk):
     project = get_object_or_404(
-        Project.objects.select_related('created_by'),
+        Project.objects.select_related('created_by', 'updated_by'),
         pk=pk,
     )
     if not PermissionService.has_project_permission(request.user, project, 'PROJECT_PERM_VIEW'):
@@ -146,10 +169,39 @@ def project_detail(request, pk):
 def project_edit(request, pk):
     project = get_object_or_404(Project, pk=pk)
     if request.method == 'POST':
+        before = project_audit_snapshot(project)
         form = ProjectForm(request.POST, instance=project)
         if form.is_valid():
-            project = form.save()
-            log_activity('project', project.pk, request.user, 'project_updated', f'Project {project.code} updated')
+            project = form.save(commit=False)
+            project.updated_by = request.user
+            project.save()
+            after = project_audit_snapshot(project)
+            changed = project_changed_fields(before, after)
+            actor = project_user_display(request.user)
+            now = timezone.now()
+            if changed:
+                fields_text = ', '.join(changed)
+                description = (
+                    f'Project {project.code} edited by {actor} on '
+                    f'{format_project_timestamp(now)} — changed: {fields_text}'
+                )
+            else:
+                description = (
+                    f'Project {project.code} saved by {actor} on '
+                    f'{format_project_timestamp(now)} (no field changes)'
+                )
+            log_activity(
+                'project', project.pk, request.user,
+                'project_updated', description,
+                metadata={'before': before, 'after': after, 'changed_fields': changed},
+            )
+            log_audit(
+                request.user, 'project_updated',
+                entity_type='project', entity_id=project.pk,
+                before=before, after=after,
+                comment=description,
+                request=request,
+            )
             messages.success(request, 'Project updated successfully.')
             return redirect('projects:detail', pk=project.pk)
         messages.error(request, 'Please correct the errors below.')
