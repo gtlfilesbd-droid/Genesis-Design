@@ -224,3 +224,47 @@ class DesignTeamMembersTests(TestCase):
         self.assertIn(self.hod.pk, member_ids)
         self.assertIn(self.designer.pk, member_ids)
         self.assertNotIn(self.requester.pk, member_ids)
+
+
+class EditProjectExtraPermissionTests(TestCase):
+    def setUp(self):
+        self.requester = User.objects.create_user(
+            username='reqedit', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RE1',
+        )
+        self.other = User.objects.create_user(
+            username='otheredit', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RE2',
+        )
+        self.project = Project.objects.create(
+            name='Owned', code='OWN1', client_name='Client', start_date=date.today(),
+            created_by=self.requester,
+        )
+        self.foreign_project = Project.objects.create(
+            name='Foreign', code='FOR1', client_name='Other', start_date=date.today(),
+            created_by=self.other,
+        )
+
+    def test_requester_without_extra_cannot_edit(self):
+        self.assertFalse(
+            PermissionService.has_project_permission(
+                self.requester, self.project, 'PROJECT_PERM_EDIT',
+            )
+        )
+
+    def test_requester_with_extra_can_edit_own_project(self):
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.requester, can_edit_project=True)
+        self.requester._cached_role_perms = None
+        self.assertTrue(
+            PermissionService.has_project_permission(
+                self.requester, self.project, 'PROJECT_PERM_EDIT',
+            )
+        )
+
+    def test_requester_with_extra_cannot_edit_foreign_project(self):
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.requester, can_edit_project=True)
+        self.assertFalse(
+            PermissionService.has_project_permission(
+                self.requester, self.foreign_project, 'PROJECT_PERM_EDIT',
+            )
+        )

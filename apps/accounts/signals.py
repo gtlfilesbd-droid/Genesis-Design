@@ -53,6 +53,9 @@ def _extra_to_auth_perms(extra: UserExtraPermission):
         perms += _model_perms("projects", "project", ["add", "change", "view"])
         perms += _model_perms("projects", "projectattachment", ["add", "change", "delete", "view"])
 
+    if extra.can_edit_project:
+        perms += _model_perms("projects", "project", ["change", "view"])
+
     if extra.can_create_request:
         perms += _model_perms("designs", "designrequest", ["add", "view"])
 
