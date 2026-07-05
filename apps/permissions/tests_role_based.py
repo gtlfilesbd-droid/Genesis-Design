@@ -300,3 +300,34 @@ class RequesterProjectVisibilityTests(TestCase):
         visible = PermissionService.get_user_projects(self.requester)
         self.assertEqual(visible.count(), 1)
         self.assertEqual(visible.first().code, 'MINE1')
+
+
+class CreateProjectVisibilityTests(TestCase):
+    def setUp(self):
+        ensure_role_permissions()
+        self.designer = User.objects.create_user(
+            username='desview', password='pass', role=UserRole.DESIGNER, employee_id='DV1',
+        )
+        self.other = User.objects.create_user(
+            username='otherdes', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='DV2',
+        )
+        Project.objects.create(
+            name='Designer Project', code='DES1', client_name='Designer', start_date=date.today(),
+            created_by=self.designer,
+        )
+        Project.objects.create(
+            name='Other Project', code='OTH1', client_name='Other', start_date=date.today(),
+            created_by=self.other,
+        )
+
+    def test_designer_with_extra_create_project_sees_all(self):
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.designer, can_create_project=True)
+        self.designer._cached_role_perms = None
+        visible = PermissionService.get_user_projects(self.designer)
+        self.assertEqual(visible.count(), 2)
+
+    def test_designer_without_create_project_sees_only_own(self):
+        visible = PermissionService.get_user_projects(self.designer)
+        self.assertEqual(visible.count(), 1)
+        self.assertEqual(visible.first().code, 'DES1')

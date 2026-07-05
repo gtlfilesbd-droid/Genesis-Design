@@ -216,6 +216,9 @@ class PermissionService:
         if PermissionService._is_admin_or_hod(user):
             return Project.objects.all()
 
+        if PermissionService._matrix_flag(user, 'can_create_project'):
+            return Project.objects.all()
+
         if (
             user.role == UserRole.DESIGN_REQUESTER
             and PermissionService._matrix_flag(user, 'can_create_request')
@@ -242,6 +245,7 @@ class PermissionService:
             return Project.objects.none()
         if (
             PermissionService._is_admin_or_hod(user)
+            or PermissionService._matrix_flag(user, 'can_create_project')
             or PermissionService.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS')
         ):
             return Project.objects.order_by('name')
