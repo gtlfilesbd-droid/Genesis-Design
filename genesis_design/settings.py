@@ -148,4 +148,7 @@ CELERY_TIMEZONE = TIME_ZONE
 # Start deadline status/escalation checks inside runserver (no Docker/Redis required).
 DEADLINE_AUTO_SCHEDULER = env.bool('DEADLINE_AUTO_SCHEDULER', default=True)
 
-from genesis_design.celery_beat_schedule import CELERY_BEAT_SCHEDULE  # noqa: E402, F401
+try:
+    from genesis_design.celery_beat_schedule import CELERY_BEAT_SCHEDULE  # noqa: E402, F401
+except ImportError:
+    CELERY_BEAT_SCHEDULE = {}
