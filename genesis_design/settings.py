@@ -14,6 +14,28 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-genesis-design-dev-key')
 DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
+
+def _build_csrf_trusted_origins():
+    """Trust browser origins for ALLOWED_HOSTS on common app ports (IP/LAN deploys)."""
+    explicit = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+    if explicit:
+        return explicit
+
+    hosts = [h.strip() for h in ALLOWED_HOSTS if h.strip() and h.strip() != '*']
+    ports = env.list('APP_PORTS', default=['8000', '8030'])
+    origins = []
+    for host in hosts:
+        for port in ports:
+            origins.append(f'http://{host}:{port}')
+        origins.append(f'http://{host}')
+        origins.append(f'https://{host}')
+        for port in ports:
+            origins.append(f'https://{host}:{port}')
+    return list(dict.fromkeys(origins))
+
+
+CSRF_TRUSTED_ORIGINS = _build_csrf_trusted_origins()
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -61,6 +83,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.csrf',
                 'apps.notifications.context_processors.unread_notifications',
                 'apps.permissions.context_processors.user_permissions',
             ],

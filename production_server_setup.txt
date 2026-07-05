@@ -60,6 +60,9 @@ PART 1 — ONE-TIME SETUP ON SERVER (192.168.68.97)
      SECRET_KEY=put-a-long-random-secret-key-here
      ALLOWED_HOSTS=localhost,127.0.0.1,192.168.68.97
 
+     # CSRF for browser POST via IP:port (auto-built from ALLOWED_HOSTS if omitted)
+     # CSRF_TRUSTED_ORIGINS=http://192.168.68.97:8000,http://192.168.68.97:8030
+
      DB_NAME=genesis_design
      DB_USER=genesis_admin
      DB_PASSWORD=YOUR_DB_PASSWORD
