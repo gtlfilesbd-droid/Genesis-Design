@@ -98,6 +98,10 @@ class PermissionService:
         )
 
     @staticmethod
+    def _has_full_project_data_access(user) -> bool:
+        return PermissionService._matrix_flag(user, 'can_create_project')
+
+    @staticmethod
     def _get_sidebar_perms(user):
         if not user or not user.is_authenticated:
             return None
@@ -134,10 +138,18 @@ class PermissionService:
 
         nav_field = PermissionService._nav_field_for_code(permission_code)
         if nav_field:
+            if (
+                permission_code == 'NAV_PERM_REPORTS'
+                and PermissionService._has_full_project_data_access(user)
+            ):
+                return True
             return PermissionService._sidebar_flag(user, nav_field)
 
         if permission_code == 'PERM_VIEW_ALL_PROJECTS':
-            return PermissionService._is_admin_or_hod(user)
+            return (
+                PermissionService._is_admin_or_hod(user)
+                or PermissionService._has_full_project_data_access(user)
+            )
 
         if permission_code == 'PERM_ADMIN_PANEL':
             return user.role == UserRole.ADMIN
@@ -155,6 +167,7 @@ class PermissionService:
             return (
                 PermissionService._is_admin_or_hod(user)
                 or PermissionService._matrix_flag(user, 'can_view_reports')
+                or PermissionService._has_full_project_data_access(user)
             )
 
         if permission_code == 'SCOPE_OWN_REQUESTS':
@@ -281,6 +294,8 @@ class PermissionService:
             return queryset.none()
         if PermissionService._is_admin_or_hod(user):
             return queryset
+        if PermissionService._has_full_project_data_access(user):
+            return queryset
 
         participation = PermissionService._design_participation_q(user)
 
@@ -376,6 +391,11 @@ class PermissionService:
         items = []
         for item in SIDEBAR_ITEMS:
             if PermissionService._sidebar_flag(user, item['field']):
+                items.append(item['key'])
+            elif (
+                item['key'] == 'reports'
+                and PermissionService._has_full_project_data_access(user)
+            ):
                 items.append(item['key'])
         return items
 

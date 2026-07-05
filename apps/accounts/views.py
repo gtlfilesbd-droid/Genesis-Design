@@ -126,9 +126,12 @@ def admin_dashboard(request):
 @require_global_permission('NAV_PERM_DASHBOARD')
 def requester_dashboard(request):
     projects = PermissionService.get_user_projects(request.user)
+    base_qs = DesignRequest.objects.all()
+    if not PermissionService._has_full_project_data_access(request.user):
+        base_qs = base_qs.filter(requested_by=request.user)
     designs = PermissionService.filter_design_requests(
         request.user,
-        DesignRequest.objects.filter(requested_by=request.user),
+        base_qs,
     ).select_related('project', 'drawing_type', 'current_holder')[:20]
     context = _base_dashboard_context(request)
     context.update({

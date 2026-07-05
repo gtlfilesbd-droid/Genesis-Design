@@ -331,3 +331,62 @@ class CreateProjectVisibilityTests(TestCase):
         visible = PermissionService.get_user_projects(self.designer)
         self.assertEqual(visible.count(), 1)
         self.assertEqual(visible.first().code, 'DES1')
+
+
+class CreateProjectFullAccessTests(TestCase):
+    def setUp(self):
+        ensure_role_permissions()
+        self.requester = User.objects.create_user(
+            username='reqfull', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RF1',
+        )
+        self.other = User.objects.create_user(
+            username='otherfull', password='pass', role=UserRole.DESIGN_REQUESTER, employee_id='RF2',
+        )
+        self.project = Project.objects.create(
+            name='Foreign', code='FOR2', client_name='Foreign', start_date=date.today(),
+            created_by=self.other,
+        )
+        self.drawing_type = DrawingType.objects.create(name='Layout', code_prefix='LY', allowed_days=3)
+        self.foreign_request = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.other,
+        )
+
+    def test_requester_with_create_project_sees_foreign_design_request(self):
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.requester, can_create_project=True)
+        self.requester._cached_role_perms = None
+        visible = PermissionService.filter_design_requests(
+            self.requester, DesignRequest.objects.all(),
+        )
+        self.assertIn(self.foreign_request, visible)
+
+    def test_requester_with_create_project_has_reports_access(self):
+        from apps.core.models import UserExtraPermission
+        UserExtraPermission.objects.create(user=self.requester, can_create_project=True)
+        self.requester._cached_role_perms = None
+        self.assertTrue(
+            PermissionService.has_global_permission(self.requester, 'NAV_PERM_REPORTS')
+        )
+        self.assertIn('reports', PermissionService.get_user_sidebar_items(self.requester))
+
+    def test_requester_without_create_project_scoped_to_own_requests(self):
+        rp = RolePermission.objects.get(role=UserRole.DESIGN_REQUESTER)
+        rp.can_create_project = False
+        rp.save()
+        self.requester._cached_role_perms = None
+        own_project = Project.objects.create(
+            name='Own', code='OWN2', client_name='Own', start_date=date.today(),
+            created_by=self.requester,
+        )
+        own_request = DesignRequest.objects.create(
+            project=own_project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+        )
+        visible = PermissionService.filter_design_requests(
+            self.requester, DesignRequest.objects.all(),
+        )
+        self.assertIn(own_request, visible)
+        self.assertNotIn(self.foreign_request, visible)
