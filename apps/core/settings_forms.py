@@ -56,6 +56,7 @@ class DeadlineConfigurationForm(forms.ModelForm):
             'escalation_level_4_days', 'escalation_level_4_hours',
             'auto_breach_notify', 'count_weekends',
             'action_acknowledge_days', 'action_acknowledge_hours',
+            'action_engineer_acknowledge_days', 'action_engineer_acknowledge_hours',
             'action_assign_designer_days', 'action_assign_designer_hours',
             'action_accept_assignment_days', 'action_accept_assignment_hours',
             'action_hod_review_days', 'action_hod_review_hours',
