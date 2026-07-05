@@ -70,7 +70,7 @@
 
             {% endfor %}
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Site Design Lead *</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Site Design Lead By *</label>
                 {{ form.assigned_site_engineer }}
                 {% if not site_engineers_available %}
                 <p class="text-amber-700 text-xs mt-2 p-3 rounded-lg bg-amber-50 border border-amber-100">
@@ -82,7 +82,7 @@
                 {% if form.assigned_site_engineer.errors %}<p class="text-red-600 text-xs mt-1">{{ form.assigned_site_engineer.errors.0 }}</p>{% endif %}
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Engineer Due Date *</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Site Design Submit Due Date *</label>
                 {{ form.engineer_due_date }}
                 {% if form.engineer_due_date.errors %}<p class="text-red-600 text-xs mt-1">{{ form.engineer_due_date.errors.0 }}</p>{% endif %}
             </div>
