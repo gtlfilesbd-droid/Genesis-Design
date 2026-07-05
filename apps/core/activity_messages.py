@@ -53,7 +53,7 @@ ACTIVITY_TITLES = {
     'hod_fast_complete': 'Design marked completed',
     'cancel': 'Design request cancelled',
     'cancelled': 'Design request cancelled',
-    'acknowledge_engineer': 'Site engineer acknowledged',
+    'acknowledge_engineer': 'Site design lead acknowledged',
     'submit_engineer_review': 'Site review submitted',
     'comment_added': 'Comment added',
     'project_created': 'Project created',
@@ -83,7 +83,7 @@ def build_workflow_activity_description(
         return f'{actor} (Head of Design) acknowledged this request'
 
     if action == 'acknowledge_engineer':
-        return f'{actor} acknowledged the site engineering assignment'
+        return f'{actor} acknowledged the site design work assignment'
 
     if action == 'submit_engineer_review':
         return f'{actor} submitted site review notes for Head of Design review'

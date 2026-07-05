@@ -26,7 +26,7 @@ class WorkflowAuditReportTests(TestCase):
         )
         self.engineer = User.objects.create_user(
             username='eng', password='pass', role=UserRole.VERIFICATION_TEAM, employee_id='E001',
-            first_name='Site', last_name='Engineer',
+            first_name='Field', last_name='Lead',
         )
         self.designer = User.objects.create_user(
             username='des', password='pass', role=UserRole.DESIGNER, employee_id='D001',
@@ -134,7 +134,7 @@ class WorkflowAuditReportTests(TestCase):
         report = build_workflow_audit_report(self.design)
         stages = [row['stage'] for row in report['rows']]
         self.assertIn('Request Submitted', stages)
-        self.assertIn('Site engineer acknowledged', stages)
+        self.assertIn('Site design lead acknowledged', stages)
         self.assertIn('Site review submitted', stages)
         self.assertIn('Request acknowledged', stages)
 
@@ -157,9 +157,10 @@ class WorkflowAuditReportTests(TestCase):
         self.assertEqual(len(ack_rows), 1)
         self.assertTrue(ack_rows[0]['is_delayed'])
         self.assertEqual(ack_rows[0]['delay_type'], 'action_sla')
-        self.assertEqual(ack_rows[0]['delayed_by'], 'Site Engineer')
+        self.assertEqual(ack_rows[0]['delayed_by'], 'Field Lead')
 
-    def test_primary_delay_source_marked(self):
+    def test_primary_delay_source_marked_legacy_site_engineer_label(self):
+        """Legacy delay_source='Site Engineer' still matches after display rename."""
         self.design.delay_source = 'Site Engineer'
         self.design.delay_duration_days = 3
         self.design.save(update_fields=['delay_source', 'delay_duration_days'])
@@ -174,8 +175,23 @@ class WorkflowAuditReportTests(TestCase):
         delayed_rows = [r for r in report['rows'] if r['is_delayed'] and r['delay_type'] == 'primary_delay']
         self.assertTrue(delayed_rows)
 
+    def test_primary_delay_source_marked_site_design_lead_label(self):
+        self.design.delay_source = 'Site Design Lead'
+        self.design.delay_duration_days = 3
+        self.design.save(update_fields=['delay_source', 'delay_duration_days'])
+        log_activity(
+            'design_request', self.design.pk, self.engineer, 'acknowledge_engineer',
+            'Site design lead acknowledged',
+            {'old_status': DesignStatus.ENGINEER_PENDING_ACK, 'new_status': DesignStatus.ENGINEER_IN_PROGRESS},
+        )
+
+        report = build_workflow_audit_report(self.design)
+        self.assertIsNotNone(report['delay_summary'])
+        delayed_rows = [r for r in report['rows'] if r['is_delayed'] and r['delay_type'] == 'primary_delay']
+        self.assertTrue(delayed_rows)
+
     def test_reports_audit_tab_requires_permission(self):
-        self.client.login(username='req', password='pass')
+        self.client.login(username='des', password='pass')
         response = self.client.get(reverse('reports:index'), {'tab': 'audit', 'design': self.design.design_number})
         self.assertEqual(response.status_code, 302)
 

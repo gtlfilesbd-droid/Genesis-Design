@@ -381,10 +381,10 @@ class SiteEngineerLifecycleTests(TestCase):
     def test_engineer_pending_ack_shows_site_engineer_acknowledgement(self):
         data = build_lifecycle_data(self.design)
         labels = [s['label'] for s in data['segments']]
-        self.assertIn('Site Engineer Acknowledgement', labels)
-        self.assertEqual(data['current_stage_label'], 'Site Engineer Acknowledgement')
-        ack_seg = next(s for s in data['segments'] if s['label'] == 'Site Engineer Acknowledgement')
-        self.assertEqual(ack_seg['bar_label'], 'Eng. Ack')
+        self.assertIn('Site Design Lead Acknowledgement', labels)
+        self.assertEqual(data['current_stage_label'], 'Site Design Lead Acknowledgement')
+        ack_seg = next(s for s in data['segments'] if s['label'] == 'Site Design Lead Acknowledgement')
+        self.assertEqual(ack_seg['bar_label'], 'Lead Ack')
         self.assertTrue(ack_seg['is_ongoing'])
         self.assertEqual(ack_seg['role'], 'engineer')
         self.assertGreaterEqual(ack_seg['grow'], 1.0)
@@ -441,7 +441,7 @@ class SiteEngineerLifecycleTests(TestCase):
         )
         data = build_lifecycle_data(design)
         labels = [s['label'] for s in data['segments']]
-        self.assertNotIn('Site Engineer Acknowledgement', labels)
+        self.assertNotIn('Site Design Lead Acknowledgement', labels)
         ack_seg = next(s for s in data['segments'] if s['label'] == 'Acknowledgement')
         self.assertTrue(ack_seg['is_ongoing'])
         self.assertEqual(ack_seg['start'], design.created_at)

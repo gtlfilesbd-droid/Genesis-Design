@@ -11,11 +11,13 @@ from apps.workflow.action_sla import (
     compute_action_due_at,
 )
 
+from apps.core.workflow_labels import SITE_DESIGN_LEAD_LABEL
+
 ACTION_ROLE_LABELS = {
     'submit_request': 'Requester',
     'design_requested': 'Requester',
-    'acknowledge_engineer': 'Site Engineer',
-    'submit_engineer_review': 'Site Engineer',
+    'acknowledge_engineer': SITE_DESIGN_LEAD_LABEL,
+    'submit_engineer_review': SITE_DESIGN_LEAD_LABEL,
     'acknowledge': 'Head of Design',
     'assign': 'Head of Design',
     'accept_assignment': 'Designer',
@@ -39,10 +41,18 @@ ACTION_ROLE_LABELS = {
     'cancel': 'Requester',
 }
 
+_SITE_DESIGN_LEAD_DELAY_MATCH = (
+    SITE_DESIGN_LEAD_LABEL,
+    'acknowledge_engineer',
+    'submit_engineer_review',
+    'engineer',
+)
+
 DELAY_SOURCE_STAGE_MATCH = {
     'Designer': ('Designer', 'submit_work', 'resubmit', 'accept_assignment', 'in_progress'),
     'Head of Design': ('Head of Design', 'acknowledge', 'assign', 'start_review', 'HOD'),
-    'Site Engineer': ('Site Engineer', 'acknowledge_engineer', 'submit_engineer_review', 'engineer'),
+    SITE_DESIGN_LEAD_LABEL: _SITE_DESIGN_LEAD_DELAY_MATCH,
+    'Site Engineer': _SITE_DESIGN_LEAD_DELAY_MATCH,  # legacy delay_source values
     'Verification Team': ('Verifier', 'accept_verification', 'verify_approved', 'verification'),
     'Compliance Team': ('Compliance', 'accept_compliance', 'compliance_approved', 'compliance'),
 }
@@ -509,9 +519,9 @@ def _build_rows_from_logs(design):
         if not has_engineer_row:
             insert_at = 1 if rows else 0
             rows.insert(insert_at, _make_row(
-                'Site Engineer Assigned',
+                f'{SITE_DESIGN_LEAD_LABEL} Assigned',
                 _person_name(design.assigned_site_engineer),
-                'Site Engineer',
+                SITE_DESIGN_LEAD_LABEL,
                 design.engineer_assigned_at,
                 action='site_engineer_assigned',
                 notes='',

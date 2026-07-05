@@ -4,6 +4,11 @@ from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
 from apps.core.models import ActivityLog
+from apps.core.workflow_labels import (
+    SITE_DESIGN_LEAD_ACK_LABEL,
+    SITE_DESIGN_LEAD_ACK_SHORT,
+    SITE_DESIGN_LEAD_LABEL,
+)
 from apps.designs.models import DesignStatus
 from apps.workflow.services import get_head_of_design
 
@@ -15,14 +20,14 @@ HOD_ACTIONS = (
 
 ROLE_LABELS = {
     'hod': 'Head of Design',
-    'engineer': 'Site Engineer',
+    'engineer': SITE_DESIGN_LEAD_LABEL,
     'designer': 'Designer',
     'verifier': 'Verifier',
     'compliance': 'Compliance',
 }
 
 HAPPY_PATH_PENDING = [
-    ('engineer', 'Site Engineer'),
+    ('engineer', SITE_DESIGN_LEAD_LABEL),
     ('hod', 'Assign'),
     ('designer', 'Designer'),
     ('hod', 'HOD Review'),
@@ -57,7 +62,7 @@ STATUS_PENDING_START = {
 
 STAGE_ROLE_LABELS = {
     DesignStatus.ENGINEER_PENDING_ACK: ('engineer', 'Awaiting Acknowledgement'),
-    DesignStatus.ENGINEER_IN_PROGRESS: ('engineer', 'Site Engineer'),
+    DesignStatus.ENGINEER_IN_PROGRESS: ('engineer', SITE_DESIGN_LEAD_LABEL),
     DesignStatus.NEW_REQUEST: ('hod', 'Awaiting Acknowledgement'),
     DesignStatus.ACKNOWLEDGED: ('hod', 'Assigning Designer'),
     DesignStatus.ASSIGNED: ('hod', 'Assigning Designer'),
@@ -79,8 +84,8 @@ STAGE_ROLE_LABELS = {
 }
 
 DELAY_STATUS_LABELS = {
-    DesignStatus.ENGINEER_PENDING_ACK: 'Site Engineer — Acknowledgement',
-    DesignStatus.ENGINEER_IN_PROGRESS: 'Site Engineer',
+    DesignStatus.ENGINEER_PENDING_ACK: f'{SITE_DESIGN_LEAD_LABEL} — Acknowledgement',
+    DesignStatus.ENGINEER_IN_PROGRESS: SITE_DESIGN_LEAD_LABEL,
     DesignStatus.NEW_REQUEST: 'Head of Design — Acknowledgement',
     DesignStatus.ACKNOWLEDGED: 'Head of Design — Assignment',
     DesignStatus.ASSIGNED: 'Designer — Accept Assignment',
@@ -513,7 +518,7 @@ def _synthetic_initial_segment(design):
     if design.status == DesignStatus.ENGINEER_PENDING_ACK:
         engineer_start = design.engineer_assigned_at or design.created_at
         return {
-            'label': 'Site Engineer',
+            'label': SITE_DESIGN_LEAD_LABEL,
             'role': 'engineer',
             'person': _person_name(design.assigned_site_engineer),
             'days': _days_between(engineer_start, now_time),
@@ -694,7 +699,7 @@ def get_initials(full_name):
 
 def _bar_stage_label(label):
     mapping = {
-        'Site Eng Ack': 'Eng. Ack',
+        SITE_DESIGN_LEAD_ACK_SHORT: 'Lead Ack',
         'Site Verification': 'Site Verify',
         'Ack': 'HOD Ack',
         'Assign': 'Assign',
@@ -713,7 +718,7 @@ def _display_stage_label(label):
         'Ack': 'Acknowledgement',
         'Assign': 'Assignment',
         'HOD': 'HOD Review',
-        'Site Eng Ack': 'Site Engineer Acknowledgement',
+        SITE_DESIGN_LEAD_ACK_SHORT: SITE_DESIGN_LEAD_ACK_LABEL,
         'Site Verification': 'Site Verification',
     }
     return mapping.get(label, label)
@@ -803,7 +808,7 @@ def build_lifecycle_data(design):
         engineer_name = _person_name(design.assigned_site_engineer)
         engineer_start = design.engineer_assigned_at or design.created_at
         add_segment(
-            'Site Eng Ack', 'engineer', engineer_name, engineer_start,
+            SITE_DESIGN_LEAD_ACK_SHORT, 'engineer', engineer_name, engineer_start,
             design.engineer_acknowledged_at, person_id=design.assigned_site_engineer_id,
         )
         if design.engineer_acknowledged_at:

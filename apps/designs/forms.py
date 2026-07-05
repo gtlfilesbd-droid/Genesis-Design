@@ -2,6 +2,7 @@ from django import forms
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.workflow_labels import SITE_DESIGN_LEAD_LABEL
 from apps.permissions.services import PermissionService
 from apps.workflow.deadline_utils import add_allowed_duration, get_deadline_config
 
@@ -15,7 +16,7 @@ class DesignRequestForm(forms.ModelForm):
     assigned_site_engineer = forms.ModelChoiceField(
         queryset=PermissionService.get_site_engineers(),
         widget=forms.Select(attrs={'class': INPUT}),
-        label='Site Engineer',
+        label=SITE_DESIGN_LEAD_LABEL,
         required=True,
     )
     engineer_due_date = forms.DateTimeField(

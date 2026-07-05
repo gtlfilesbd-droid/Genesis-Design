@@ -70,13 +70,13 @@
 
             {% endfor %}
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Site Engineer *</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Site Design Lead *</label>
                 {{ form.assigned_site_engineer }}
                 {% if not site_engineers_available %}
                 <p class="text-amber-700 text-xs mt-2 p-3 rounded-lg bg-amber-50 border border-amber-100">
-                    No site engineers are available. An admin must open <strong>Team → Users</strong>, edit a user
+                    No site design leads are available. An admin must open <strong>Team → Users</strong>, edit a user
                     (Requester, Verifier, or Compliance — not Admin/HOD/Designer), and enable the
-                    <strong>Site Engineer</strong> permission under Extra Permissions.
+                    <strong>Site Design Lead</strong> permission under Extra Permissions.
                 </p>
                 {% endif %}
                 {% if form.assigned_site_engineer.errors %}<p class="text-red-600 text-xs mt-1">{{ form.assigned_site_engineer.errors.0 }}</p>{% endif %}
@@ -93,7 +93,7 @@
             </div>
             <div class="flex items-center gap-3 pt-2">
 
-                <button type="submit" class="g-btn-primary" {% if not site_engineers_available %}disabled title="Enable Site Engineer permission on at least one user first"{% endif %}>Submit Request</button>
+                <button type="submit" class="g-btn-primary" {% if not site_engineers_available %}disabled title="Enable Site Design Lead permission on at least one user first"{% endif %}>Submit Request</button>
 
                 <a href="{% url 'projects:detail' project.pk %}" class="g-btn-secondary">Cancel</a>
 

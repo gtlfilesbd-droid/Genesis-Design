@@ -480,12 +480,12 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
     elif action == 'acknowledge_engineer':
         if design.assigned_site_engineer_id != user.pk:
-            raise WorkflowError('Only the assigned site engineer can acknowledge this request.')
+            raise WorkflowError('Only the assigned site design lead can acknowledge this request.')
         design.engineer_acknowledged_at = timezone.now()
 
     elif action == 'submit_engineer_review':
         if design.assigned_site_engineer_id != user.pk:
-            raise WorkflowError('Only the assigned site engineer can submit this review.')
+            raise WorkflowError('Only the assigned site design lead can submit this review.')
         if not comments.strip():
             raise WorkflowError('Site notes are required before submitting.')
         design.engineer_site_notes = comments.strip()

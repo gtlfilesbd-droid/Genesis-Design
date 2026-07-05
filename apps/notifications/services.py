@@ -127,7 +127,7 @@ class NotificationService:
 
     @staticmethod
     def on_engineer_assigned(design_request):
-        title = f'Site Engineer Assignment: {design_request.design_number}'
+        title = f'Site Design Lead Assignment: {design_request.design_number}'
         from apps.core.notification_messages import (
             engineer_assigned_message,
             engineer_assigned_requester_message,
@@ -140,7 +140,7 @@ class NotificationService:
             message,
             related_request=design_request,
         )
-        requester_title = f'Site Engineer Assigned: {design_request.design_number}'
+        requester_title = f'Site Design Lead Assigned: {design_request.design_number}'
         requester_message = engineer_assigned_requester_message(design_request)
         NotificationService._notify_many(
             NotificationService._requester_side_recipients(design_request),
@@ -157,7 +157,7 @@ class NotificationService:
             NotificationService._requester_side_recipients(design_request),
             exclude=actor,
         )
-        title = f'Site Engineer Acknowledged: {design_request.design_number}'
+        title = f'Site Design Lead Acknowledged: {design_request.design_number}'
         message = engineer_acknowledged_message(design_request, actor.get_full_name())
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,

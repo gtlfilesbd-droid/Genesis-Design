@@ -1,5 +1,6 @@
 from apps.accounts.models import UserRole
 from apps.core.models import RolePermission
+from apps.core.workflow_labels import SITE_DESIGN_LEAD_LABEL
 
 PERMISSION_FIELD_LABELS = {
     'can_create_project': 'Create Projects',
@@ -11,7 +12,7 @@ PERMISSION_FIELD_LABELS = {
     'can_manage_users': 'Manage Users',
     'can_view_reports': 'View Reports',
     'can_manage_settings': 'Manage Settings',
-    'can_site_engineer': 'Site Engineer',
+    'can_site_engineer': SITE_DESIGN_LEAD_LABEL,
     'can_edit_project': 'Edit Projects',
 }
 
