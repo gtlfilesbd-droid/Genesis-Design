@@ -161,6 +161,10 @@ class LifecycleTimelineTests(TestCase):
         ]
         self.assertIn('1st Submission', submission_labels)
         self.assertIn('2nd Submission', submission_labels)
+        first_seg = next(s for s in data['segments'] if s['label'] == '1st Submission')
+        self.assertEqual(first_seg['bar_label'], '1st Submit')
+        second_seg = next(s for s in data['segments'] if s['label'] == '2nd Submission')
+        self.assertEqual(second_seg['bar_label'], '2nd Submit')
 
     def test_completed_on_time_shows_green_status(self):
         transition(self.design, 'acknowledge', self.hod)

@@ -33,8 +33,8 @@ def designer_submission_bar_label(version, *, in_progress=False, awaiting=False)
     if in_progress:
         return DESIGN_IN_PROGRESS_BAR
     if awaiting:
-        return f'Await Submit {version}'
-    return f'Submit {version}'
+        return f'Awaiting {_ordinal(version)}'
+    return f'{_ordinal(version)} Submit'
 
 
 def bar_label_for_submission_style_label(label):
@@ -44,13 +44,13 @@ def bar_label_for_submission_style_label(label):
         version_text = label[len('Awaiting '):-len(' Submission')]
         for version in range(1, 20):
             if _ordinal(version) == version_text:
-                return f'Await Submit {version}'
+                return designer_submission_bar_label(version, awaiting=True)
         return label
     if label.endswith(' Submission'):
         version_text = label[:-len(' Submission')]
         for version in range(1, 20):
             if _ordinal(version) == version_text:
-                return f'Submit {version}'
+                return designer_submission_bar_label(version)
         return label
     if label.startswith('HOD Review ('):
         return 'HOD Review'
