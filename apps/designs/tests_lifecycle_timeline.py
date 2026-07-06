@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
+from apps.core.workflow_labels import DESIGN_IN_PROGRESS_LABEL
 from apps.designs.lifecycle_timeline import (
     _format_days_count,
     build_lifecycle_data,
@@ -96,7 +97,7 @@ class LifecycleTimelineTests(TestCase):
 
         segments = build_timeline_segments(self.design)
         labels = [s['label'] for s in segments if not s.get('is_pending')]
-        self.assertTrue(any('Assign' in label or 'Designer' in label for label in labels))
+        self.assertTrue(any('Assign' in label or 'Submission' in label or label == DESIGN_IN_PROGRESS_LABEL for label in labels))
 
     def test_correction_creates_multiple_designer_segments(self):
         transition(self.design, 'acknowledge', self.hod)
@@ -114,7 +115,52 @@ class LifecycleTimelineTests(TestCase):
 
         segments = build_timeline_segments(self.design)
         designer_labels = [s['label'] for s in segments if s['role'] == 'designer' and not s.get('is_pending')]
-        self.assertGreaterEqual(len(designer_labels), +2)
+        self.assertGreaterEqual(len(designer_labels), 2)
+        self.assertNotIn('Designer V1', designer_labels)
+        self.assertTrue(any('Submission' in label for label in designer_labels))
+
+    def test_assigned_designer_shows_design_in_progress(self):
+        transition(self.design, 'acknowledge', self.hod)
+        transition(
+            self.design,
+            'assign',
+            self.hod,
+            designer=self.designer,
+            due_date=timezone.now() + timedelta(days=3),
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+        self.design.refresh_from_db()
+
+        data = build_lifecycle_data(self.design)
+        self.assertEqual(data['current_stage_label'], DESIGN_IN_PROGRESS_LABEL)
+        designer_seg = next(
+            s for s in data['segments']
+            if s['role'] == 'designer' and s.get('is_ongoing')
+        )
+        self.assertEqual(designer_seg['label'], DESIGN_IN_PROGRESS_LABEL)
+        self.assertEqual(designer_seg['bar_label'], 'In Progress')
+
+    def test_submission_labels_after_submit_and_resubmit(self):
+        transition(self.design, 'acknowledge', self.hod)
+        transition(
+            self.design,
+            'assign',
+            self.hod,
+            designer=self.designer,
+            due_date=timezone.now() + timedelta(days=3),
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+        transition(self.design, 'submit_work', self.designer, comments='First')
+        transition(self.design, 'request_correction', self.hod, comments='Fix')
+        transition(self.design, 'resubmit', self.designer, comments='Second')
+
+        data = build_lifecycle_data(self.design)
+        submission_labels = [
+            s['label'] for s in data['segments']
+            if s['role'] == 'designer' and not s.get('is_ongoing')
+        ]
+        self.assertIn('1st Submission', submission_labels)
+        self.assertIn('2nd Submission', submission_labels)
 
     def test_completed_on_time_shows_green_status(self):
         transition(self.design, 'acknowledge', self.hod)

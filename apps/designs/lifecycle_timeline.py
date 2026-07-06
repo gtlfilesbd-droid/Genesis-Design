@@ -8,6 +8,9 @@ from apps.core.workflow_labels import (
     SITE_DESIGN_LEAD_ACK_LABEL,
     SITE_DESIGN_LEAD_ACK_SHORT,
     SITE_DESIGN_LEAD_LABEL,
+    bar_label_for_submission_style_label,
+    designer_submission_label,
+    hod_review_label,
 )
 from apps.designs.models import DesignStatus
 from apps.workflow.services import get_head_of_design
@@ -450,16 +453,14 @@ def _label_for_duration(design, stage, counters):
 
     if stage == DesignStatus.IN_PROGRESS:
         counters['designer'] += 1
-        suffix = ' (correction)' if counters['designer'] > 1 else ''
-        return 'designer', f'Designer V{counters["designer"]}{suffix}'
+        return 'designer', designer_submission_label(counters['designer'], in_progress=True)
     if stage == DesignStatus.RESUBMITTED:
-        suffix = ' (correction)' if counters['designer'] > 1 else ''
-        return 'designer', f'Designer V{counters["designer"]}{suffix}'
+        return 'designer', designer_submission_label(counters['designer'])
     if stage == DesignStatus.CORRECTION_REQUIRED:
-        return 'designer', f'Designer V{counters["designer"] + 1} — awaiting correction'
+        return 'designer', designer_submission_label(counters['designer'] + 1, awaiting=True)
     if stage == DesignStatus.UNDER_REVIEW:
         counters['hod_review'] += 1
-        return 'hod', f'HOD Review (V{counters["hod_review"]})'
+        return 'hod', hod_review_label(counters['hod_review'])
     if stage == DesignStatus.VERIFICATION_PENDING:
         counters['verifier'] += 1
         suffix = ' (re-check)' if counters['verifier'] > 1 else ''
@@ -698,6 +699,9 @@ def get_initials(full_name):
 
 
 def _bar_stage_label(label):
+    submission_bar = bar_label_for_submission_style_label(label)
+    if submission_bar:
+        return submission_bar
     mapping = {
         SITE_DESIGN_LEAD_ACK_SHORT: 'Lead Ack',
         'Site Verification': 'Site Verify',
@@ -708,8 +712,6 @@ def _bar_stage_label(label):
         'Compliance': 'Compliance',
         'Completed': 'Done',
     }
-    if label.startswith('Designer V'):
-        return label
     return mapping.get(label, label)
 
 
@@ -834,7 +836,7 @@ def build_lifecycle_data(design):
         designer_name = _person_name(rev.submitted_by)
         note = 'Correction' if rev.version_number > 1 else None
         add_segment(
-            f'Designer V{rev.version_number}',
+            designer_submission_label(rev.version_number),
             'designer',
             designer_name,
             prev_end,
@@ -860,7 +862,7 @@ def build_lifecycle_data(design):
     if not revisions and design.assigned_designer_id and design.assigned_at:
         designer_name = _person_name(design.assigned_designer)
         add_segment(
-            'Designer V1',
+            designer_submission_label(1, in_progress=True),
             'designer',
             designer_name,
             design.assigned_at,
