@@ -114,29 +114,25 @@ def build_leaderboard_context(
     rankings,
     period='monthly',
     below_minimum_count=0,
-    min_completions_required=3,
+    min_completions_required=1,
 ):
     if period not in PERIOD_LABELS:
         period = 'monthly'
-    ranking_list = list(rankings)
+    ranking_list = [
+        e for e in rankings
+        if e.get('is_qualified', e['kpis'].get('total_completed', 0) >= min_completions_required)
+        and e['kpis'].get('total_completed', 0) > 0
+    ]
 
-    def _is_qualified(entry):
-        if 'is_qualified' in entry:
-            return entry['is_qualified']
-        return entry['kpis'].get('total_completed', 0) >= min_completions_required
-
-    qualified_entries = [e for e in ranking_list if _is_qualified(e)]
-    qualified_scores = [e['score'] for e in qualified_entries]
+    qualified_scores = [e['score'] for e in ranking_list]
     avg_score = round(sum(qualified_scores) / len(qualified_scores), 1) if qualified_scores else 0
     top_score = qualified_scores[0] if qualified_scores else 0
 
     podium = []
     for idx, entry in enumerate(ranking_list[:3], start=1):
-        is_qualified = _is_qualified(entry)
         tone = _rate_tone(entry['score'])
         colors = TONE_COLORS[tone]
         icon_meta = PODIUM_ICONS[idx]
-        completed = entry['kpis'].get('total_completed', 0)
         podium.append({
             'rank': idx,
             'rank_class': f'rank-{idx}',
@@ -146,21 +142,16 @@ def build_leaderboard_context(
             'completion_rate': entry['kpis'].get('completion_rate', 0),
             'podium_icon': icon_meta['icon'],
             'podium_icon_color': icon_meta['color'],
-            'is_qualified': is_qualified,
-            'status_note': (
-                ''
-                if is_qualified
-                else f'Below minimum ({completed}/{min_completions_required} completions)'
-            ),
+            'is_qualified': True,
+            'status_note': '',
         })
 
-    has_qualified = bool(qualified_entries)
-    has_unqualified = len(ranking_list) > len(qualified_entries)
-    first_unqualified = True
+    podium_empty_message = ''
+    if not ranking_list:
+        podium_empty_message = 'No qualified designers this period'
 
     rows = []
     for idx, entry in enumerate(ranking_list, start=1):
-        is_qualified = _is_qualified(entry)
         tone = _rate_tone(entry['score'])
         colors = TONE_COLORS[tone]
         kpis = entry['kpis']
@@ -188,30 +179,19 @@ def build_leaderboard_context(
             },
         ]
         corrections = kpis.get('total_corrections', 0)
-        completed = kpis.get('total_completed', 0)
-        if is_qualified:
-            rank_class = f'rank-{idx}' if idx <= 3 else 'rank-other'
-            status_note = ''
-            show_tier_divider = False
-        else:
-            rank_class = 'rank-unqualified'
-            status_note = f'Below minimum ({completed}/{min_completions_required} completions)'
-            show_tier_divider = has_qualified and has_unqualified and first_unqualified
-            first_unqualified = False
-
         rows.append({
             'rank': idx,
-            'rank_class': rank_class,
+            'rank_class': f'rank-{idx}' if idx <= 3 else 'rank-other',
             'user': entry['user'],
             'score': entry['score'],
             'score_color': colors['text'],
             'metrics': metrics,
-            'completed': completed,
+            'completed': kpis.get('total_completed', 0),
             'corrections': corrections,
             'has_corrections': corrections > 0,
-            'is_qualified': is_qualified,
-            'status_note': status_note,
-            'show_tier_divider': show_tier_divider,
+            'is_qualified': True,
+            'status_note': '',
+            'show_tier_divider': False,
         })
 
     return {
@@ -225,6 +205,7 @@ def build_leaderboard_context(
             'top_score': top_score,
         },
         'podium': podium,
+        'podium_empty_message': podium_empty_message,
         'rows': rows,
     }
 

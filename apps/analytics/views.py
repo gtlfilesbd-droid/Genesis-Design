@@ -217,7 +217,7 @@ def compute_project_health(project):
     return score
 
 
-LEADERBOARD_MIN_COMPLETIONS = 3
+LEADERBOARD_MIN_COMPLETIONS = 1
 
 
 def _normalize_period(period):
@@ -270,32 +270,28 @@ def compute_leaderboard_kpis(designer, period='monthly'):
 def get_leaderboard(period='monthly'):
     period = _normalize_period(period)
     designers = PermissionService.get_design_team_members()
-    qualified = []
-    unqualified = []
+    rankings = []
     for d in designers:
         kpis = compute_leaderboard_kpis(d, period)
+        if kpis['total_completed'] <= 0:
+            continue
         score = (
             kpis['completion_rate'] * 0.4 +
             kpis['on_time_rate'] * 0.3 +
             kpis['first_time_approval_rate'] * 0.3
         )
-        entry = {
+        rankings.append({
             'user': d,
             'score': round(score, 1),
             'kpis': kpis,
-            'is_qualified': kpis['total_completed'] >= LEADERBOARD_MIN_COMPLETIONS,
-        }
-        if entry['is_qualified']:
-            qualified.append(entry)
-        else:
-            unqualified.append(entry)
+            'is_qualified': True,
+        })
 
-    qualified.sort(key=lambda x: x['score'], reverse=True)
-    unqualified.sort(key=lambda x: x['kpis']['total_completed'], reverse=True)
+    rankings.sort(key=lambda x: x['score'], reverse=True)
 
     return {
-        'rankings': qualified + unqualified,
-        'below_minimum_count': len(unqualified),
+        'rankings': rankings,
+        'below_minimum_count': 0,
         'min_completions_required': LEADERBOARD_MIN_COMPLETIONS,
         'period': period,
     }

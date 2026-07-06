@@ -65,19 +65,21 @@
   <p class="report-section-label">Podium</p>
   <div class="rank-podium">
     {% for entry in report_context.podium %}
-    <div class="podium-card {{ entry.rank_class }}{% if not entry.is_qualified %} podium-card-unqualified{% endif %}">
+    <div class="podium-card {{ entry.rank_class }}">
       <div class="podium-icon" style="color:{{ entry.podium_icon_color }};">
         <i class="ti {{ entry.podium_icon }}"></i>
       </div>
       <div class="mt-3 mb-1">{% render_user_avatar entry.user size_class='w-10 h-10' %}</div>
       <div class="designer-name">{{ entry.user.get_full_name }}</div>
-      {% if entry.status_note %}
-      <span class="below-minimum-badge">{{ entry.status_note }}</span>
-      {% endif %}
       <div class="podium-score" style="color:{{ entry.score_color }};">{{ entry.score }}</div>
       <div class="podium-meta">{{ entry.completion_rate }}% completion</div>
     </div>
     {% endfor %}
+  </div>
+  {% elif report_context.podium_empty_message %}
+  <p class="report-section-label">Podium</p>
+  <div class="report-card px-6 py-10 text-center text-slate-500">
+    {{ report_context.podium_empty_message }}
   </div>
   {% endif %}
 
@@ -95,21 +97,13 @@
       </thead>
       <tbody>
         {% for row in report_context.rows %}
-        {% if row.show_tier_divider %}
-        <tr class="leaderboard-tier-divider">
-          <td colspan="5">Below minimum completions</td>
-        </tr>
-        {% endif %}
-        <tr class="{% if not row.is_qualified %}rank-unqualified-row{% endif %}">
+        <tr>
           <td>{% include 'components/report_rank_badge.html' with rank=row.rank rank_class=row.rank_class %}</td>
           <td>
             <div class="designer-cell">
               {% render_user_avatar row.user size_class='w-8 h-8' %}
               <div>
                 <span class="designer-name">{{ row.user.get_full_name }}</span>
-                {% if row.status_note %}
-                <span class="below-minimum-badge">{{ row.status_note }}</span>
-                {% endif %}
               </div>
             </div>
           </td>
@@ -132,7 +126,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-center text-slate-500 py-12">No ranking data.</td></tr>
+        <tr><td colspan="5" class="text-center text-slate-500 py-12">No completed designs in this period yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>

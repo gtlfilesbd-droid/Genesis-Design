@@ -61,12 +61,12 @@ class LeaderboardDisplayTests(TestCase):
                 'completion_rate': 65, 'on_time_rate': 55, 'first_time_approval_rate': 58,
                 'total_corrections': 0, 'total_completed': 5,
             }},
-            {'user': user4, 'score': 40.0, 'is_qualified': False, 'kpis': {
+            {'user': user4, 'score': 40.0, 'is_qualified': True, 'kpis': {
                 'completion_rate': 45, 'on_time_rate': 35, 'first_time_approval_rate': 38,
                 'total_corrections': 1, 'total_completed': 2,
             }},
         ]
-        context = build_leaderboard_context(rankings, period='monthly', below_minimum_count=1)
+        context = build_leaderboard_context(rankings, period='monthly', below_minimum_count=0)
 
         self.assertEqual(len(context['podium']), 3)
         self.assertEqual(context['podium'][0]['rank'], 1)
@@ -75,9 +75,14 @@ class LeaderboardDisplayTests(TestCase):
         self.assertEqual(context['summary']['top_score'], 92.0)
         self.assertEqual(context['rows'][0]['score_color'], '#3B6D11')
         self.assertTrue(context['rows'][1]['has_corrections'])
-        self.assertFalse(context['rows'][3]['is_qualified'])
-        self.assertEqual(context['rows'][3]['rank_class'], 'rank-unqualified')
-        self.assertTrue(context['rows'][3]['show_tier_divider'])
+        self.assertEqual(context['rows'][3]['rank'], 4)
+        self.assertEqual(context['rows'][3]['rank_class'], 'rank-other')
+
+    def test_build_leaderboard_context_empty_podium_message(self):
+        context = build_leaderboard_context([], period='monthly')
+        self.assertEqual(context['podium'], [])
+        self.assertEqual(context['podium_empty_message'], 'No qualified designers this period')
+        self.assertEqual(context['rows'], [])
 
 
 class ExecutiveDisplayTests(TestCase):
@@ -283,15 +288,30 @@ class ReportsViewTests(TestCase):
         self.assertContains(response, 'Suggested next')
 
     def test_leaderboard_view_renders(self):
+        from django.utils import timezone
+
+        DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            requested_by=self.requester,
+            assigned_designer=self.designer,
+            status=DesignStatus.COMPLETED,
+            completion_date=timezone.now(),
+            due_date=timezone.now() + timedelta(days=1),
+        )
         self.client.login(username='hod', password='pass')
         response = self.client.get(reverse('analytics:leaderboard'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Full rankings')
         self.assertContains(response, 'rank-podium')
         self.assertContains(response, 'ti-trophy')
-        self.assertContains(response, 'rank-medal')
-        self.assertContains(response, '🥇')
-        self.assertContains(response, '🥈')
+
+    def test_leaderboard_view_empty_podium_message(self):
+        self.client.login(username='hod', password='pass')
+        response = self.client.get(reverse('analytics:leaderboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No qualified designers this period')
+        self.assertContains(response, 'No completed designs in this period yet.')
 
     def test_leaderboard_period_query_param(self):
         self.client.login(username='hod', password='pass')
@@ -340,7 +360,7 @@ class LeaderboardFairnessTests(TestCase):
         )
         return design
 
-    def test_leaderboard_shows_low_volume_at_bottom(self):
+    def test_leaderboard_ranks_by_score_among_designers_with_completions(self):
         for _ in range(2):
             self._create_completed(self.busy)
         for _ in range(3):
@@ -348,22 +368,24 @@ class LeaderboardFairnessTests(TestCase):
         data = get_leaderboard('monthly')
         ranked_ids = [r['user'].pk for r in data['rankings']]
         self.assertIn(self.busy.pk, ranked_ids)
-        self.assertGreaterEqual(data['below_minimum_count'], 1)
-        busy_entry = next(r for r in data['rankings'] if r['user'].pk == self.busy.pk)
-        self.assertFalse(busy_entry['is_qualified'])
         self.assertIn(self.light.pk, ranked_ids)
-        self.assertGreater(ranked_ids.index(self.busy.pk), ranked_ids.index(self.light.pk))
+        self.assertEqual(data['below_minimum_count'], 0)
+        busy_entry = next(r for r in data['rankings'] if r['user'].pk == self.busy.pk)
+        light_entry = next(r for r in data['rankings'] if r['user'].pk == self.light.pk)
+        self.assertTrue(busy_entry['is_qualified'])
+        self.assertEqual(busy_entry['kpis']['total_completed'], 2)
+        self.assertEqual(light_entry['kpis']['total_completed'], 3)
+        scores = [r['score'] for r in data['rankings']]
+        self.assertEqual(scores, sorted(scores, reverse=True))
 
-    def test_leaderboard_all_designers_have_rank(self):
+    def test_leaderboard_only_includes_designers_with_completions(self):
         for _ in range(3):
             self._create_completed(self.light)
         for _ in range(2):
             self._create_completed(self.busy)
         data = get_leaderboard('monthly')
-        team_ids = {u.pk for u in PermissionService.get_design_team_members()}
         ranked_ids = [r['user'].pk for r in data['rankings']]
-        self.assertEqual(len(ranked_ids), len(team_ids))
-        self.assertEqual(set(ranked_ids), team_ids)
+        self.assertEqual(set(ranked_ids), {self.light.pk, self.busy.pk})
         ranks = list(range(1, len(ranked_ids) + 1))
         context = build_leaderboard_context(
             data['rankings'],
@@ -372,6 +394,10 @@ class LeaderboardFairnessTests(TestCase):
             min_completions_required=data['min_completions_required'],
         )
         self.assertEqual([row['rank'] for row in context['rows']], ranks)
+
+    def test_leaderboard_excludes_zero_completion_designers(self):
+        data = get_leaderboard('monthly')
+        self.assertEqual(data['rankings'], [])
 
     def test_leaderboard_busy_designer_qualifies_in_period(self):
         from django.utils import timezone
@@ -411,6 +437,9 @@ class LeaderboardFairnessTests(TestCase):
         self._create_completed(self.busy, when=old)
         kpis = compute_leaderboard_kpis(self.busy, 'monthly')
         self.assertEqual(kpis['total_completed'], 0)
+        data = get_leaderboard('monthly')
+        ranked_ids = [r['user'].pk for r in data['rankings']]
+        self.assertNotIn(self.busy.pk, ranked_ids)
 
 
 class WorkloadHodTests(TestCase):
