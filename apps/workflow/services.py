@@ -546,7 +546,9 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
             raise WorkflowError('Only the assigned reviewer can cancel this request.')
         if not comments.strip():
             raise WorkflowError('Cancel reason is required.')
-        design.review_cancel_reason = comments.strip()
+        reason = comments.strip()
+        design.review_cancel_reason = reason
+        design.cancel_reason = reason
         design.review_cancelled_at = timezone.now()
         design.current_holder = None
 
@@ -650,6 +652,55 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
     from apps.notifications.services import notify_workflow_transition
     notify_workflow_transition(design, action, user)
 
+    return design
+
+
+def cancel_design_request_by_requester(design, user, *, reason, request=None):
+    """Cancel a design request on behalf of the requester (or admin via view guard)."""
+    from apps.core.activity_messages import (
+        build_project_activity_description,
+        build_workflow_activity_description,
+    )
+    from apps.notifications.services import NotificationService
+
+    if design.status in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
+        return design
+
+    reason = (reason or '').strip()
+    if not reason:
+        raise WorkflowError('Cancel reason is required.')
+
+    old_status = design.status
+    now = timezone.now()
+    _end_stage(design, old_status)
+    design.status = DesignStatus.CANCELLED
+    design.current_holder = None
+    design.cancel_reason = reason
+    if old_status == DesignStatus.REQUEST_UNDER_REVIEW:
+        design.review_cancelled_at = now
+        design.review_cancel_reason = reason
+    design.save()
+
+    activity_description = build_workflow_activity_description(
+        'cancelled', user, design, comments=reason,
+    )
+    log_activity(
+        'design_request', design.pk, user, 'cancelled',
+        activity_description,
+        {'old_status': old_status, 'new_status': DesignStatus.CANCELLED, 'comments': reason},
+    )
+    log_activity(
+        'project', design.project_id, user, 'cancelled',
+        build_project_activity_description('cancelled', user, design, comments=reason),
+    )
+    log_audit(
+        user, 'cancelled', 'design_request', design.pk,
+        before={'status': old_status},
+        after={'status': DesignStatus.CANCELLED},
+        comment=reason,
+        request=request,
+    )
+    NotificationService.on_request_cancelled_by_requester(design, user)
     return design
 
 

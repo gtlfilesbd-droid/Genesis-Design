@@ -21,6 +21,7 @@ from apps.core.notification_messages import (
     request_created_message,
     request_review_acknowledged_message,
     request_review_cancelled_message,
+    request_cancelled_by_requester_message,
     request_sent_for_review_message,
     sent_to_compliance_message,
     sent_to_compliance_requester_message,
@@ -163,7 +164,28 @@ class NotificationService:
         recipients = NotificationService._requester_side_recipients(design_request)
         title = f'Request Cancelled: {design_request.design_number}'
         message = request_review_cancelled_message(
-            design_request, design_request.review_cancel_reason or 'No reason provided',
+            design_request,
+            design_request.cancel_reason_display or 'No reason provided',
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_request_cancelled_by_requester(design_request, actor):
+        reason = design_request.cancel_reason_display or 'No reason provided'
+        requester_name = actor.get_full_name() or actor.username
+        recipients = []
+        if (
+            design_request.assigned_review_user_id
+            and design_request.assigned_review_user_id != actor.pk
+        ):
+            recipients.append(design_request.assigned_review_user)
+        if not recipients:
+            return
+        title = f'Request Cancelled: {design_request.design_number}'
+        message = request_cancelled_by_requester_message(
+            design_request, requester_name, reason,
         )
         NotificationService._notify_many(
             recipients, NotificationType.WORKFLOW, title, message, design_request,

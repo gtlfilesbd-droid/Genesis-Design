@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
@@ -56,6 +57,7 @@ class RequestUnderReviewWorkflowTests(TestCase):
         )
         self.other_group.systems.set([self.other_system])
         self.due = timezone.now() + timedelta(days=5)
+        self.client = Client()
 
     def _create_request(self):
         return create_design_request(self.project, self.requester, {
@@ -138,6 +140,7 @@ class RequestUnderReviewWorkflowTests(TestCase):
         design.refresh_from_db()
         self.assertEqual(design.status, DesignStatus.CANCELLED)
         self.assertEqual(design.review_cancel_reason, 'Incomplete scope')
+        self.assertEqual(design.cancel_reason, 'Incomplete scope')
         self.assertTrue(
             Notification.objects.filter(
                 user=self.requester,
@@ -192,6 +195,7 @@ class RequestUnderReviewWorkflowTests(TestCase):
         self.assertTrue(lifecycle['is_cancelled'])
         self.assertEqual(lifecycle['current_stage_label'], 'Cancelled')
         self.assertEqual(lifecycle['cancel_reason'], 'Incomplete scope')
+        self.assertIn(self.reviewer.get_full_name() or self.reviewer.username, lifecycle['cancelled_by_display'])
         reviewer_segments = [
             seg for seg in lifecycle['segments']
             if seg.get('role') == 'reviewer'
@@ -200,3 +204,67 @@ class RequestUnderReviewWorkflowTests(TestCase):
         self.assertFalse(reviewer_segments[0]['is_ongoing'])
         self.assertIsNotNone(reviewer_segments[0]['days'])
         self.assertEqual(lifecycle['segments'][-1]['label'], 'Cancelled')
+
+    def test_requester_can_cancel_before_review_acknowledge(self):
+        from apps.designs.lifecycle_timeline import build_lifecycle_data
+        from apps.designs.progress import build_progress_steps
+        from apps.workflow.permissions import design_action_flags
+
+        design = self._create_request()
+        flags = design_action_flags(self.requester, design)
+        self.assertTrue(flags['can_cancel_request'])
+
+        self.client.login(username='req', password='pass')
+        response = self.client.post(
+            reverse('requests:detail', kwargs={'pk': design.pk}),
+            {'action': 'cancel_request', 'cancel_reason': 'Submitted by mistake'},
+        )
+        self.assertEqual(response.status_code, 302)
+        design.refresh_from_db()
+        self.assertEqual(design.status, DesignStatus.CANCELLED)
+        self.assertEqual(design.cancel_reason, 'Submitted by mistake')
+        self.assertIsNotNone(design.review_cancelled_at)
+
+        steps, progress_cancelled = build_progress_steps(design)
+        self.assertTrue(progress_cancelled)
+        lifecycle = build_lifecycle_data(design)
+        self.assertTrue(lifecycle['is_cancelled'])
+        self.assertEqual(lifecycle['cancel_reason'], 'Submitted by mistake')
+        self.assertIn(self.requester.get_full_name() or self.requester.username, lifecycle['cancelled_by_display'])
+        self.assertFalse(any(seg.get('is_ongoing') for seg in lifecycle['segments']))
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.reviewer,
+                title__contains='Cancelled',
+                message__contains='Submitted by mistake',
+            ).exists()
+        )
+
+    def test_requester_cancel_requires_reason(self):
+        design = self._create_request()
+        self.client.login(username='req', password='pass')
+        response = self.client.post(
+            reverse('requests:detail', kwargs={'pk': design.pk}),
+            {'action': 'cancel_request', 'cancel_reason': '   '},
+        )
+        self.assertEqual(response.status_code, 302)
+        design.refresh_from_db()
+        self.assertEqual(design.status, DesignStatus.REQUEST_UNDER_REVIEW)
+
+    def test_requester_cannot_cancel_after_review_acknowledge(self):
+        from apps.workflow.permissions import design_action_flags
+
+        design = self._create_request()
+        transition(design, 'review_acknowledge', self.reviewer)
+        design.refresh_from_db()
+        flags = design_action_flags(self.requester, design)
+        self.assertFalse(flags['can_cancel_request'])
+
+        self.client.login(username='req', password='pass')
+        response = self.client.post(
+            reverse('requests:detail', kwargs={'pk': design.pk}),
+            {'action': 'cancel_request'},
+        )
+        self.assertEqual(response.status_code, 302)
+        design.refresh_from_db()
+        self.assertEqual(design.status, DesignStatus.REQUEST_UNDER_REVIEW)

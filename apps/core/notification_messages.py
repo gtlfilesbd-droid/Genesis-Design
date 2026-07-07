@@ -85,6 +85,13 @@ def request_review_cancelled_message(design_request, reason):
     )
 
 
+def request_cancelled_by_requester_message(design_request, requester_name, reason):
+    return (
+        f'{requester_name} cancelled the {_drawing_type(design_request)} request '
+        f'for {_project_label(design_request)}. Reason: "{reason}"'
+    )
+
+
 def design_leads_assigned_message(design_request, *, is_sub=False):
     due = design_request.engineer_due_date
     due_label = due.strftime('%d %b %Y') if due else '—'

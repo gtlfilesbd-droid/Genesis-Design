@@ -61,34 +61,31 @@ def design_detail(request, pk):
         return redirect('requests:detail', pk=pk)
 
     if request.method == 'POST' and request.POST.get('action') == 'cancel_request':
-        if design.requested_by_id != request.user.pk and not PermissionService.has_global_permission(
-            request.user, 'PERM_ADMIN_PANEL',
-        ):
-            messages.error(request, 'You do not have permission to cancel this request.')
+        from apps.workflow.permissions import requester_can_cancel_design
+        from apps.workflow.services import WorkflowError, cancel_design_request_by_requester
+
+        is_admin = PermissionService.has_global_permission(request.user, 'PERM_ADMIN_PANEL')
+        reason = request.POST.get('cancel_reason', '').strip()
+        if not reason:
+            messages.error(request, 'Cancel reason is required.')
             return redirect('requests:detail', pk=pk)
-        if (
-            design.requested_by_id == request.user.pk
-            and design.status not in (
-                DesignStatus.NEW_REQUEST,
-                DesignStatus.ENGINEER_PENDING_ACK,
-                DesignStatus.ENGINEER_IN_PROGRESS,
-            )
-        ):
-            messages.error(
-                request,
-                'This request has already been acknowledged and cannot be cancelled.',
-            )
+        if not is_admin and not requester_can_cancel_design(request.user, design):
+            if design.requested_by_id != request.user.pk:
+                messages.error(request, 'You do not have permission to cancel this request.')
+            else:
+                messages.error(
+                    request,
+                    'This request has already been acknowledged and cannot be cancelled.',
+                )
             return redirect('requests:detail', pk=pk)
         if design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
-            old_status = design.status
-            design.status = DesignStatus.CANCELLED
-            design.save(update_fields=['status', 'primary_status', 'deadline_missed'])
-            from apps.core.activity_messages import build_workflow_activity_description
-            log_activity(
-                'design_request', design.pk, request.user, 'cancelled',
-                build_workflow_activity_description('cancelled', request.user, design),
-                {'old_status': old_status, 'new_status': DesignStatus.CANCELLED},
-            )
+            try:
+                cancel_design_request_by_requester(
+                    design, request.user, reason=reason, request=request,
+                )
+            except WorkflowError as exc:
+                messages.error(request, str(exc))
+                return redirect('requests:detail', pk=pk)
             messages.success(request, 'Design request cancelled.')
         return redirect('requests:detail', pk=pk)
 

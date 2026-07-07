@@ -25,6 +25,7 @@ ROLE_LABELS = {
     'hod': 'Head of Design',
     'engineer': SITE_DESIGN_LEAD_LABEL,
     'reviewer': 'Request Reviewer',
+    'requester': 'Design Requester',
     'designer': 'Designer',
     'verifier': 'Verifier',
     'compliance': 'Compliance',
@@ -362,6 +363,42 @@ def _resolve_cancelled_at(design):
     if log:
         return log.created_at
     return design.updated_at
+
+
+def _cancel_role_key_for_log(design, log):
+    if log.action == 'review_cancel':
+        return 'reviewer'
+    if log.action == 'cancelled' and design.requested_by_id == log.user_id:
+        return 'requester'
+    return 'hod'
+
+
+def _resolve_cancelled_by(design):
+    log = (
+        ActivityLog.objects.filter(
+            entity_type='design_request',
+            entity_id=design.pk,
+            action__in=('review_cancel', 'cancelled', 'cancel'),
+        )
+        .select_related('user')
+        .order_by('-created_at')
+        .first()
+    )
+    if not log or not log.user_id:
+        return None
+    name = _person_name(log.user)
+    if not name:
+        return None
+    role_key = _cancel_role_key_for_log(design, log)
+    role_label = ROLE_LABELS[role_key]
+    return {
+        'name': name,
+        'role_key': role_key,
+        'role_label': role_label,
+        'display_name': format_person_display(name, role_label),
+        'user_id': log.user_id,
+        'user': log.user,
+    }
 
 
 def _review_stage_end(design):
@@ -847,6 +884,7 @@ def _add_workflow_person(people, user, role_key):
     palette = {
         'hod': ('#B5D4F4', '#042C53'),
         'reviewer': ('#7DD3FC', '#0C4A6E'),
+        'requester': ('#C4B5FD', '#4C1D95'),
         'engineer': ('#A78BFA', '#2E1065'),
         'designer': ('#9FE1CB', '#04342C'),
         'verifier': ('#FAC775', '#412402'),
@@ -1059,6 +1097,9 @@ def build_lifecycle_data(design):
 
     is_cancelled = design.status == DesignStatus.CANCELLED
     cancelled_at = _resolve_cancelled_at(design) if is_cancelled else None
+    cancelled_by = _resolve_cancelled_by(design) if is_cancelled else None
+    if cancelled_by:
+        _add_workflow_person(people, cancelled_by['user'], cancelled_by['role_key'])
 
     is_overdue = bool(
         target_end and now_time > target_end and not design.completion_date and not is_cancelled
@@ -1241,7 +1282,8 @@ def build_lifecycle_data(design):
         'is_overdue': is_overdue,
         'is_cancelled': is_cancelled,
         'cancelled_at': cancelled_at,
-        'cancel_reason': design.review_cancel_reason or None,
+        'cancel_reason': design.cancel_reason_display or None,
+        'cancelled_by_display': cancelled_by['display_name'] if cancelled_by else None,
         'is_completed_on_time': is_completed_on_time,
         'days_over_target': days_over_target,
         'days_late': days_late,

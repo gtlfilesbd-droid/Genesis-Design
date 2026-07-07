@@ -1,0 +1,30 @@
+<div x-data="{ open: false }" x-cloak>
+    <button type="button" @click="open = true" class="{{ trigger_class|default:'g-btn-secondary w-full text-red-600 border-red-200' }}">{{ trigger_label|default:'Cancel Request' }}</button>
+    <div x-show="open" x-transition class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @keydown.escape.window="open = false">
+        <div class="g-card p-6 max-w-md w-full shadow-xl" @click.outside="open = false">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                    <i data-lucide="{{ icon|default:'x-circle' }}" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">{{ title|default:'Cancel this request?' }}</h3>
+                    <p class="text-sm text-slate-500 mt-1">{{ message|default:'This design request will be marked as cancelled. A reason is required.' }}</p>
+                </div>
+            </div>
+            <form method="post" action="{{ action_url }}" class="space-y-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="cancel_request">
+                <div>
+                    <label for="cancel-reason-{{ modal_id|default:'default' }}" class="block text-sm font-medium text-slate-700 mb-1">Cancel Reason <span class="text-red-600">*</span></label>
+                    <textarea id="cancel-reason-{{ modal_id|default:'default' }}" name="cancel_reason" rows="4" required
+                              class="g-input w-full resize-y min-h-[96px]"
+                              placeholder="Reason for cancellation..."></textarea>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @click="open = false" class="g-btn-secondary">Close</button>
+                    <button type="submit" class="g-btn-primary !bg-red-600 hover:!bg-red-700">{{ confirm_label|default:'Yes, Cancel' }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

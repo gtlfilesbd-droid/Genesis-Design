@@ -91,6 +91,12 @@
       {% if lifecycle.is_cancelled %}
         <strong class="lc-status-headline">Request cancelled</strong>
         <div class="lc-delay-rows">
+          {% if lifecycle.cancelled_by_display %}
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Cancelled by</span>
+            <span class="lc-delay-value">{{ lifecycle.cancelled_by_display }}</span>
+          </div>
+          {% endif %}
           <div class="lc-delay-row">
             <span class="lc-delay-label">Cancelled on</span>
             <span class="lc-delay-value">{{ lifecycle.cancelled_at|date:"d M Y, h:i A" }}</span>

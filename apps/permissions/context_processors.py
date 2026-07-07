@@ -1,7 +1,7 @@
 from django.urls import reverse
 
 from apps.accounts.models import UserRole
-from apps.designs.models import DesignStatus
+from apps.workflow.permissions import requester_can_cancel_design
 from .services import PermissionService
 
 
@@ -124,9 +124,7 @@ def user_permissions(request):
                 )
             ),
             'can_cancel_request': (
-                current_design.status == DesignStatus.NEW_REQUEST
-                and current_design.requested_by_id == user.pk
-                and ps.has_project_permission(user, design_project, 'PROJECT_PERM_REQUEST')
+                requester_can_cancel_design(user, current_design)
             ) or (
                 ps.has_global_permission(user, 'PERM_ADMIN_PANEL')
                 and current_design.status not in ('completed', 'cancelled')

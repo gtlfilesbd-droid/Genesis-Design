@@ -188,6 +188,7 @@ class DesignRequest(models.Model):
     review_acknowledged_at = models.DateTimeField(null=True, blank=True)
     review_cancel_reason = models.TextField(blank=True)
     review_cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancel_reason = models.TextField(blank=True)
     main_design_lead = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -323,6 +324,10 @@ class DesignRequest(models.Model):
     def system_names_display(self):
         names = list(self.systems.values_list('name', flat=True))
         return ', '.join(names) if names else ''
+
+    @property
+    def cancel_reason_display(self):
+        return self.cancel_reason or self.review_cancel_reason
 
     def is_site_lead_user(self, user):
         if not user or not user.is_authenticated:

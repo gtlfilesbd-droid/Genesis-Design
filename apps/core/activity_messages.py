@@ -111,6 +111,12 @@ def build_workflow_activity_description(
         comment = comments or 'No reason provided'
         return f'{actor} cancelled this design request: "{comment}"'
 
+    if action in ('cancel', 'cancelled'):
+        comment = comments or kwargs.get('comments')
+        if comment:
+            return f'{actor} cancelled this design request: "{comment}"'
+        return f'{actor} cancelled this design request'
+
     if action == 'assign':
         designer = kwargs.get('designer') or design.assigned_designer
         designer_name = _person_name(designer)
@@ -183,9 +189,6 @@ def build_workflow_activity_description(
 
     if action in ('complete', 'hod_fast_complete'):
         return f'{actor} marked this design as completed'
-
-    if action in ('cancel', 'cancelled'):
-        return f'{actor} cancelled this design request'
 
     return f'{actor} updated this request'
 

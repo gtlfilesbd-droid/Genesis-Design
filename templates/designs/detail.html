@@ -57,12 +57,13 @@
                 <div><dt class="text-slate-500">Requested By</dt><dd class="font-medium">{{ design.requested_by }}</dd></div>
                 <div><dt class="text-slate-500">Request Date</dt><dd class="font-medium">{{ design.created_at|date:"d M Y, h:i A" }}</dd></div>
                 <div><dt class="text-slate-500">Drawing Type</dt><dd class="font-medium">{{ design.drawing_type.name }}</dd></div>
+                <div><dt class="text-slate-500">Design System Name</dt><dd class="font-medium">{{ design.system_names_display|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Priority</dt><dd>{% render_priority_badge design.priority %}</dd></div>
                 <div><dt class="text-slate-500">Target Date</dt><dd class="font-medium">{{ design.target_completion_date|date:"d M Y"|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Revisions</dt><dd class="font-medium">{{ design.revision_count }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Message</dt><dd>{{ design.request_message|default:"—" }}</dd></div>
-                {% if design.review_cancel_reason %}
-                <div class="col-span-2"><dt class="text-slate-500">Cancel Reason</dt><dd class="text-red-700">{{ design.review_cancel_reason }}</dd></div>
+                {% if design.cancel_reason_display %}
+                <div class="col-span-2"><dt class="text-slate-500">Cancel Reason</dt><dd class="text-red-700">{{ design.cancel_reason_display }}</dd></div>
                 {% endif %}
             </dl>
         </div>
@@ -316,7 +317,7 @@
                 {% if design.status != 'completed' and design.status != 'cancelled' %}
                 {% if can_cancel_request %}
                 <div class="pt-2 border-t border-slate-100 mt-2">
-                    {% include 'components/confirm_modal.html' with title='Cancel this request?' message='This design request will be marked as cancelled.' action_url=request.path hidden_action='cancel_request' trigger_label='Cancel Request' confirm_label='Yes, Cancel' icon='x-circle' %}
+                    {% include 'components/cancel_request_modal.html' with action_url=request.path modal_id=design.pk %}
                 </div>
                 {% endif %}
                 {% endif %}

@@ -33,6 +33,22 @@ def can_user_submit_work(user, design) -> bool:
     )
 
 
+def requester_can_cancel_design(user, design) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if design.requested_by_id != user.pk:
+        return False
+    if not PermissionService.has_project_permission(user, design.project, 'PROJECT_PERM_REQUEST'):
+        return False
+    if design.status == DesignStatus.REQUEST_UNDER_REVIEW:
+        return not design.review_acknowledged_at
+    return design.status in (
+        DesignStatus.NEW_REQUEST,
+        DesignStatus.ENGINEER_PENDING_ACK,
+        DesignStatus.ENGINEER_IN_PROGRESS,
+    )
+
+
 def design_action_flags(user, design) -> dict:
     project = design.project
     return {
@@ -129,13 +145,7 @@ def design_action_flags(user, design) -> dict:
             user, project, 'complete', 'PROJECT_PERM_COMPLETE',
         ),
         'can_cancel_request': (
-            design.requested_by_id == user.pk
-            and design.status in (
-                DesignStatus.NEW_REQUEST,
-                DesignStatus.ENGINEER_PENDING_ACK,
-                DesignStatus.ENGINEER_IN_PROGRESS,
-            )
-            and PermissionService.has_project_permission(user, project, 'PROJECT_PERM_REQUEST')
+            requester_can_cancel_design(user, design)
         ) or (
             PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL')
             and design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED)
