@@ -77,6 +77,7 @@
 .lc-card .seg-sub { font-size: 9px; white-space: nowrap; margin-top: 1px; opacity: 0.9; }
 
 .lc-card .seg-hod        { background: #B5D4F4; color: #042C53; }
+.lc-card .seg-reviewer   { background: #7DD3FC; color: #0C4A6E; }
 .lc-card .seg-engineer   { background: #A78BFA; color: #2E1065; }
 .lc-card .seg-designer   { background: #9FE1CB; color: #04342C; }
 .lc-card .seg-verifier   { background: #FAC775; color: #412402; }

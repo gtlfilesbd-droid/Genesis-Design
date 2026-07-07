@@ -24,7 +24,7 @@ HOD_ACTIONS = (
 ROLE_LABELS = {
     'hod': 'Head of Design',
     'engineer': SITE_DESIGN_LEAD_LABEL,
-    'reviewer': 'System Reviewer',
+    'reviewer': 'Request Reviewer',
     'designer': 'Designer',
     'verifier': 'Verifier',
     'compliance': 'Compliance',
@@ -91,7 +91,7 @@ STAGE_ROLE_LABELS = {
 }
 
 DELAY_STATUS_LABELS = {
-    DesignStatus.REQUEST_UNDER_REVIEW: 'System Reviewer — Under Review',
+    DesignStatus.REQUEST_UNDER_REVIEW: 'Request Reviewer — Under Review',
     DesignStatus.ENGINEER_PENDING_ACK: f'{SITE_DESIGN_LEAD_LABEL} — Acknowledgement',
     DesignStatus.ENGINEER_IN_PROGRESS: SITE_DESIGN_LEAD_LABEL,
     DesignStatus.NEW_REQUEST: 'Head of Design — Acknowledgement',
@@ -780,6 +780,7 @@ def _add_workflow_person(people, user, role_key):
     role_label = ROLE_LABELS[role_key]
     palette = {
         'hod': ('#B5D4F4', '#042C53'),
+        'reviewer': ('#7DD3FC', '#0C4A6E'),
         'engineer': ('#A78BFA', '#2E1065'),
         'designer': ('#9FE1CB', '#04342C'),
         'verifier': ('#FAC775', '#412402'),
