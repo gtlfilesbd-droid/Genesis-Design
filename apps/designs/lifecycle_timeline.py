@@ -347,6 +347,50 @@ def _ongoing_stage_duration(design, stage):
     )
 
 
+def _resolve_cancelled_at(design):
+    if design.review_cancelled_at:
+        return design.review_cancelled_at
+    log = (
+        ActivityLog.objects.filter(
+            entity_type='design_request',
+            entity_id=design.pk,
+            action__in=('review_cancel', 'cancelled', 'cancel'),
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if log:
+        return log.created_at
+    return design.updated_at
+
+
+def _review_stage_end(design):
+    if design.engineer_assigned_at:
+        return design.engineer_assigned_at
+    if design.review_cancelled_at:
+        return design.review_cancelled_at
+    if design.status == DesignStatus.REQUEST_UNDER_REVIEW:
+        return None
+    if design.status == DesignStatus.CANCELLED:
+        return _resolve_cancelled_at(design)
+    return None
+
+
+def _close_cancelled_segments(design, segments):
+    if design.status != DesignStatus.CANCELLED:
+        return
+    cancelled_at = _resolve_cancelled_at(design)
+    for seg in segments:
+        if not seg.get('is_ongoing'):
+            continue
+        start = seg.get('start')
+        seg['end'] = cancelled_at
+        seg['is_ongoing'] = False
+        if start:
+            seg['days'] = round((cancelled_at - start).total_seconds() / 86400, 1)
+            seg['grow'] = max(seg['days'], 1.0)
+
+
 def _waiting_since_for_status(design):
     status = design.status
     duration = _ongoing_stage_duration(design, status)
@@ -622,6 +666,28 @@ def build_timeline_segments(design):
             })
         return segments
 
+    if design.status == DesignStatus.CANCELLED:
+        cancelled_at = _resolve_cancelled_at(design)
+        for seg in segments:
+            if seg.get('is_ongoing'):
+                seg['is_ongoing'] = False
+                seg['is_done'] = True
+                if seg.get('days') is None and seg.get('start'):
+                    seg['days'] = _days_between(seg['start'], cancelled_at)
+        if not segments or not segments[-1].get('is_endcap'):
+            segments.append({
+                'label': 'Cancelled',
+                'role': 'endcap',
+                'person': None,
+                'days': None,
+                'is_ongoing': False,
+                'is_done': True,
+                'is_pending': False,
+                'is_endcap': True,
+                'is_current_delay_source': False,
+            })
+        return segments
+
     _append_pending_placeholders(design, segments)
     return segments
 
@@ -832,9 +898,7 @@ def build_lifecycle_data(design):
 
     if design.assigned_review_user_id:
         reviewer_name = _person_name(design.assigned_review_user)
-        review_end = design.engineer_assigned_at or (
-            design.review_acknowledged_at if design.status != DesignStatus.REQUEST_UNDER_REVIEW else None
-        )
+        review_end = _review_stage_end(design)
         add_segment(
             'Under Review', 'reviewer', reviewer_name, design.created_at, review_end,
             person_id=design.assigned_review_user_id,
@@ -966,6 +1030,22 @@ def build_lifecycle_data(design):
             'start': None,
             'end': None,
         })
+    elif design.status == DesignStatus.CANCELLED:
+        _close_cancelled_segments(design, segments)
+        segments.append({
+            'label': 'Cancelled',
+            'bar_label': 'Cancelled',
+            'role': 'endcap',
+            'person': None,
+            'person_id': None,
+            'days': None,
+            'grow': 0.6,
+            'is_ongoing': False,
+            'is_delay': False,
+            'note': None,
+            'start': None,
+            'end': None,
+        })
 
     if hod_id:
         hod_user = User.objects.filter(pk=hod_id).first()
@@ -977,8 +1057,11 @@ def build_lifecycle_data(design):
                 seg['bar_label'] = _bar_stage_label(seg['label'])
             seg['label'] = _display_stage_label(seg['label'])
 
+    is_cancelled = design.status == DesignStatus.CANCELLED
+    cancelled_at = _resolve_cancelled_at(design) if is_cancelled else None
+
     is_overdue = bool(
-        target_end and now_time > target_end and not design.completion_date
+        target_end and now_time > target_end and not design.completion_date and not is_cancelled
     )
     delay_stage_label = None
     delay_person = None
@@ -1038,6 +1121,9 @@ def build_lifecycle_data(design):
     current_person_display, _ = _resolve_display(
         current_person, current_role_key or 'hod',
     )
+    if is_cancelled:
+        current_person_display = 'Cancelled'
+
     delay_person_display, delay_person_id = _resolve_display(
         delay_person,
         current_role_key or 'hod',
@@ -1101,7 +1187,14 @@ def build_lifecycle_data(design):
     completed_target_summary = None
     completed_late_target_summary = None
 
-    if not design.completion_date and not is_overdue:
+    if is_cancelled:
+        current_stage_label = 'Cancelled'
+        current_person = None
+        current_role_key = None
+        current_elapsed_days = None
+        progress_assigned_summary = None
+        progress_target_summary = None
+    elif not design.completion_date and not is_overdue:
         progress_role_key = current_role_key or 'hod'
         progress_since = _resolve_person_waiting_since(design, progress_role_key, None)
         progress_waiting_days = (
@@ -1146,6 +1239,9 @@ def build_lifecycle_data(design):
         'total_days': total_days,
         'days_allowed': days_allowed,
         'is_overdue': is_overdue,
+        'is_cancelled': is_cancelled,
+        'cancelled_at': cancelled_at,
+        'cancel_reason': design.review_cancel_reason or None,
         'is_completed_on_time': is_completed_on_time,
         'days_over_target': days_over_target,
         'days_late': days_late,

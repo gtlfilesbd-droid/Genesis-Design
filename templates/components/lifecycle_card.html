@@ -9,6 +9,8 @@
     </div>
     {% if lifecycle.is_overdue %}
       <span class="lc-badge lc-badge-danger">{{ lifecycle.days_over_target }} day(s) overdue</span>
+    {% elif lifecycle.is_cancelled %}
+      <span class="lc-badge lc-badge-cancelled">Cancelled</span>
     {% elif lifecycle.is_completed_on_time %}
       <span class="lc-badge lc-badge-success">Completed on time</span>
     {% elif request.completed_at %}
@@ -83,10 +85,24 @@
     {% endfor %}
   </div>
 
-  <div class="lc-status {% if lifecycle.is_overdue %}lc-status-danger{% elif request.completed_at and lifecycle.is_completed_on_time %}lc-status-success{% else %}lc-status-neutral{% endif %}">
-    <i class="ti {% if lifecycle.is_overdue %}ti-alert-triangle{% elif request.completed_at %}ti-check{% else %}ti-clock{% endif %}" aria-hidden="true"></i>
+  <div class="lc-status {% if lifecycle.is_overdue %}lc-status-danger{% elif lifecycle.is_cancelled %}lc-status-cancelled{% elif request.completed_at and lifecycle.is_completed_on_time %}lc-status-success{% else %}lc-status-neutral{% endif %}">
+    <i class="ti {% if lifecycle.is_overdue %}ti-alert-triangle{% elif lifecycle.is_cancelled %}ti-ban{% elif request.completed_at %}ti-check{% else %}ti-clock{% endif %}" aria-hidden="true"></i>
     <div class="lc-status-body">
-      {% if lifecycle.is_overdue %}
+      {% if lifecycle.is_cancelled %}
+        <strong class="lc-status-headline">Request cancelled</strong>
+        <div class="lc-delay-rows">
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Cancelled on</span>
+            <span class="lc-delay-value">{{ lifecycle.cancelled_at|date:"d M Y, h:i A" }}</span>
+          </div>
+          {% if lifecycle.cancel_reason %}
+          <div class="lc-delay-row">
+            <span class="lc-delay-label">Reason</span>
+            <span class="lc-delay-value">{{ lifecycle.cancel_reason }}</span>
+          </div>
+          {% endif %}
+        </div>
+      {% elif lifecycle.is_overdue %}
         <strong class="lc-status-headline">Request overdue</strong>
         <div class="lc-delay-rows">
           <div class="lc-delay-row">
@@ -160,7 +176,7 @@
     </div>
   </div>
 
-  {% if not request.completed_at %}
+  {% if not request.completed_at and not lifecycle.is_cancelled %}
   <div class="lc-actions">
     {% if lifecycle.is_overdue and lifecycle.delay_person_id %}
       <button type="button" onclick="sendReminderAction({{ request.id }}, {{ lifecycle.delay_person_id }})">

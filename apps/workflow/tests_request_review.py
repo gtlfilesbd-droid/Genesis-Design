@@ -180,3 +180,23 @@ class RequestUnderReviewWorkflowTests(TestCase):
                 action='review_cancel',
             ).exists()
         )
+
+    def test_lifecycle_card_reflects_review_cancel(self):
+        from apps.designs.lifecycle_timeline import build_lifecycle_data
+
+        design = self._create_request()
+        transition(design, 'review_cancel', self.reviewer, comments='Incomplete scope')
+        design.refresh_from_db()
+
+        lifecycle = build_lifecycle_data(design)
+        self.assertTrue(lifecycle['is_cancelled'])
+        self.assertEqual(lifecycle['current_stage_label'], 'Cancelled')
+        self.assertEqual(lifecycle['cancel_reason'], 'Incomplete scope')
+        reviewer_segments = [
+            seg for seg in lifecycle['segments']
+            if seg.get('role') == 'reviewer'
+        ]
+        self.assertEqual(len(reviewer_segments), 1)
+        self.assertFalse(reviewer_segments[0]['is_ongoing'])
+        self.assertIsNotNone(reviewer_segments[0]['days'])
+        self.assertEqual(lifecycle['segments'][-1]['label'], 'Cancelled')

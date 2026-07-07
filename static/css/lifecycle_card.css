@@ -26,6 +26,7 @@
 .lc-badge-danger  { background: #FEF2F2; color: #991B1B; }
 .lc-badge-success { background: #F0FDF4; color: #166534; }
 .lc-badge-neutral { background: #F1F5F9; color: #475569; }
+.lc-badge-cancelled { background: #FEF2F2; color: #B91C1C; }
 
 .lc-stats {
   display: grid;
@@ -176,6 +177,10 @@
 
 .lc-status-danger  { background: #FEF2F2; border: 1px solid #F09595; color: #791F1F; }
 .lc-status-danger i, .lc-status-danger .lc-status-headline { color: #791F1F; }
+.lc-status-cancelled { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
+.lc-status-cancelled i, .lc-status-cancelled .lc-status-headline { color: #991B1B; }
+.lc-status-cancelled .lc-delay-label { color: #B45353; }
+.lc-status-cancelled .lc-delay-value { color: #7F1D1D; }
 .lc-status-success { background: #F0FDF4; border: 1px solid #C0DD97; color: #166534; }
 .lc-status-success i, .lc-status-success .lc-status-headline { color: #166534; }
 .lc-status-neutral { background: #F8FAFC; border: 1px solid #E2E8F0; color: #475569; }
