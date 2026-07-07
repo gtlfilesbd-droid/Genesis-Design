@@ -129,6 +129,32 @@ class RequestUnderReviewWorkflowTests(TestCase):
                 due_date=self.due,
             )
 
+    def test_review_assign_form_excludes_selected_leads_from_opposite_dropdown(self):
+        from apps.workflow.views import ReviewLeadAssignForm
+
+        design = self._create_request()
+        form = ReviewLeadAssignForm(
+            data={
+                'main_design_lead': str(self.main_lead.pk),
+                'sub_design_lead': '',
+            },
+            design=design,
+        )
+        sub_ids = set(form.fields['sub_design_lead'].queryset.values_list('pk', flat=True))
+        self.assertNotIn(self.main_lead.pk, sub_ids)
+        self.assertIn(self.sub_lead.pk, sub_ids)
+
+        form = ReviewLeadAssignForm(
+            data={
+                'main_design_lead': '',
+                'sub_design_lead': str(self.sub_lead.pk),
+            },
+            design=design,
+        )
+        main_ids = set(form.fields['main_design_lead'].queryset.values_list('pk', flat=True))
+        self.assertNotIn(self.sub_lead.pk, main_ids)
+        self.assertIn(self.main_lead.pk, main_ids)
+
     def test_review_cancel_requires_reason(self):
         design = self._create_request()
         with self.assertRaises(WorkflowError):

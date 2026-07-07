@@ -92,8 +92,17 @@ class ReviewLeadAssignForm(forms.Form):
     def __init__(self, *args, design=None, **kwargs):
         super().__init__(*args, **kwargs)
         leads = PermissionService.get_site_engineers()
-        self.fields['main_design_lead'].queryset = leads
-        self.fields['sub_design_lead'].queryset = leads
+        self._all_leads = leads
+
+        excluded_from_main = self._lead_pk(self.data.get('sub_design_lead')) if self.is_bound else None
+        excluded_from_sub = self._lead_pk(self.data.get('main_design_lead')) if self.is_bound else None
+
+        self.fields['main_design_lead'].queryset = (
+            leads.exclude(pk=excluded_from_main) if excluded_from_main else leads
+        )
+        self.fields['sub_design_lead'].queryset = (
+            leads.exclude(pk=excluded_from_sub) if excluded_from_sub else leads
+        )
         if design and not self.is_bound and 'due_date' not in self.initial:
             drawing_type = design.drawing_type
             config = get_deadline_config()
@@ -104,6 +113,25 @@ class ReviewLeadAssignForm(forms.Form):
                 count_weekends=config.count_weekends,
             )
             self.fields['due_date'].initial = timezone.localtime(due).strftime('%Y-%m-%dT%H:%M')
+
+    @staticmethod
+    def _lead_pk(value):
+        if not value:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def site_engineer_options(self):
+        return [
+            {
+                'id': user.pk,
+                'name': user.get_full_name().strip() or user.username,
+            }
+            for user in self._all_leads
+        ]
 
     def clean(self):
         cleaned = super().clean()

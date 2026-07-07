@@ -1,11 +1,15 @@
 {% extends "base.html" %}
-{% block title %}{% if action == 'review_cancel' or action == 'cancel_request' %}Cancel Request{% else %}{{ action|title }}{% endif %}{% endblock %}
+{% block title %}{% if action == 'review_cancel' or action == 'cancel_request' %}Cancel Request{% elif action == 'review_assign' %}Assign Design Leads{% else %}{{ action|title }}{% endif %}{% endblock %}
 {% block content %}
 <div class="max-w-lg mx-auto">
     {% if action == 'review_cancel' or action == 'cancel_request' %}
     <h1 class="text-xl font-bold text-slate-900 mb-2">Cancel Request</h1>
     <p class="text-sm text-slate-500 mb-6">{{ design.design_number }} · {{ design.project.code }}</p>
     <p class="text-sm text-slate-600 mb-6">This design request will be marked as cancelled. A reason is required.</p>
+    {% elif action == 'review_assign' %}
+    <h1 class="text-xl font-bold text-slate-900 mb-2">Assign Design Leads</h1>
+    <p class="text-sm text-slate-500 mb-6">{{ design.design_number }} · {{ design.project.code }}</p>
+    <p class="text-sm text-slate-600 mb-6">Choose main and sub site design leads. The same person cannot be selected for both roles.</p>
     {% else %}
     <h1 class="text-xl font-bold text-slate-900 mb-2">{{ action|title }}</h1>
     <p class="text-sm text-slate-500 mb-6">{{ design.design_number }} · {{ design.project.code }}</p>
@@ -19,6 +23,52 @@
     <div class="g-card p-6">
         <form method="post"{% if action != 'submit_work' %} enctype="multipart/form-data"{% endif %} class="space-y-4">
             {% csrf_token %}
+
+            {% if action == 'review_assign' %}
+            {{ form.site_engineer_options|json_script:"site-engineer-options" }}
+            <div class="space-y-4"
+                 x-data="reviewLeadAssignForm()"
+                 x-init="init()">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="id_main_design_lead">
+                        Main Design Lead <span class="text-red-600">*</span>
+                    </label>
+                    <select id="id_main_design_lead" name="main_design_lead" class="{{ form.fields.main_design_lead.widget.attrs.class }}"
+                            x-model="mainId" @change="onMainChange()" required>
+                        <option value="">---------</option>
+                        <template x-for="option in mainOptions()" :key="'main-' + option.id">
+                            <option :value="option.id" x-text="option.name"></option>
+                        </template>
+                    </select>
+                    {% if form.main_design_lead.errors %}<p class="text-red-600 text-xs mt-1">{{ form.main_design_lead.errors.0 }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1" for="id_sub_design_lead">
+                        Sub Design Lead
+                    </label>
+                    <select id="id_sub_design_lead" name="sub_design_lead" class="{{ form.fields.sub_design_lead.widget.attrs.class }}"
+                            x-model="subId" @change="onSubChange()">
+                        <option value="">---------</option>
+                        <template x-for="option in subOptions()" :key="'sub-' + option.id">
+                            <option :value="option.id" x-text="option.name"></option>
+                        </template>
+                    </select>
+                    {% if form.sub_design_lead.errors %}<p class="text-red-600 text-xs mt-1">{{ form.sub_design_lead.errors.0 }}</p>{% endif %}
+                </div>
+                {% for field in form %}
+                    {% if field.name != 'main_design_lead' and field.name != 'sub_design_lead' %}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-red-600">*</span>{% endif %}</label>
+                        {{ field }}
+                        {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+                {% if form.non_field_errors %}
+                <p class="text-red-600 text-xs">{{ form.non_field_errors.0 }}</p>
+                {% endif %}
+            </div>
+            {% else %}
             {% for field in form %}
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}{% if field.field.required %} <span class="text-red-600">*</span>{% endif %}</label>
@@ -26,6 +76,8 @@
                 {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
             </div>
             {% endfor %}
+            {% endif %}
+
             <div class="flex gap-3 pt-2">
                 {% if action == 'review_cancel' or action == 'cancel_request' %}
                 <button type="submit" class="g-btn-primary !bg-red-600 hover:!bg-red-700">Cancel Request</button>
@@ -37,4 +89,48 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if action == 'review_assign' %}
+<script>
+function reviewLeadAssignForm() {
+    return {
+        allOptions: [],
+        mainId: '{{ form.main_design_lead.value|default:'' }}',
+        subId: '{{ form.sub_design_lead.value|default:'' }}',
+        init() {
+            const dataEl = document.getElementById('site-engineer-options');
+            this.allOptions = dataEl ? JSON.parse(dataEl.textContent) : [];
+            this.mainId = this.mainId ? String(this.mainId) : '';
+            this.subId = this.subId ? String(this.subId) : '';
+            this.onMainChange(false);
+            this.onSubChange(false);
+        },
+        mainOptions() {
+            if (!this.subId) {
+                return this.allOptions;
+            }
+            return this.allOptions.filter((option) => String(option.id) !== String(this.subId));
+        },
+        subOptions() {
+            if (!this.mainId) {
+                return this.allOptions;
+            }
+            return this.allOptions.filter((option) => String(option.id) !== String(this.mainId));
+        },
+        onMainChange(clearSub = true) {
+            if (clearSub && this.subId && String(this.subId) === String(this.mainId)) {
+                this.subId = '';
+            }
+        },
+        onSubChange(clearMain = true) {
+            if (clearMain && this.mainId && String(this.mainId) === String(this.subId)) {
+                this.mainId = '';
+            }
+        },
+    };
+}
+</script>
+{% endif %}
 {% endblock %}
