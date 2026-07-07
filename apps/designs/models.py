@@ -329,6 +329,21 @@ class DesignRequest(models.Model):
     def cancel_reason_display(self):
         return self.cancel_reason or self.review_cancel_reason
 
+    @property
+    def cancelled_at(self):
+        if self.status != DesignStatus.CANCELLED:
+            return None
+        from apps.designs.lifecycle_timeline import _resolve_cancelled_at
+        return _resolve_cancelled_at(self)
+
+    @property
+    def cancelled_by_display(self):
+        if self.status != DesignStatus.CANCELLED:
+            return ''
+        from apps.designs.lifecycle_timeline import _resolve_cancelled_by
+        info = _resolve_cancelled_by(self)
+        return info['display_name'] if info else ''
+
     def is_site_lead_user(self, user):
         if not user or not user.is_authenticated:
             return False

@@ -104,3 +104,11 @@ def create_design_request(project, user, cleaned_data):
         from apps.workflow.services import start_workflow_stage
         start_workflow_stage(design, DesignStatus.REQUEST_UNDER_REVIEW, group.review_user)
     return design
+
+
+class CancelRequestForm(forms.Form):
+    comments = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4, 'class': TEXTAREA, 'placeholder': 'Reason for cancellation...'}),
+        required=True,
+        label='Cancel Reason',
+    )

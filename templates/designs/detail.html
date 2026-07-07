@@ -62,8 +62,12 @@
                 <div><dt class="text-slate-500">Target Date</dt><dd class="font-medium">{{ design.target_completion_date|date:"d M Y"|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Revisions</dt><dd class="font-medium">{{ design.revision_count }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Message</dt><dd>{{ design.request_message|default:"—" }}</dd></div>
+                {% if design.status == 'cancelled' %}
+                <div><dt class="text-slate-500">Cancelled By</dt><dd class="font-medium">{{ design.cancelled_by_display|default:"—" }}</dd></div>
+                <div><dt class="text-slate-500">Cancelled On</dt><dd class="font-medium">{{ design.cancelled_at|date:"d M Y, h:i A"|default:"—" }}</dd></div>
                 {% if design.cancel_reason_display %}
                 <div class="col-span-2"><dt class="text-slate-500">Cancel Reason</dt><dd class="text-red-700">{{ design.cancel_reason_display }}</dd></div>
+                {% endif %}
                 {% endif %}
             </dl>
         </div>
@@ -317,7 +321,7 @@
                 {% if design.status != 'completed' and design.status != 'cancelled' %}
                 {% if can_cancel_request %}
                 <div class="pt-2 border-t border-slate-100 mt-2">
-                    {% include 'components/cancel_request_modal.html' with action_url=request.path modal_id=design.pk %}
+                    <a href="{% url 'requests:cancel' design.pk %}" class="g-btn-secondary w-full block text-center text-red-600 border-red-200">Cancel Request</a>
                 </div>
                 {% endif %}
                 {% endif %}

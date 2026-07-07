@@ -78,8 +78,8 @@ class WorkflowBugfixTests(TestCase):
 
         self.client.login(username='req', password='pass')
         response = self.client.post(
-            reverse('requests:detail', kwargs={'pk': self.design.pk}),
-            {'action': 'cancel_request'},
+            reverse('requests:cancel', kwargs={'pk': self.design.pk}),
+            {'comments': 'Too late'},
         )
         self.assertEqual(response.status_code, 302)
         self.design.refresh_from_db()

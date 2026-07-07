@@ -50,6 +50,7 @@
               x-data="{
                   priority: '{{ form.priority.value|default:'medium' }}',
                   drawingType: '{{ form.drawing_type.value|default:'' }}',
+                  drawingTypeLabel: '{% if form.drawing_type.value %}{% for dt in form.fields.drawing_type.queryset %}{% if form.drawing_type.value|stringformat:"s" == dt.pk|stringformat:"s" %}{{ dt.name|escapejs }}{% endif %}{% endfor %}{% endif %}',
                   selectedSystems: [{% if form.systems.value %}{% for v in form.systems.value %}'{{ v }}'{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}],
                   toggleSystem(id) {
                       id = String(id);
@@ -130,31 +131,39 @@
 
             {# —— Drawing Type —— #}
             <section class="space-y-4 pt-2 border-t border-slate-100">
-                <div>
-                    <h3 class="text-sm font-semibold text-slate-900">Drawing Type <span class="text-red-500">*</span></h3>
-                    <p class="text-xs text-slate-500 mt-1">Select the type of drawing package required for this request.</p>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-900">Drawing Type <span class="text-red-500">*</span></h3>
+                        <p class="text-xs text-slate-500 mt-1">Select the type of drawing package required for this request.</p>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border transition-colors"
+                          :class="drawingType ? 'bg-primary/10 text-primary border-primary/20' : 'bg-slate-100 text-slate-500 border-slate-200'">
+                        <i data-lucide="file-pen" class="w-3.5 h-3.5"></i>
+                        <span x-text="drawingTypeLabel || 'None selected'"></span>
+                    </span>
                 </div>
 
                 {% if form.fields.drawing_type.queryset %}
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {% for dt in form.fields.drawing_type.queryset %}
-                    <label class="group relative flex flex-col gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 min-h-[88px]"
+                    <label class="group relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-150"
                            :class="drawingType === '{{ dt.pk }}'
                                ? 'border-primary bg-primary/[0.04] shadow-sm ring-1 ring-primary/10'
                                : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'">
                         <input type="radio" name="drawing_type" value="{{ dt.pk }}" class="sr-only"
                                {% if form.drawing_type.value|stringformat:"s" == dt.pk|stringformat:"s" %}checked{% endif %}
-                               @change="drawingType = '{{ dt.pk }}'">
-                        <div class="flex items-start justify-between gap-2">
-                            <span class="text-sm font-semibold transition-colors"
-                                  :class="drawingType === '{{ dt.pk }}' ? 'text-primary' : 'text-slate-800'">{{ dt.name }}</span>
-                            <span class="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md"
-                                  :class="drawingType === '{{ dt.pk }}' ? 'bg-primary/15 text-primary' : 'bg-slate-100 text-slate-500'">{{ dt.code_prefix }}</span>
-                        </div>
-                        <span class="text-xs text-slate-500 flex items-center gap-1.5">
-                            <i data-lucide="clock" class="w-3 h-3"></i>
-                            {{ dt.allowed_duration_label }} allowed
+                               @change="drawingType = '{{ dt.pk }}'; drawingTypeLabel = '{{ dt.name|escapejs }}'">
+                        <span class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors"
+                              :class="drawingType === '{{ dt.pk }}' ? 'border-primary' : 'border-slate-300 bg-white group-hover:border-slate-400'">
+                            <span class="w-2.5 h-2.5 rounded-full bg-primary transition-transform"
+                                  :class="drawingType === '{{ dt.pk }}' ? 'scale-100' : 'scale-0'"></span>
                         </span>
+                        <span class="flex-1 min-w-0">
+                            <span class="block text-sm font-medium truncate transition-colors"
+                                  :class="drawingType === '{{ dt.pk }}' ? 'text-primary' : 'text-slate-800'">{{ dt.name }}</span>
+                        </span>
+                        <span class="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md"
+                              :class="drawingType === '{{ dt.pk }}' ? 'bg-primary/15 text-primary' : 'bg-slate-100 text-slate-500'">{{ dt.code_prefix }}</span>
                     </label>
                     {% endfor %}
                 </div>

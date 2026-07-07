@@ -1,9 +1,15 @@
 {% extends "base.html" %}
-{% block title %}{{ action|title }}{% endblock %}
+{% block title %}{% if action == 'review_cancel' or action == 'cancel_request' %}Cancel Request{% else %}{{ action|title }}{% endif %}{% endblock %}
 {% block content %}
 <div class="max-w-lg mx-auto">
+    {% if action == 'review_cancel' or action == 'cancel_request' %}
+    <h1 class="text-xl font-bold text-slate-900 mb-2">Cancel Request</h1>
+    <p class="text-sm text-slate-500 mb-6">{{ design.design_number }} · {{ design.project.code }}</p>
+    <p class="text-sm text-slate-600 mb-6">This design request will be marked as cancelled. A reason is required.</p>
+    {% else %}
     <h1 class="text-xl font-bold text-slate-900 mb-2">{{ action|title }}</h1>
     <p class="text-sm text-slate-500 mb-6">{{ design.design_number }} · {{ design.project.code }}</p>
+    {% endif %}
     {% if action == 'submit_work' or action == 'resubmit' %}
     {% if action == 'submit_work' and file_sharing_policy %}
     <div class="mb-4 p-4 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-900">{{ file_sharing_policy }}</div>
@@ -15,13 +21,18 @@
             {% csrf_token %}
             {% for field in form %}
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+                <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}{% if field.field.required %} <span class="text-red-600">*</span>{% endif %}</label>
                 {{ field }}
+                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
             </div>
             {% endfor %}
             <div class="flex gap-3 pt-2">
+                {% if action == 'review_cancel' or action == 'cancel_request' %}
+                <button type="submit" class="g-btn-primary !bg-red-600 hover:!bg-red-700">Cancel Request</button>
+                {% else %}
                 <button type="submit" class="g-btn-primary">Submit</button>
-                <a href="{% url 'requests:detail' design.pk %}" class="g-btn-secondary">Cancel</a>
+                {% endif %}
+                <a href="{% url 'requests:detail' design.pk %}" class="g-btn-secondary">Back</a>
             </div>
         </form>
     </div>

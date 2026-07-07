@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from apps.permissions.decorators import require_global_permission
 from apps.permissions.services import PermissionService
 from apps.accounts.models import User, UserRole
+from apps.designs.forms import CancelRequestForm
 from apps.designs.models import DesignRequest, DesignStatus
 
 from django.utils import timezone
@@ -111,14 +112,6 @@ class ReviewLeadAssignForm(forms.Form):
         if main_lead and sub_lead and main_lead.pk == sub_lead.pk:
             raise forms.ValidationError('Main and Sub Design Lead cannot be the same user.')
         return cleaned
-
-
-class ReviewCancelForm(forms.Form):
-    comments = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 4, 'class': INPUT, 'placeholder': 'Reason for cancellation...'}),
-        required=True,
-        label='Cancel Reason',
-    )
 
 
 class SendToVerificationForm(forms.Form):
@@ -264,7 +257,7 @@ def workflow_action(request, pk, action):
         'compliance_approved': CommentForm,
         'submit_engineer_review': EngineerSubmitForm,
         'review_assign': lambda **kw: ReviewLeadAssignForm(design=design, **kw),
-        'review_cancel': ReviewCancelForm,
+        'review_cancel': CancelRequestForm,
     }
 
     if request.method == 'GET' and action in form_actions:
@@ -349,7 +342,7 @@ def workflow_action(request, pk, action):
                 kwargs = form.cleaned_data
                 _warn_if_past_target(request, design, kwargs.get('due_date'))
             elif action == 'review_cancel':
-                form = ReviewCancelForm(request.POST)
+                form = CancelRequestForm(request.POST)
                 if not form.is_valid():
                     return render(request, 'workflow/action_form.html', {
                         'design': design, 'action': action, 'form': form,

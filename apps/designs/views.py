@@ -26,7 +26,7 @@ from apps.core.my_tasks_helpers import (
 from apps.core.utils import log_activity
 from apps.projects.models import Project
 
-from .forms import DesignRequestForm, create_design_request
+from .forms import CancelRequestForm, DesignRequestForm, create_design_request
 from .models import DesignComment, DesignRequest, DesignStatus, DrawingType
 from .utils import create_design_comment
 
@@ -58,35 +58,6 @@ def design_detail(request, pk):
                 comments = design.comments.select_related('author').prefetch_related('mentions')
                 return render(request, 'designs/partials/comments.html', {'comments': comments})
             messages.success(request, 'Comment posted.')
-        return redirect('requests:detail', pk=pk)
-
-    if request.method == 'POST' and request.POST.get('action') == 'cancel_request':
-        from apps.workflow.permissions import requester_can_cancel_design
-        from apps.workflow.services import WorkflowError, cancel_design_request_by_requester
-
-        is_admin = PermissionService.has_global_permission(request.user, 'PERM_ADMIN_PANEL')
-        reason = request.POST.get('cancel_reason', '').strip()
-        if not reason:
-            messages.error(request, 'Cancel reason is required.')
-            return redirect('requests:detail', pk=pk)
-        if not is_admin and not requester_can_cancel_design(request.user, design):
-            if design.requested_by_id != request.user.pk:
-                messages.error(request, 'You do not have permission to cancel this request.')
-            else:
-                messages.error(
-                    request,
-                    'This request has already been acknowledged and cannot be cancelled.',
-                )
-            return redirect('requests:detail', pk=pk)
-        if design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
-            try:
-                cancel_design_request_by_requester(
-                    design, request.user, reason=reason, request=request,
-                )
-            except WorkflowError as exc:
-                messages.error(request, str(exc))
-                return redirect('requests:detail', pk=pk)
-            messages.success(request, 'Design request cancelled.')
         return redirect('requests:detail', pk=pk)
 
     from apps.core.models import ActivityLog, CompanySettings
@@ -131,6 +102,58 @@ def design_detail(request, pk):
         'progress_cancelled': progress_cancelled,
         'can_view_reports': can_view_reports,
         **action_flags,
+    })
+
+
+@login_required
+def cancel_design_request(request, pk):
+    design = get_object_or_404(
+        DesignRequest.objects.select_related('project', 'requested_by'),
+        pk=pk,
+    )
+    if not PermissionService.filter_design_requests(request.user).filter(pk=design.pk).exists():
+        messages.error(request, 'You do not have access to this design request.')
+        return redirect('requests:list')
+
+    from apps.workflow.permissions import requester_can_cancel_design
+    from apps.workflow.services import WorkflowError, cancel_design_request_by_requester
+
+    is_admin = PermissionService.has_global_permission(request.user, 'PERM_ADMIN_PANEL')
+    if not is_admin and not requester_can_cancel_design(request.user, design):
+        if design.requested_by_id != request.user.pk:
+            messages.error(request, 'You do not have permission to cancel this request.')
+        else:
+            messages.error(
+                request,
+                'This request has already been acknowledged and cannot be cancelled.',
+            )
+        return redirect('requests:detail', pk=pk)
+
+    if design.status in (DesignStatus.COMPLETED, DesignStatus.CANCELLED):
+        messages.error(request, 'This request is already closed.')
+        return redirect('requests:detail', pk=pk)
+
+    if request.method == 'POST':
+        form = CancelRequestForm(request.POST)
+        if form.is_valid():
+            try:
+                cancel_design_request_by_requester(
+                    design,
+                    request.user,
+                    reason=form.cleaned_data['comments'],
+                    request=request,
+                )
+                messages.success(request, 'Design request cancelled.')
+                return redirect('requests:detail', pk=pk)
+            except WorkflowError as exc:
+                messages.error(request, str(exc))
+    else:
+        form = CancelRequestForm()
+
+    return render(request, 'workflow/action_form.html', {
+        'design': design,
+        'action': 'cancel_request',
+        'form': form,
     })
 
 

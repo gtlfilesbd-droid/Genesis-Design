@@ -216,8 +216,8 @@ class RequestUnderReviewWorkflowTests(TestCase):
 
         self.client.login(username='req', password='pass')
         response = self.client.post(
-            reverse('requests:detail', kwargs={'pk': design.pk}),
-            {'action': 'cancel_request', 'cancel_reason': 'Submitted by mistake'},
+            reverse('requests:cancel', kwargs={'pk': design.pk}),
+            {'comments': 'Submitted by mistake'},
         )
         self.assertEqual(response.status_code, 302)
         design.refresh_from_db()
@@ -244,10 +244,10 @@ class RequestUnderReviewWorkflowTests(TestCase):
         design = self._create_request()
         self.client.login(username='req', password='pass')
         response = self.client.post(
-            reverse('requests:detail', kwargs={'pk': design.pk}),
-            {'action': 'cancel_request', 'cancel_reason': '   '},
+            reverse('requests:cancel', kwargs={'pk': design.pk}),
+            {'comments': '   '},
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
         design.refresh_from_db()
         self.assertEqual(design.status, DesignStatus.REQUEST_UNDER_REVIEW)
 
@@ -262,8 +262,8 @@ class RequestUnderReviewWorkflowTests(TestCase):
 
         self.client.login(username='req', password='pass')
         response = self.client.post(
-            reverse('requests:detail', kwargs={'pk': design.pk}),
-            {'action': 'cancel_request'},
+            reverse('requests:cancel', kwargs={'pk': design.pk}),
+            {'comments': 'Should not work'},
         )
         self.assertEqual(response.status_code, 302)
         design.refresh_from_db()
