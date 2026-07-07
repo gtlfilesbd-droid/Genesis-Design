@@ -26,7 +26,10 @@
             Deadline: {{ design.get_deadline_status_display }}
         </span>
     </div>
-    <p class="text-sm text-slate-500 mt-1">{{ design.drawing_type.name }} · {{ design.project.code }}</p>
+    <p class="text-sm text-slate-500 mt-1">
+        {{ design.drawing_type.name }} · {{ design.project.code }}
+        {% if design.system_names_display %} · {{ design.system_names_display }}{% endif %}
+    </p>
 </div>
 
 <div class="g-card p-6 mb-6 overflow-x-auto">
@@ -58,6 +61,9 @@
                 <div><dt class="text-slate-500">Target Date</dt><dd class="font-medium">{{ design.target_completion_date|date:"d M Y"|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Revisions</dt><dd class="font-medium">{{ design.revision_count }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Message</dt><dd>{{ design.request_message|default:"—" }}</dd></div>
+                {% if design.review_cancel_reason %}
+                <div class="col-span-2"><dt class="text-slate-500">Cancel Reason</dt><dd class="text-red-700">{{ design.review_cancel_reason }}</dd></div>
+                {% endif %}
             </dl>
         </div>
 
@@ -73,12 +79,19 @@
             </dl>
         </div>
 
-        {% if design.assigned_site_engineer %}
+        {% if design.main_design_lead or design.assigned_site_engineer %}
         <div class="g-card p-6">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-4">Site Design Lead</h2>
             <dl class="grid grid-cols-2 gap-4 text-sm">
+                {% if design.main_design_lead %}
+                <div><dt class="text-slate-500">Main Design Lead</dt><dd class="font-medium">{{ design.main_design_lead }}</dd></div>
+                {% if design.sub_design_lead %}
+                <div><dt class="text-slate-500">Sub Design Lead</dt><dd class="font-medium">{{ design.sub_design_lead }}</dd></div>
+                {% endif %}
+                {% else %}
                 <div><dt class="text-slate-500">Assigned To</dt><dd class="font-medium">{{ design.assigned_site_engineer }}</dd></div>
-                <div><dt class="text-slate-500">Assigned By</dt><dd class="font-medium">{{ design.requested_by|default:"—" }}</dd></div>
+                {% endif %}
+                <div><dt class="text-slate-500">Assigned By</dt><dd class="font-medium">{{ design.assigned_review_user|default:design.requested_by|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Due Date</dt><dd class="font-medium {% if design.is_engineer_work_overdue %}text-red-600{% endif %}">{{ design.engineer_due_date|date:"d M Y, h:i A"|default:"—" }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Instructions</dt><dd>{{ design.engineer_instructions|default:"—" }}</dd></div>
                 {% if design.engineer_site_notes %}
@@ -214,6 +227,15 @@
         <div class="g-card p-6 border-2 border-primary/20">
             <h2 class="text-xs font-semibold uppercase tracking-wide text-primary mb-4">Your Actions</h2>
             <div class="space-y-2">
+                {% if design.status == 'request_under_review' and can_review_acknowledge %}
+                <form method="post" action="{% url 'workflow:action' design.pk 'review_acknowledge' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge</button></form>
+                {% endif %}
+                {% if design.status == 'request_under_review' and can_review_assign %}
+                <a href="{% url 'workflow:action' design.pk 'review_assign' %}" class="g-btn-primary w-full block text-center">Assign Design Leads</a>
+                {% endif %}
+                {% if design.status == 'request_under_review' and can_review_cancel %}
+                <a href="{% url 'workflow:action' design.pk 'review_cancel' %}" class="g-btn-secondary w-full block text-center mt-2">Cancel Request</a>
+                {% endif %}
                 {% if design.status == 'engineer_pending_acknowledgement' and can_acknowledge_engineer %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'acknowledge_engineer' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge Site Assignment</button></form>
                 {% endif %}

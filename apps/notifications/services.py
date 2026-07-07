@@ -13,10 +13,15 @@ from apps.core.notification_messages import (
     design_accepted_message,
     design_approved_message,
     design_completed_message,
+    design_leads_assigned_message,
+    design_leads_assigned_requester_message,
     designer_assigned_message,
     designer_assigned_requester_message,
     hod_fast_complete_message,
     request_created_message,
+    request_review_acknowledged_message,
+    request_review_cancelled_message,
+    request_sent_for_review_message,
     sent_to_compliance_message,
     sent_to_compliance_requester_message,
     sent_to_verification_message,
@@ -123,6 +128,69 @@ class NotificationService:
         message = request_created_message(design_request)
         NotificationService._notify_many(
             users, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_request_sent_for_review(design_request):
+        if not design_request.assigned_review_user_id:
+            return
+        title = f'Review Required: {design_request.design_number}'
+        message = request_sent_for_review_message(design_request)
+        NotificationService.notify(
+            design_request.assigned_review_user,
+            NotificationType.WORKFLOW,
+            title,
+            message,
+            related_request=design_request,
+        )
+
+    @staticmethod
+    def on_request_review_acknowledged(design_request, actor):
+        recipients = NotificationService._merge_recipients(
+            NotificationService._requester_side_recipients(design_request),
+            exclude=actor,
+        )
+        title = f'Request Acknowledged: {design_request.design_number}'
+        message = request_review_acknowledged_message(
+            design_request, actor.get_full_name() or actor.username,
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_request_review_cancelled(design_request):
+        recipients = NotificationService._requester_side_recipients(design_request)
+        title = f'Request Cancelled: {design_request.design_number}'
+        message = request_review_cancelled_message(
+            design_request, design_request.review_cancel_reason or 'No reason provided',
+        )
+        NotificationService._notify_many(
+            recipients, NotificationType.WORKFLOW, title, message, design_request,
+        )
+
+    @staticmethod
+    def on_design_leads_assigned(design_request):
+        recipients = []
+        if design_request.main_design_lead_id:
+            recipients.append(design_request.main_design_lead)
+        if design_request.sub_design_lead_id:
+            recipients.append(design_request.sub_design_lead)
+        for lead in recipients:
+            is_sub = design_request.sub_design_lead_id == lead.pk
+            title = f'Site Design Lead Assignment: {design_request.design_number}'
+            message = design_leads_assigned_message(design_request, is_sub=is_sub)
+            NotificationService.notify(
+                lead, NotificationType.WORKFLOW, title, message, related_request=design_request,
+            )
+        requester_title = f'Site Design Leads Assigned: {design_request.design_number}'
+        requester_message = design_leads_assigned_requester_message(design_request)
+        NotificationService._notify_many(
+            NotificationService._requester_side_recipients(design_request),
+            NotificationType.WORKFLOW,
+            requester_title,
+            requester_message,
+            design_request,
         )
 
     @staticmethod
@@ -474,6 +542,9 @@ def notify_workflow_transition(design, action, actor):
         'requested_by',
         'assigned_designer',
         'assigned_site_engineer',
+        'main_design_lead',
+        'sub_design_lead',
+        'assigned_review_user',
         'project',
         'project__created_by',
         'assigned_verifier',
@@ -483,6 +554,9 @@ def notify_workflow_transition(design, action, actor):
 
     handlers = {
         'submit_request': NotificationService.on_request_created,
+        'review_acknowledge': NotificationService.on_request_review_acknowledged,
+        'review_assign': NotificationService.on_design_leads_assigned,
+        'review_cancel': NotificationService.on_request_review_cancelled,
         'acknowledge': NotificationService.on_request_acknowledged,
         'acknowledge_engineer': NotificationService.on_engineer_acknowledged,
         'submit_engineer_review': NotificationService.on_engineer_submitted,
@@ -508,7 +582,7 @@ def notify_workflow_transition(design, action, actor):
     if handler:
         if action in (
             'accept_assignment', 'accept_verification', 'accept_compliance',
-            'acknowledge_engineer',
+            'acknowledge_engineer', 'review_acknowledge',
         ):
             handler(design, actor)
         else:

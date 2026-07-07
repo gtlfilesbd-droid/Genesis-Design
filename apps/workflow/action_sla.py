@@ -14,6 +14,7 @@ from apps.designs.models import (
 from apps.workflow.deadline_utils import add_allowed_duration, get_deadline_config
 
 ACTION_SLA_CONFIG = {
+    DesignStatus.REQUEST_UNDER_REVIEW: 'action_acknowledge',
     DesignStatus.ENGINEER_PENDING_ACK: 'action_engineer_acknowledge',
     DesignStatus.NEW_REQUEST: 'action_acknowledge',
     DesignStatus.ACKNOWLEDGED: 'action_assign_designer',
@@ -43,6 +44,7 @@ HOD_ACTION_STATUSES = frozenset({
 })
 
 ACTION_DUE_LABELS = {
+    DesignStatus.REQUEST_UNDER_REVIEW: 'Review due',
     DesignStatus.ENGINEER_PENDING_ACK: 'Ack due',
     DesignStatus.NEW_REQUEST: 'Ack due',
     DesignStatus.ACKNOWLEDGED: 'Assign due',
@@ -104,6 +106,8 @@ def _compliance_approved_at(design):
 
 def get_action_anchor(design):
     status = design.status
+    if status == DesignStatus.REQUEST_UNDER_REVIEW:
+        return design.created_at
     if status == DesignStatus.ENGINEER_PENDING_ACK:
         return design.engineer_assigned_at or design.created_at
     if status == DesignStatus.NEW_REQUEST:
@@ -172,11 +176,17 @@ def _compliance_is_responsible(design, user):
 
 
 def _engineer_is_responsible(design, user):
-    return design.assigned_site_engineer_id == user.pk
+    return design.is_site_lead_user(user)
+
+
+def _reviewer_is_responsible(design, user):
+    return design.assigned_review_user_id == user.pk
 
 
 def is_action_responsible_user(design, user):
     status = design.status
+    if status == DesignStatus.REQUEST_UNDER_REVIEW:
+        return _reviewer_is_responsible(design, user)
     if status in HOD_ACTION_STATUSES:
         return _hod_is_responsible(design, user)
     if status == DesignStatus.ENGINEER_PENDING_ACK:

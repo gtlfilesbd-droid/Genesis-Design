@@ -335,7 +335,7 @@ def get_site_engineer_tasks(user, now):
     if not PermissionService.is_site_engineer(user):
         return []
     active = DesignRequest.objects.filter(
-        assigned_site_engineer=user,
+        Q(assigned_site_engineer=user) | Q(main_design_lead=user) | Q(sub_design_lead=user),
         status__in=SITE_ENGINEER_ACTIVE_STATUSES,
     ).select_related('project', 'drawing_type', 'requested_by').order_by(
         Case(

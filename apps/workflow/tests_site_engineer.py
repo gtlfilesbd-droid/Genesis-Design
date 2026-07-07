@@ -5,7 +5,6 @@ from django.utils import timezone
 
 from apps.accounts.models import User, UserRole
 from apps.core.models import UserExtraPermission
-from apps.designs.forms import create_design_request
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.permissions.services import PermissionService
 from apps.projects.models import Project
@@ -34,32 +33,36 @@ class SiteEngineerWorkflowTests(TestCase):
         )
         self.due = timezone.now() + timedelta(days=5)
 
-    def _create_via_form(self):
-        return create_design_request(self.project, self.requester, {
-            'drawing_type': self.drawing_type,
-            'priority': 'medium',
-            'target_completion_date': None,
-            'request_message': 'Need site check',
-            'reference_design': None,
-            'assigned_site_engineer': self.engineer,
-            'engineer_due_date': self.due,
-            'engineer_instructions': 'Measure all rooms',
-        })
+    def _create_legacy_engineer_request(self):
+        """Legacy requests that bypass the under-review stage."""
+        return DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            priority='medium',
+            request_message='Need site check',
+            requested_by=self.requester,
+            assigned_site_engineer=self.engineer,
+            engineer_due_date=self.due,
+            engineer_instructions='Measure all rooms',
+            engineer_assigned_at=timezone.now(),
+            status=DesignStatus.ENGINEER_PENDING_ACK,
+            current_holder=self.engineer,
+        )
 
     def test_get_site_engineers_excludes_admin_hod_designer(self):
         qs = PermissionService.get_site_engineers()
         self.assertIn(self.engineer, qs)
         self.assertNotIn(self.hod, qs)
 
-    def test_create_assigns_engineer_pending_ack(self):
-        design = self._create_via_form()
+    def test_legacy_create_assigns_engineer_pending_ack(self):
+        design = self._create_legacy_engineer_request()
         self.assertEqual(design.status, DesignStatus.ENGINEER_PENDING_ACK)
         self.assertEqual(design.assigned_site_engineer, self.engineer)
         self.assertEqual(design.current_holder, self.engineer)
         self.assertEqual(design.engineer_due_date, self.due)
 
     def test_full_engineer_to_hod_path(self):
-        design = self._create_via_form()
+        design = self._create_legacy_engineer_request()
         transition(design, 'acknowledge_engineer', self.engineer)
         design.refresh_from_db()
         self.assertEqual(design.status, DesignStatus.ENGINEER_IN_PROGRESS)
@@ -79,26 +82,26 @@ class SiteEngineerWorkflowTests(TestCase):
         self.assertEqual(design.status, DesignStatus.ACKNOWLEDGED)
 
     def test_submit_requires_notes(self):
-        design = self._create_via_form()
+        design = self._create_legacy_engineer_request()
         transition(design, 'acknowledge_engineer', self.engineer)
         with self.assertRaises(WorkflowError):
             transition(design, 'submit_engineer_review', self.engineer, comments='   ')
 
     def test_engineer_participation_visibility(self):
-        design = self._create_via_form()
+        design = self._create_legacy_engineer_request()
         visible = PermissionService.filter_design_requests(
             self.engineer, DesignRequest.objects.all(),
         )
         self.assertIn(design, visible)
 
     def test_ack_overdue_for_engineer(self):
-        design = self._create_via_form()
+        design = self._create_legacy_engineer_request()
         design.engineer_assigned_at = timezone.now() - timedelta(days=3)
         design.save(update_fields=['engineer_assigned_at'])
         self.assertTrue(is_action_overdue_for_user(design, self.engineer))
 
     def test_work_overdue_property(self):
-        design = self._create_via_form()
+        design = self._create_legacy_engineer_request()
         design.engineer_due_date = timezone.now() - timedelta(hours=1)
         design.save(update_fields=['engineer_due_date'])
         self.assertTrue(design.is_engineer_work_overdue)

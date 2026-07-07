@@ -2,41 +2,29 @@ from django import forms
 from django.db import transaction
 from django.utils import timezone
 
-from apps.core.workflow_labels import (
-    SITE_DESIGN_LEAD_BY_LABEL,
-    SITE_DESIGN_SUBMIT_DUE_DATE_LABEL,
-)
 from apps.permissions.services import PermissionService
-from apps.workflow.deadline_utils import add_allowed_duration, get_deadline_config
+from apps.systems.models import SystemName
+from apps.systems.services import resolve_group_for_systems
 
 from .models import DesignRequest, DesignStatus, DrawingType
 
 
 INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+MULTI_SELECT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]'
 
 
 class DesignRequestForm(forms.ModelForm):
-    assigned_site_engineer = forms.ModelChoiceField(
-        queryset=PermissionService.get_site_engineers(),
-        widget=forms.Select(attrs={'class': INPUT}),
-        label=SITE_DESIGN_LEAD_BY_LABEL,
+    systems = forms.ModelMultipleChoiceField(
+        queryset=SystemName.objects.filter(is_active=True),
+        widget=forms.SelectMultiple(attrs={'class': MULTI_SELECT}),
+        label='System Name',
         required=True,
-    )
-    engineer_due_date = forms.DateTimeField(
-        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': INPUT}),
-        required=True,
-        label=SITE_DESIGN_SUBMIT_DUE_DATE_LABEL,
-    )
-    engineer_instructions = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
-        required=False,
-        label='Instructions for Engineer',
     )
 
     class Meta:
         model = DesignRequest
         fields = [
-            'drawing_type', 'priority', 'target_completion_date',
+            'systems', 'drawing_type', 'priority', 'target_completion_date',
             'request_message', 'reference_design',
         ]
         widgets = {
@@ -51,50 +39,44 @@ class DesignRequestForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.project = project
         self.fields['drawing_type'].queryset = DrawingType.objects.filter(is_active=True)
-        self.fields['assigned_site_engineer'].queryset = PermissionService.get_site_engineers()
+        self.fields['systems'].queryset = SystemName.objects.filter(is_active=True)
+        self.fields['target_completion_date'].required = True
         if project:
             self.fields['reference_design'].queryset = DesignRequest.objects.filter(
                 project=project,
                 status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
             )
         self.fields['reference_design'].required = False
-        if not self.is_bound and 'engineer_due_date' not in self.initial:
-            drawing_type = None
-            if self.data.get('drawing_type'):
-                drawing_type = DrawingType.objects.filter(pk=self.data.get('drawing_type')).first()
-            elif self.initial.get('drawing_type'):
-                drawing_type = self.initial['drawing_type']
-            if drawing_type:
-                config = get_deadline_config()
-                due = add_allowed_duration(
-                    timezone.now(),
-                    drawing_type.allowed_days,
-                    drawing_type.allowed_hours,
-                    count_weekends=config.count_weekends,
-                )
-                self.fields['engineer_due_date'].initial = timezone.localtime(due).strftime(
-                    '%Y-%m-%dT%H:%M'
-                )
+
+    def clean_systems(self):
+        systems = self.cleaned_data.get('systems')
+        if not systems:
+            raise forms.ValidationError('At least one system must be selected.')
+        try:
+            self.resolved_group = resolve_group_for_systems(systems)
+        except Exception as exc:
+            raise forms.ValidationError(str(exc)) from exc
+        return systems
 
 
 def create_design_request(project, user, cleaned_data):
-    now = timezone.now()
-    engineer = cleaned_data['assigned_site_engineer']
+    systems = list(cleaned_data['systems'])
+    group = resolve_group_for_systems(systems)
     with transaction.atomic():
         design = DesignRequest(
             project=project,
             drawing_type=cleaned_data['drawing_type'],
             priority=cleaned_data['priority'],
-            target_completion_date=cleaned_data.get('target_completion_date'),
+            target_completion_date=cleaned_data['target_completion_date'],
             request_message=cleaned_data.get('request_message', ''),
             reference_design=cleaned_data.get('reference_design'),
             requested_by=user,
-            assigned_site_engineer=engineer,
-            engineer_due_date=cleaned_data['engineer_due_date'],
-            engineer_instructions=cleaned_data.get('engineer_instructions', ''),
-            engineer_assigned_at=now,
-            status=DesignStatus.ENGINEER_PENDING_ACK,
-            current_holder=engineer,
+            status=DesignStatus.REQUEST_UNDER_REVIEW,
+            assigned_review_user=group.review_user,
+            current_holder=group.review_user,
         )
         design.save()
+        design.systems.set(systems)
+        from apps.workflow.services import start_workflow_stage
+        start_workflow_stage(design, DesignStatus.REQUEST_UNDER_REVIEW, group.review_user)
     return design

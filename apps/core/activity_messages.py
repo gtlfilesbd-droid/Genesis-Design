@@ -55,6 +55,9 @@ ACTIVITY_TITLES = {
     'cancelled': 'Design request cancelled',
     'acknowledge_engineer': 'Site design lead acknowledged',
     'submit_engineer_review': 'Site review submitted',
+    'review_acknowledge': 'Request review acknowledged',
+    'review_assign': 'Design leads assigned',
+    'review_cancel': 'Design request cancelled',
     'comment_added': 'Comment added',
     'project_created': 'Project created',
     'project_updated': 'Project updated',
@@ -87,6 +90,26 @@ def build_workflow_activity_description(
 
     if action == 'submit_engineer_review':
         return f'{actor} submitted site review notes for Head of Design review'
+
+    if action == 'review_acknowledge':
+        return f'{actor} acknowledged the design request for review'
+
+    if action == 'review_assign':
+        main_lead = kwargs.get('main_design_lead') or design.main_design_lead
+        sub_lead = kwargs.get('sub_design_lead') or design.sub_design_lead
+        main_name = _person_name(main_lead)
+        due_date = _format_due_date(kwargs.get('due_date') or design.engineer_due_date)
+        if sub_lead:
+            sub_name = _person_name(sub_lead)
+            return (
+                f'{actor} assigned {main_name} (main) and {sub_name} (sub) as site design leads '
+                f'· Due {due_date}'
+            )
+        return f'{actor} assigned {main_name} as main site design lead · Due {due_date}'
+
+    if action == 'review_cancel':
+        comment = comments or 'No reason provided'
+        return f'{actor} cancelled this design request: "{comment}"'
 
     if action == 'assign':
         designer = kwargs.get('designer') or design.assigned_designer

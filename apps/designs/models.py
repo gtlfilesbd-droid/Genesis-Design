@@ -36,6 +36,7 @@ class DesignPriority(models.TextChoices):
 
 class DesignStatus(models.TextChoices):
     DRAFT = 'draft', 'Draft Request'
+    REQUEST_UNDER_REVIEW = 'request_under_review', 'Request Under Review'
     ENGINEER_PENDING_ACK = 'engineer_pending_acknowledgement', 'Engineer Pending Acknowledgement'
     ENGINEER_IN_PROGRESS = 'engineer_in_progress', 'Engineer In Progress'
     NEW_REQUEST = 'new_request', 'New Request'
@@ -76,6 +77,7 @@ class PrimaryStatus(models.TextChoices):
 
 PRIMARY_STATUS_MAP = {
     DesignStatus.DRAFT: PrimaryStatus.NEW,
+    DesignStatus.REQUEST_UNDER_REVIEW: PrimaryStatus.NEW,
     DesignStatus.ENGINEER_PENDING_ACK: PrimaryStatus.NEW,
     DesignStatus.ENGINEER_IN_PROGRESS: PrimaryStatus.NEW,
     DesignStatus.NEW_REQUEST: PrimaryStatus.NEW,
@@ -170,6 +172,35 @@ class DesignRequest(models.Model):
         null=True,
         blank=True,
         related_name='compliance_assignments',
+    )
+    systems = models.ManyToManyField(
+        'systems.SystemName',
+        related_name='design_requests',
+        blank=True,
+    )
+    assigned_review_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='review_assigned_designs',
+    )
+    review_acknowledged_at = models.DateTimeField(null=True, blank=True)
+    review_cancel_reason = models.TextField(blank=True)
+    review_cancelled_at = models.DateTimeField(null=True, blank=True)
+    main_design_lead = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='main_design_lead_assignments',
+    )
+    sub_design_lead = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sub_design_lead_assignments',
     )
     assigned_site_engineer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -287,6 +318,31 @@ class DesignRequest(models.Model):
         ):
             return False
         return timezone.now() > self.engineer_due_date
+
+    @property
+    def system_names_display(self):
+        names = list(self.systems.values_list('name', flat=True))
+        return ', '.join(names) if names else ''
+
+    def is_site_lead_user(self, user):
+        if not user or not user.is_authenticated:
+            return False
+        user_pk = user.pk
+        if self.main_design_lead_id or self.sub_design_lead_id:
+            return user_pk in (self.main_design_lead_id, self.sub_design_lead_id)
+        return self.assigned_site_engineer_id == user_pk
+
+    def site_lead_users(self):
+        if self.main_design_lead_id or self.sub_design_lead_id:
+            users = []
+            if self.main_design_lead_id:
+                users.append(self.main_design_lead)
+            if self.sub_design_lead_id:
+                users.append(self.sub_design_lead)
+            return users
+        if self.assigned_site_engineer_id:
+            return [self.assigned_site_engineer]
+        return []
 
     @property
     def verification_status(self):

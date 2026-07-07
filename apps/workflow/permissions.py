@@ -93,17 +93,31 @@ def design_action_flags(user, design) -> dict:
         ),
         'can_acknowledge_engineer': (
             design.status == DesignStatus.ENGINEER_PENDING_ACK
-            and design.assigned_site_engineer_id == user.pk
+            and design.is_site_lead_user(user)
             and PermissionService.has_project_permission(
                 user, project, 'DESIGN_PERM_SITE_ENGINEER',
             )
         ),
         'can_submit_engineer_review': (
             design.status == DesignStatus.ENGINEER_IN_PROGRESS
-            and design.assigned_site_engineer_id == user.pk
+            and design.is_site_lead_user(user)
             and PermissionService.has_project_permission(
                 user, project, 'DESIGN_PERM_SITE_ENGINEER',
             )
+        ),
+        'can_review_acknowledge': (
+            design.status == DesignStatus.REQUEST_UNDER_REVIEW
+            and design.assigned_review_user_id == user.pk
+            and not design.review_acknowledged_at
+        ),
+        'can_review_assign': (
+            design.status == DesignStatus.REQUEST_UNDER_REVIEW
+            and design.assigned_review_user_id == user.pk
+            and design.review_acknowledged_at
+        ),
+        'can_review_cancel': (
+            design.status == DesignStatus.REQUEST_UNDER_REVIEW
+            and design.assigned_review_user_id == user.pk
         ),
         'can_forward_to_designer': can_run_workflow_action(
             user, project, 'forward_to_designer', 'PROJECT_PERM_ASSIGN',

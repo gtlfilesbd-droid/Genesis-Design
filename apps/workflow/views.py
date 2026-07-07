@@ -64,6 +64,63 @@ class EngineerSubmitForm(forms.Form):
     )
 
 
+class ReviewLeadAssignForm(forms.Form):
+    main_design_lead = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={'class': INPUT}),
+        label='Main Design Lead',
+        required=True,
+    )
+    sub_design_lead = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.Select(attrs={'class': INPUT}),
+        label='Sub Design Lead',
+        required=False,
+    )
+    due_date = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': INPUT}),
+        required=True,
+        label='Due Date',
+    )
+    instructions = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3, 'class': INPUT}),
+        required=False,
+        label='Instructions for Engineer',
+    )
+
+    def __init__(self, *args, design=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        leads = PermissionService.get_site_engineers()
+        self.fields['main_design_lead'].queryset = leads
+        self.fields['sub_design_lead'].queryset = leads
+        if design and not self.is_bound and 'due_date' not in self.initial:
+            drawing_type = design.drawing_type
+            config = get_deadline_config()
+            due = add_allowed_duration(
+                timezone.now(),
+                drawing_type.allowed_days,
+                drawing_type.allowed_hours,
+                count_weekends=config.count_weekends,
+            )
+            self.fields['due_date'].initial = timezone.localtime(due).strftime('%Y-%m-%dT%H:%M')
+
+    def clean(self):
+        cleaned = super().clean()
+        main_lead = cleaned.get('main_design_lead')
+        sub_lead = cleaned.get('sub_design_lead')
+        if main_lead and sub_lead and main_lead.pk == sub_lead.pk:
+            raise forms.ValidationError('Main and Sub Design Lead cannot be the same user.')
+        return cleaned
+
+
+class ReviewCancelForm(forms.Form):
+    comments = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 4, 'class': INPUT, 'placeholder': 'Reason for cancellation...'}),
+        required=True,
+        label='Cancel Reason',
+    )
+
+
 class SendToVerificationForm(forms.Form):
     verifier = forms.ModelChoiceField(
         queryset=User.objects.none(),
@@ -131,6 +188,9 @@ ACTION_PERMISSIONS = {
     'complete': 'PROJECT_PERM_COMPLETE',
     'acknowledge_engineer': 'DESIGN_PERM_SITE_ENGINEER',
     'submit_engineer_review': 'DESIGN_PERM_SITE_ENGINEER',
+    'review_acknowledge': None,
+    'review_assign': None,
+    'review_cancel': None,
 }
 
 
@@ -146,6 +206,11 @@ def _warn_if_past_target(request, design, due_date):
 
 
 def _check_workflow_permission(request, design, action):
+    if action in ('review_acknowledge', 'review_assign', 'review_cancel'):
+        return (
+            design.status == DesignStatus.REQUEST_UNDER_REVIEW
+            and design.assigned_review_user_id == request.user.pk
+        )
     required = ACTION_PERMISSIONS.get(action)
     if not required:
         return True
@@ -162,7 +227,7 @@ def _check_workflow_permission(request, design, action):
         )
     if action in ('acknowledge_engineer', 'submit_engineer_review'):
         return (
-            design.assigned_site_engineer_id == request.user.pk
+            design.is_site_lead_user(request.user)
             and can_run_workflow_action(request.user, project, action, required)
         )
     if action in ('accept_assignment', 'submit_work', 'resubmit'):
@@ -198,6 +263,8 @@ def workflow_action(request, pk, action):
         'verify_approved': CommentForm,
         'compliance_approved': CommentForm,
         'submit_engineer_review': EngineerSubmitForm,
+        'review_assign': lambda **kw: ReviewLeadAssignForm(design=design, **kw),
+        'review_cancel': ReviewCancelForm,
     }
 
     if request.method == 'GET' and action in form_actions:
@@ -271,6 +338,21 @@ def workflow_action(request, pk, action):
                     return render(request, 'workflow/action_form.html', {
                         'design': design, 'action': action, 'form': form,
                         'file_sharing_policy': company.file_sharing_policy if company else '',
+                    })
+                kwargs['comments'] = form.cleaned_data.get('comments', '')
+            elif action == 'review_assign':
+                form = ReviewLeadAssignForm(request.POST, design=design)
+                if not form.is_valid():
+                    return render(request, 'workflow/action_form.html', {
+                        'design': design, 'action': action, 'form': form,
+                    })
+                kwargs = form.cleaned_data
+                _warn_if_past_target(request, design, kwargs.get('due_date'))
+            elif action == 'review_cancel':
+                form = ReviewCancelForm(request.POST)
+                if not form.is_valid():
+                    return render(request, 'workflow/action_form.html', {
+                        'design': design, 'action': action, 'form': form,
                     })
                 kwargs['comments'] = form.cleaned_data.get('comments', '')
 

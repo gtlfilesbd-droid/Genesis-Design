@@ -160,6 +160,21 @@ WORKFLOW_ACTIONS = {
             UserRole.ADMIN,
         ],
     },
+    'review_acknowledge': {
+        'from': [DesignStatus.REQUEST_UNDER_REVIEW],
+        'to': DesignStatus.REQUEST_UNDER_REVIEW,
+        'roles': [],
+    },
+    'review_assign': {
+        'from': [DesignStatus.REQUEST_UNDER_REVIEW],
+        'to': DesignStatus.ENGINEER_PENDING_ACK,
+        'roles': [],
+    },
+    'review_cancel': {
+        'from': [DesignStatus.REQUEST_UNDER_REVIEW],
+        'to': DesignStatus.CANCELLED,
+        'roles': [],
+    },
 }
 
 _ASSIGNABLE_ROLES = frozenset({
@@ -228,8 +243,10 @@ def get_compliance_team():
 def _check_permission(user, action_config, design=None, action=None):
     if user.is_superuser or user.role == UserRole.ADMIN:
         return True
+    if action in ('review_acknowledge', 'review_assign', 'review_cancel'):
+        return design and design.assigned_review_user_id == user.pk
     if action in ('acknowledge_engineer', 'submit_engineer_review'):
-        return design and design.assigned_site_engineer_id == user.pk
+        return design and design.is_site_lead_user(user)
     return user.role in action_config['roles']
 
 
@@ -246,6 +263,10 @@ def _start_stage(design, stage, user):
         started_at=timezone.now(),
         responsible_user=user,
     )
+
+
+def start_workflow_stage(design, stage, user):
+    _start_stage(design, stage, user)
 
 
 def _start_deadline(design):
@@ -479,18 +500,55 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         design.compliance_acknowledged_at = timezone.now()
 
     elif action == 'acknowledge_engineer':
-        if design.assigned_site_engineer_id != user.pk:
+        if not design.is_site_lead_user(user):
             raise WorkflowError('Only the assigned site design lead can acknowledge this request.')
         design.engineer_acknowledged_at = timezone.now()
 
     elif action == 'submit_engineer_review':
-        if design.assigned_site_engineer_id != user.pk:
+        if not design.is_site_lead_user(user):
             raise WorkflowError('Only the assigned site design lead can submit this review.')
         if not comments.strip():
             raise WorkflowError('Site notes are required before submitting.')
         design.engineer_site_notes = comments.strip()
         design.engineer_submitted_at = timezone.now()
         design.current_holder = get_head_of_design()
+
+    elif action == 'review_acknowledge':
+        if design.assigned_review_user_id != user.pk:
+            raise WorkflowError('Only the assigned reviewer can acknowledge this request.')
+        design.review_acknowledged_at = timezone.now()
+
+    elif action == 'review_assign':
+        if design.assigned_review_user_id != user.pk:
+            raise WorkflowError('Only the assigned reviewer can assign design leads.')
+        if not design.review_acknowledged_at:
+            raise WorkflowError('Acknowledge the request before assigning design leads.')
+        main_lead = kwargs.get('main_design_lead')
+        sub_lead = kwargs.get('sub_design_lead')
+        due_date = kwargs.get('due_date')
+        instructions = kwargs.get('instructions', '')
+        if not main_lead:
+            raise WorkflowError('Main Design Lead is required.')
+        if not due_date:
+            raise WorkflowError('Due date is required.')
+        if sub_lead and sub_lead.pk == main_lead.pk:
+            raise WorkflowError('Main and Sub Design Lead cannot be the same user.')
+        design.main_design_lead = main_lead
+        design.sub_design_lead = sub_lead
+        design.engineer_due_date = due_date
+        design.engineer_instructions = instructions
+        design.engineer_assigned_at = timezone.now()
+        design.engineer_acknowledged_at = None
+        design.current_holder = main_lead
+
+    elif action == 'review_cancel':
+        if design.assigned_review_user_id != user.pk:
+            raise WorkflowError('Only the assigned reviewer can cancel this request.')
+        if not comments.strip():
+            raise WorkflowError('Cancel reason is required.')
+        design.review_cancel_reason = comments.strip()
+        design.review_cancelled_at = timezone.now()
+        design.current_holder = None
 
     elif action == 'compliance_correction':
         design.current_holder = hod or user
@@ -545,7 +603,8 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         from apps.workflow.action_sla import reset_action_sla_breach
         reset_action_sla_breach(design)
 
-    _end_stage(design, old_status)
+    if action != 'review_acknowledge':
+        _end_stage(design, old_status)
     design.status = new_status
     design.save()
 
@@ -557,9 +616,9 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
 
     _STAGE_START_SKIP = frozenset({
         'send_to_verification', 'accept_design', 'send_to_compliance',
-        'submit_engineer_review',
+        'submit_engineer_review', 'review_acknowledge',
     })
-    if action not in _STAGE_START_SKIP:
+    if action not in _STAGE_START_SKIP and old_status != new_status:
         _start_stage(design, new_status, user)
     update_deadline_status(design)
 

@@ -11,6 +11,7 @@ from apps.core.models import UserExtraPermission
 from apps.core.settings_forms import ensure_role_permissions
 from apps.designs.models import DesignRequest, DesignStatus, DesignSubmission, DrawingType, RequestAttachment
 from apps.projects.models import Project
+from apps.systems.models import SystemGroup, SystemName
 from apps.workflow.services import transition
 
 
@@ -38,6 +39,13 @@ class ReferenceOnlyFileStorageTests(TestCase):
             name='Ref Project', code='PRJ-REF', client_name='Client',
             start_date=date.today(), created_by=self.requester,
         )
+        self.system = SystemName.objects.create(name='Fire Alarm')
+        self.system_group = SystemGroup.objects.create(
+            group_name='Security',
+            review_user=self.engineer,
+            is_active=True,
+        )
+        self.system_group.systems.add(self.system)
         self.design = DesignRequest.objects.create(
             project=self.project,
             drawing_type=self.drawing_type,
@@ -53,14 +61,13 @@ class ReferenceOnlyFileStorageTests(TestCase):
         upload = SimpleUploadedFile('brief.pdf', b'pdf-content', content_type='application/pdf')
         url = reverse('projects:request_new', kwargs={'pk': self.project.pk})
         due = timezone.localtime(timezone.now() + timedelta(days=3)).strftime('%Y-%m-%dT%H:%M')
+        target = (date.today() + timedelta(days=10)).isoformat()
         response = self.client.post(url, {
+            'systems': [self.system.pk],
             'drawing_type': self.drawing_type.pk,
             'priority': 'medium',
             'request_message': 'Need drawing',
-            'target_completion_date': '',
-            'assigned_site_engineer': self.engineer.pk,
-            'engineer_due_date': due,
-            'engineer_instructions': '',
+            'target_completion_date': target,
             'attachments': upload,
         })
         self.assertEqual(response.status_code, 302)

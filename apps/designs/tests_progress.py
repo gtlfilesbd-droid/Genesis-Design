@@ -37,11 +37,18 @@ class ProgressStepsTests(TestCase):
             else:
                 self.assertEqual(step['state'], 'upcoming', msg=f"step {step['key']} should be upcoming")
 
-    def test_engineer_pending_ack_shows_request_submitted(self):
+    def test_engineer_pending_ack_shows_site_verification(self):
         self.design.status = DesignStatus.ENGINEER_PENDING_ACK
+        self.design.assigned_site_engineer_id = self.user.pk
         active = self._active_step(self.design)
-        self.assertEqual(active['key'], 'submitted')
-        self.assertEqual(active['label'], 'Request Submitted')
+        self.assertEqual(active['key'], 'site_engineer')
+        self.assertEqual(active['label'], 'Site Verification')
+
+    def test_request_under_review_shows_under_review_step(self):
+        self.design.status = DesignStatus.REQUEST_UNDER_REVIEW
+        active = self._active_step(self.design)
+        self.assertEqual(active['key'], 'request_under_review')
+        self.assertEqual(active['label'], 'Under Review')
 
     def test_engineer_in_progress_shows_site_verification(self):
         self.design.status = DesignStatus.ENGINEER_IN_PROGRESS
@@ -135,7 +142,7 @@ class ProgressStepsTests(TestCase):
     def test_completed_marks_all_prior_steps_done(self):
         self.design.status = DesignStatus.COMPLETED
         steps, _ = build_progress_steps(self.design)
-        self.assertEqual(len(steps), 10)
+        self.assertEqual(len(steps), 11)
         self.assertEqual(steps[-1]['state'], 'active')
         self.assertTrue(all(step['state'] == 'completed' for step in steps[:-1]))
         self._assert_continuous_completed_line(steps)
@@ -149,9 +156,10 @@ class ProgressStepsTests(TestCase):
     def test_early_pipeline_order(self):
         self.design.status = DesignStatus.ENGINEER_PENDING_ACK
         steps, _ = build_progress_steps(self.design)
-        labels = [s['label'] for s in steps[:4]]
+        labels = [s['label'] for s in steps[:5]]
         self.assertEqual(labels, [
             'Request Submitted',
+            'Under Review',
             'Site Verification',
             'HOD Acknowledgement',
             'Designer Assigned',

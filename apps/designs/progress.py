@@ -2,6 +2,7 @@ from apps.designs.models import DesignStatus
 
 PROGRESS_STEPS = [
     ('submitted', 'Request Submitted'),
+    ('request_under_review', 'Under Review'),
     ('site_engineer', 'Site Verification'),
     ('hod_ack', 'HOD Acknowledgement'),
     ('assigned', 'Designer Assigned'),
@@ -17,7 +18,8 @@ STEP_KEYS = [step[0] for step in PROGRESS_STEPS]
 
 STATUS_TO_STEP_KEY = {
     DesignStatus.DRAFT: 'submitted',
-    DesignStatus.ENGINEER_PENDING_ACK: 'submitted',
+    DesignStatus.REQUEST_UNDER_REVIEW: 'request_under_review',
+    DesignStatus.ENGINEER_PENDING_ACK: 'site_engineer',
     DesignStatus.ENGINEER_IN_PROGRESS: 'site_engineer',
     DesignStatus.NEW_REQUEST: 'site_engineer',
     DesignStatus.ACKNOWLEDGED: 'hod_ack',
@@ -47,14 +49,17 @@ def _resolve_current_index(design):
     except ValueError:
         current_index = 0
 
-    if design.assigned_site_engineer_id and not design.engineer_submitted_at:
+    if design.assigned_site_engineer_id or design.main_design_lead_id:
         if design.status == DesignStatus.ENGINEER_PENDING_ACK:
-            current_index = min(current_index, STEP_KEYS.index('submitted'))
+            current_index = max(current_index, STEP_KEYS.index('site_engineer'))
         elif design.status == DesignStatus.ENGINEER_IN_PROGRESS:
-            current_index = min(current_index, STEP_KEYS.index('site_engineer'))
+            current_index = max(current_index, STEP_KEYS.index('site_engineer'))
+
+    if design.status == DesignStatus.REQUEST_UNDER_REVIEW:
+        current_index = STEP_KEYS.index('request_under_review')
 
     if design.status == DesignStatus.NEW_REQUEST:
-        if design.assigned_site_engineer_id:
+        if design.assigned_site_engineer_id or design.main_design_lead_id:
             current_index = STEP_KEYS.index('site_engineer')
         else:
             current_index = STEP_KEYS.index('submitted')

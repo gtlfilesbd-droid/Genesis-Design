@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'apps.core',
     'apps.projects',
     'apps.designs',
+    'apps.systems',
     'apps.workflow',
     'apps.notifications',
     'apps.reports',

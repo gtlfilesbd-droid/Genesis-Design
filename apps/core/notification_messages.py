@@ -62,6 +62,53 @@ def designer_assigned_requester_message(design_request):
     )
 
 
+def request_sent_for_review_message(design_request):
+    requester = _person_name(design_request.requested_by)
+    systems = design_request.system_names_display or 'selected systems'
+    return (
+        f'{requester} submitted a new {_drawing_type(design_request)} request '
+        f'for {_project_label(design_request)} · Systems: {systems}'
+    )
+
+
+def request_review_acknowledged_message(design_request, reviewer_name):
+    return (
+        f'{reviewer_name} acknowledged your {_drawing_type(design_request)} request '
+        f'for {_project_label(design_request)} and will assign site design leads'
+    )
+
+
+def request_review_cancelled_message(design_request, reason):
+    return (
+        f'Your {_drawing_type(design_request)} request for {_project_label(design_request)} '
+        f'was cancelled during review. Reason: "{reason}"'
+    )
+
+
+def design_leads_assigned_message(design_request, *, is_sub=False):
+    due = design_request.engineer_due_date
+    due_label = due.strftime('%d %b %Y') if due else '—'
+    role = 'sub site design lead' if is_sub else 'main site design lead'
+    return (
+        f"You've been assigned as {role} for {_drawing_type(design_request)} "
+        f'for {_project_label(design_request)} · Due {due_label}'
+    )
+
+
+def design_leads_assigned_requester_message(design_request):
+    main = _person_name(design_request.main_design_lead)
+    sub = _person_name(design_request.sub_design_lead) if design_request.sub_design_lead_id else None
+    if sub:
+        return (
+            f'{main} (main) and {sub} (sub) have been assigned as site design leads for your '
+            f'{_drawing_type(design_request)} request for {_project_label(design_request)}'
+        )
+    return (
+        f'{main} has been assigned as main site design lead for your '
+        f'{_drawing_type(design_request)} request for {_project_label(design_request)}'
+    )
+
+
 def engineer_assigned_message(design_request):
     due = design_request.engineer_due_date
     due_label = due.strftime('%d %b %Y') if due else '—'

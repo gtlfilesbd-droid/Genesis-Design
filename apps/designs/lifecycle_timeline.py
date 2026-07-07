@@ -24,12 +24,14 @@ HOD_ACTIONS = (
 ROLE_LABELS = {
     'hod': 'Head of Design',
     'engineer': SITE_DESIGN_LEAD_LABEL,
+    'reviewer': 'System Reviewer',
     'designer': 'Designer',
     'verifier': 'Verifier',
     'compliance': 'Compliance',
 }
 
 HAPPY_PATH_PENDING = [
+    ('reviewer', 'Under Review'),
     ('engineer', SITE_DESIGN_LEAD_LABEL),
     ('hod', 'Assign'),
     ('designer', 'Designer'),
@@ -42,28 +44,30 @@ HAPPY_PATH_PENDING = [
 ]
 
 STATUS_PENDING_START = {
-    DesignStatus.ENGINEER_PENDING_ACK: 0,
-    DesignStatus.ENGINEER_IN_PROGRESS: 0,
-    DesignStatus.NEW_REQUEST: 1,
-    DesignStatus.ACKNOWLEDGED: 2,
-    DesignStatus.ASSIGNED: 3,
-    DesignStatus.IN_PROGRESS: 4,
-    DesignStatus.CORRECTION_REQUIRED: 4,
-    DesignStatus.RESUBMITTED: 4,
-    DesignStatus.SUBMITTED: 5,
-    DesignStatus.UNDER_REVIEW: 5,
-    DesignStatus.VERIFICATION_PENDING_ACK: 6,
-    DesignStatus.VERIFICATION_PENDING: 6,
-    DesignStatus.VERIFICATION_CORRECTION: 7,
-    DesignStatus.AWAITING_COMPLIANCE: 7,
-    DesignStatus.COMPLIANCE_PENDING_ACK: 8,
-    DesignStatus.COMPLIANCE_PENDING: 8,
-    DesignStatus.COMPLIANCE_CORRECTION: 9,
-    DesignStatus.FINAL_APPROVAL_PENDING: 9,
-    DesignStatus.APPROVED: 10,
+    DesignStatus.REQUEST_UNDER_REVIEW: 0,
+    DesignStatus.ENGINEER_PENDING_ACK: 1,
+    DesignStatus.ENGINEER_IN_PROGRESS: 1,
+    DesignStatus.NEW_REQUEST: 2,
+    DesignStatus.ACKNOWLEDGED: 3,
+    DesignStatus.ASSIGNED: 4,
+    DesignStatus.IN_PROGRESS: 5,
+    DesignStatus.CORRECTION_REQUIRED: 5,
+    DesignStatus.RESUBMITTED: 5,
+    DesignStatus.SUBMITTED: 6,
+    DesignStatus.UNDER_REVIEW: 6,
+    DesignStatus.VERIFICATION_PENDING_ACK: 7,
+    DesignStatus.VERIFICATION_PENDING: 7,
+    DesignStatus.VERIFICATION_CORRECTION: 8,
+    DesignStatus.AWAITING_COMPLIANCE: 8,
+    DesignStatus.COMPLIANCE_PENDING_ACK: 9,
+    DesignStatus.COMPLIANCE_PENDING: 9,
+    DesignStatus.COMPLIANCE_CORRECTION: 10,
+    DesignStatus.FINAL_APPROVAL_PENDING: 10,
+    DesignStatus.APPROVED: 11,
 }
 
 STAGE_ROLE_LABELS = {
+    DesignStatus.REQUEST_UNDER_REVIEW: ('reviewer', 'Under Review'),
     DesignStatus.ENGINEER_PENDING_ACK: ('engineer', 'Awaiting Acknowledgement'),
     DesignStatus.ENGINEER_IN_PROGRESS: ('engineer', SITE_DESIGN_LEAD_LABEL),
     DesignStatus.NEW_REQUEST: ('hod', 'Awaiting Acknowledgement'),
@@ -87,6 +91,7 @@ STAGE_ROLE_LABELS = {
 }
 
 DELAY_STATUS_LABELS = {
+    DesignStatus.REQUEST_UNDER_REVIEW: 'System Reviewer — Under Review',
     DesignStatus.ENGINEER_PENDING_ACK: f'{SITE_DESIGN_LEAD_LABEL} — Acknowledgement',
     DesignStatus.ENGINEER_IN_PROGRESS: SITE_DESIGN_LEAD_LABEL,
     DesignStatus.NEW_REQUEST: 'Head of Design — Acknowledgement',
@@ -348,6 +353,8 @@ def _waiting_since_for_status(design):
     if duration:
         return duration.started_at, duration.responsible_user
 
+    if status == DesignStatus.REQUEST_UNDER_REVIEW:
+        return design.created_at, design.assigned_review_user
     if status == DesignStatus.ENGINEER_PENDING_ACK:
         return design.engineer_assigned_at or design.created_at, design.assigned_site_engineer
     if status == DesignStatus.ENGINEER_IN_PROGRESS:
@@ -413,9 +420,13 @@ def get_current_delay_info(design):
                       DesignStatus.COMPLIANCE_CORRECTION, DesignStatus.FINAL_APPROVAL_PENDING,
                       DesignStatus.APPROVED):
             person, person_id = get_hod_name_and_id(design)
+        elif status == DesignStatus.REQUEST_UNDER_REVIEW:
+            person = _person_name(design.assigned_review_user)
+            person_id = design.assigned_review_user_id
         elif status in (DesignStatus.ENGINEER_PENDING_ACK, DesignStatus.ENGINEER_IN_PROGRESS):
-            person = _person_name(design.assigned_site_engineer)
-            person_id = design.assigned_site_engineer_id
+            lead = design.main_design_lead or design.assigned_site_engineer
+            person = _person_name(lead)
+            person_id = lead.pk if lead else None
         elif status in (DesignStatus.IN_PROGRESS, DesignStatus.CORRECTION_REQUIRED, DesignStatus.RESUBMITTED):
             person = _person_name(design.assigned_designer)
             person_id = design.assigned_designer_id
@@ -516,6 +527,18 @@ def _segments_from_durations(design):
 
 def _synthetic_initial_segment(design):
     now_time = timezone.now()
+    if design.status == DesignStatus.REQUEST_UNDER_REVIEW:
+        return {
+            'label': 'Under Review',
+            'role': 'reviewer',
+            'person': _person_name(design.assigned_review_user),
+            'days': _days_between(design.created_at, now_time),
+            'is_ongoing': True,
+            'is_done': False,
+            'is_pending': False,
+            'is_endcap': False,
+            'is_current_delay_source': False,
+        }
     if design.status == DesignStatus.ENGINEER_PENDING_ACK:
         engineer_start = design.engineer_assigned_at or design.created_at
         return {
@@ -806,26 +829,40 @@ def build_lifecycle_data(design):
             'end': end,
         })
 
-    if design.assigned_site_engineer_id:
-        engineer_name = _person_name(design.assigned_site_engineer)
+    if design.assigned_review_user_id:
+        reviewer_name = _person_name(design.assigned_review_user)
+        review_end = design.engineer_assigned_at or (
+            design.review_acknowledged_at if design.status != DesignStatus.REQUEST_UNDER_REVIEW else None
+        )
+        add_segment(
+            'Under Review', 'reviewer', reviewer_name, design.created_at, review_end,
+            person_id=design.assigned_review_user_id,
+        )
+        _add_workflow_person(people, design.assigned_review_user, 'reviewer')
+
+    site_lead = design.main_design_lead or design.assigned_site_engineer
+    if site_lead:
+        engineer_name = _person_name(site_lead)
         engineer_start = design.engineer_assigned_at or design.created_at
         add_segment(
             SITE_DESIGN_LEAD_ACK_SHORT, 'engineer', engineer_name, engineer_start,
-            design.engineer_acknowledged_at, person_id=design.assigned_site_engineer_id,
+            design.engineer_acknowledged_at, person_id=site_lead.pk,
         )
         if design.engineer_acknowledged_at:
             add_segment(
                 'Site Verification', 'engineer', engineer_name,
                 design.engineer_acknowledged_at, design.engineer_submitted_at,
-                person_id=design.assigned_site_engineer_id,
+                person_id=site_lead.pk,
             )
-        _add_workflow_person(people, design.assigned_site_engineer, 'engineer')
+        _add_workflow_person(people, site_lead, 'engineer')
+        if design.sub_design_lead_id:
+            _add_workflow_person(people, design.sub_design_lead, 'engineer')
         if design.engineer_submitted_at:
             add_segment(
                 'Ack', 'hod', ack_person, design.engineer_submitted_at,
                 design.deadline_start, person_id=ack_id,
             )
-    else:
+    elif not design.assigned_review_user_id:
         add_segment('Ack', 'hod', ack_person, design.created_at, design.deadline_start, person_id=ack_id)
 
     add_segment('Assign', 'hod', assign_person, design.deadline_start, design.assigned_at, person_id=assign_id)

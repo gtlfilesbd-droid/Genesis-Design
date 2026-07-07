@@ -37,7 +37,9 @@ def design_detail(request, pk):
         DesignRequest.objects.select_related(
             'project', 'drawing_type', 'requested_by',
             'assigned_designer', 'current_holder',
-        ),
+            'assigned_review_user', 'main_design_lead', 'sub_design_lead',
+            'assigned_site_engineer',
+        ).prefetch_related('systems'),
         pk=pk,
     )
     if not PermissionService.filter_design_requests(request.user).filter(pk=design.pk).exists():
@@ -144,9 +146,7 @@ def design_create(request, pk):
         if form.is_valid():
             design = create_design_request(project, request.user, form.cleaned_data)
             from apps.notifications.services import NotificationService
-            from apps.workflow.views import _warn_if_past_target
-            NotificationService.on_engineer_assigned(design)
-            _warn_if_past_target(request, design, form.cleaned_data.get('engineer_due_date'))
+            NotificationService.on_request_sent_for_review(design)
             from apps.core.activity_messages import (
                 build_project_activity_description,
                 build_workflow_activity_description,
@@ -162,15 +162,13 @@ def design_create(request, pk):
                 'design_requested',
                 build_project_activity_description('design_requested', request.user, design),
             )
-            messages.success(request, f'Design request {design.design_number} submitted.')
+            messages.success(request, f'Design request {design.design_number} submitted for review.')
             return redirect('projects:detail', pk=project.pk)
     else:
         form = DesignRequestForm(project=project)
-    site_engineers = PermissionService.get_site_engineers()
     return render(request, 'designs/create.html', {
         'form': form,
         'project': project,
-        'site_engineers_available': site_engineers.exists(),
     })
 
 

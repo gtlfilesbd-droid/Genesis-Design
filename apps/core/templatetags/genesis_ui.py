@@ -12,6 +12,9 @@ register = template.Library()
 
 STATUS_BADGE = {
     'draft': ('Draft', 'bg-slate-100 text-slate-600'),
+    'request_under_review': ('Under Review', 'bg-fuchsia-100 text-fuchsia-700'),
+    'engineer_pending_acknowledgement': ('Site Lead Ack', 'bg-teal-100 text-teal-700'),
+    'engineer_in_progress': ('Site Verification', 'bg-teal-100 text-teal-800'),
     'new_request': ('New Request', 'bg-blue-100 text-blue-700'),
     'acknowledged': ('Acknowledged', 'bg-sky-100 text-sky-700'),
     'assigned': ('Assigned', 'bg-indigo-100 text-indigo-700'),

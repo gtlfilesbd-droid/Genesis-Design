@@ -52,7 +52,14 @@
 
             </div>
 
-            {% elif field.name == 'assigned_site_engineer' or field.name == 'engineer_due_date' or field.name == 'engineer_instructions' %}
+            {% elif field.name == 'systems' %}
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">System Name *</label>
+                <p class="text-xs text-slate-500 mb-2">Hold Ctrl (Windows) or Cmd (Mac) to select multiple systems. All selected systems must belong to the same group.</p>
+                {{ field }}
+                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
+            </div>
 
             {% else %}
 
@@ -69,31 +76,9 @@
             {% endif %}
 
             {% endfor %}
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Site Design Lead By *</label>
-                {{ form.assigned_site_engineer }}
-                {% if not site_engineers_available %}
-                <p class="text-amber-700 text-xs mt-2 p-3 rounded-lg bg-amber-50 border border-amber-100">
-                    No site design leads are available. An admin must open <strong>Team → Users</strong>, edit a user
-                    (Requester, Verifier, or Compliance — not Admin/HOD/Designer), and enable the
-                    <strong>Site Design Lead</strong> permission under Extra Permissions.
-                </p>
-                {% endif %}
-                {% if form.assigned_site_engineer.errors %}<p class="text-red-600 text-xs mt-1">{{ form.assigned_site_engineer.errors.0 }}</p>{% endif %}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Site Design Submit Due Date *</label>
-                {{ form.engineer_due_date }}
-                {% if form.engineer_due_date.errors %}<p class="text-red-600 text-xs mt-1">{{ form.engineer_due_date.errors.0 }}</p>{% endif %}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Instructions for Engineer</label>
-                {{ form.engineer_instructions }}
-                {% if form.engineer_instructions.errors %}<p class="text-red-600 text-xs mt-1">{{ form.engineer_instructions.errors.0 }}</p>{% endif %}
-            </div>
             <div class="flex items-center gap-3 pt-2">
 
-                <button type="submit" class="g-btn-primary" {% if not site_engineers_available %}disabled title="Enable Site Design Lead permission on at least one user first"{% endif %}>Submit Request</button>
+                <button type="submit" class="g-btn-primary">Submit Request</button>
 
                 <a href="{% url 'projects:detail' project.pk %}" class="g-btn-secondary">Cancel</a>
 
@@ -106,4 +91,3 @@
 </div>
 
 {% endblock %}
-

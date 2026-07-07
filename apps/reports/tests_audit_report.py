@@ -7,7 +7,6 @@ from django.utils import timezone
 from apps.accounts.models import User, UserRole
 from apps.core.models import UserExtraPermission
 from apps.core.utils import log_activity
-from apps.designs.forms import create_design_request
 from apps.designs.models import DesignRequest, DesignStatus, DrawingType
 from apps.projects.models import Project
 from apps.reports.audit_report import build_workflow_audit_report, get_audit_report_for_design_number
@@ -44,16 +43,20 @@ class WorkflowAuditReportTests(TestCase):
             start_date=date.today(), created_by=self.requester,
         )
         self.due = timezone.now() + timedelta(days=5)
-        self.design = create_design_request(self.project, self.requester, {
-            'drawing_type': self.drawing_type,
-            'priority': 'medium',
-            'target_completion_date': date.today() + timedelta(days=10),
-            'request_message': 'Need site check',
-            'reference_design': None,
-            'assigned_site_engineer': self.engineer,
-            'engineer_due_date': self.due,
-            'engineer_instructions': 'Measure all rooms',
-        })
+        self.design = DesignRequest.objects.create(
+            project=self.project,
+            drawing_type=self.drawing_type,
+            priority='medium',
+            target_completion_date=date.today() + timedelta(days=10),
+            request_message='Need site check',
+            requested_by=self.requester,
+            assigned_site_engineer=self.engineer,
+            engineer_due_date=self.due,
+            engineer_instructions='Measure all rooms',
+            engineer_assigned_at=timezone.now(),
+            status=DesignStatus.ENGINEER_PENDING_ACK,
+            current_holder=self.engineer,
+        )
 
     def test_build_report_includes_request_metadata(self):
         report = build_workflow_audit_report(self.design)
