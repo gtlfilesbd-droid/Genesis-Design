@@ -4,84 +4,254 @@
 
 {% block content %}
 
-<div class="max-w-xl mx-auto">
+<div class="w-full">
 
-    <h1 class="text-[28px] font-bold text-slate-900 mb-1">New Design Request</h1>
+    <div class="mb-6">
+        <h1 class="text-[28px] font-bold text-slate-900 mb-1">New Design Request</h1>
+        <p class="text-sm text-slate-500">
+            Project: <strong class="text-slate-700">{{ project.client_name }}</strong>
+            <span class="text-slate-300 mx-1">·</span>
+            <span class="font-mono text-slate-600">{{ project.code }}</span>
+        </p>
+    </div>
 
-    <p class="text-sm text-slate-500 mb-8">Project: <strong>{{ project.client_name }}</strong> ({{ project.code }})</p>
-
-    <div class="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-900">
-        Design files must be sent via email or provided in digital format.
+    <div class="mb-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="flex items-start gap-4 px-5 py-4 bg-gradient-to-r from-slate-50 via-white to-blue-50/50 border-b border-slate-100">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <i data-lucide="clipboard-list" class="w-5 h-5 text-primary"></i>
+            </div>
+            <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-slate-900">Submission guidelines</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Please review these points before submitting your request.</p>
+            </div>
+        </div>
+        <ul class="divide-y divide-slate-100 text-sm text-slate-700">
+            <li class="flex items-start gap-3 px-5 py-3.5">
+                <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <i data-lucide="mail" class="w-4 h-4 text-primary-light"></i>
+                </span>
+                <span class="pt-1">Design files must be sent via email or provided in digital format.</span>
+            </li>
+            <li class="flex items-start gap-3 px-5 py-3.5">
+                <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <i data-lucide="ban" class="w-4 h-4 text-amber-600"></i>
+                </span>
+                <span class="pt-1">
+                    Do not submit <strong class="font-semibold text-slate-900">Pre Sales Design</strong> requests through this form.
+                    However, if a Pre Sales project has significant potential, you may submit a request for management review.
+                </span>
+            </li>
+        </ul>
     </div>
 
     <div class="g-card p-8">
 
-        <form method="post" class="space-y-5" x-data="{ priority: '{{ form.priority.value|default:'medium' }}' }">
+        <form method="post" class="space-y-10"
+              x-data="{
+                  priority: '{{ form.priority.value|default:'medium' }}',
+                  drawingType: '{{ form.drawing_type.value|default:'' }}',
+                  selectedSystems: [{% if form.systems.value %}{% for v in form.systems.value %}'{{ v }}'{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}],
+                  toggleSystem(id) {
+                      id = String(id);
+                      const idx = this.selectedSystems.indexOf(id);
+                      if (idx === -1) { this.selectedSystems.push(id); }
+                      else { this.selectedSystems.splice(idx, 1); }
+                  },
+                  isSelected(id) { return this.selectedSystems.includes(String(id)); },
+                  priorityActive(val) {
+                      const styles = {
+                          critical: 'bg-red-600 text-white border-red-600 shadow-sm ring-2 ring-red-200',
+                          high: 'bg-amber-500 text-white border-amber-500 shadow-sm ring-2 ring-amber-200',
+                          medium: 'bg-primary text-white border-primary shadow-sm ring-2 ring-primary/20',
+                          low: 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-200',
+                      };
+                      return styles[val] || 'bg-primary text-white border-primary shadow-sm';
+                  },
+                  priorityIdle(val) {
+                      const styles = {
+                          critical: 'border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300',
+                          high: 'border-amber-200 text-amber-800 hover:bg-amber-50 hover:border-amber-300',
+                          medium: 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-primary/30',
+                          low: 'border-emerald-200 text-emerald-800 hover:bg-emerald-50 hover:border-emerald-300',
+                      };
+                      return styles[val] || 'border-slate-200 text-slate-700 hover:bg-slate-50';
+                  }
+              }">
 
             {% csrf_token %}
 
-            {% for field in form %}
-
-            {% if field.name == 'priority' %}
-
-            <div>
-
-                <label class="block text-sm font-medium text-slate-700 mb-2">Priority *</label>
-
-                <input type="hidden" name="priority" :value="priority">
-
-                <div class="flex flex-wrap gap-2">
-
-                    {% for val, label in form.fields.priority.choices %}
-
-                    <button type="button" @click="priority = '{{ val }}'"
-
-                        :class="priority === '{{ val }}' ? 'bg-primary text-white border-primary' : 'bg-white text-slate-700 border-slate-200 hover:border-primary/40'"
-
-                        class="px-4 py-2 rounded-full text-sm font-semibold border transition">
-
-                        {{ label }}
-
-                    </button>
-
-                    {% endfor %}
-
+            {# —— System Name —— #}
+            <section class="space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-900">System Name <span class="text-red-500">*</span></h3>
+                        <p class="text-xs text-slate-500 mt-1">Choose every system this request covers. All selections must belong to the same routing group.</p>
+                    </div>
+                    <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border transition-colors"
+                          :class="selectedSystems.length ? 'bg-primary/10 text-primary border-primary/20' : 'bg-slate-100 text-slate-500 border-slate-200'">
+                        <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                        <span x-text="selectedSystems.length + (selectedSystems.length === 1 ? ' system' : ' systems') + ' selected'"></span>
+                    </span>
                 </div>
 
-                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
+                {% if form.fields.systems.choices %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {% for value, label in form.fields.systems.choices %}
+                    <label class="group relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all duration-150"
+                           :class="isSelected('{{ value }}')
+                               ? 'border-primary bg-primary/[0.04] shadow-sm ring-1 ring-primary/10'
+                               : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'">
+                        <input type="checkbox" name="systems" value="{{ value }}" class="sr-only"
+                               {% if form.systems.value and value in form.systems.value %}checked{% endif %}
+                               @change="toggleSystem('{{ value }}')">
+                        <span class="flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors"
+                              :class="isSelected('{{ value }}') ? 'border-primary bg-primary' : 'border-slate-300 bg-white group-hover:border-slate-400'">
+                            <i data-lucide="check" class="w-3 h-3 text-white" x-show="isSelected('{{ value }}')"></i>
+                        </span>
+                        <span class="text-sm font-medium transition-colors"
+                              :class="isSelected('{{ value }}') ? 'text-primary' : 'text-slate-700'">{{ label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                    <i data-lucide="inbox" class="w-8 h-8 text-slate-300 mx-auto mb-2"></i>
+                    <p class="text-sm text-slate-600 font-medium">No systems configured yet</p>
+                    <p class="text-xs text-slate-500 mt-1">An administrator must add system names in Django Admin before requests can be submitted.</p>
+                </div>
+                {% endif %}
 
-            </div>
+                <p class="flex items-start gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2.5">
+                    <i data-lucide="info" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400"></i>
+                    <span>Your request will be routed automatically to the reviewer assigned to the selected system group.</span>
+                </p>
+                {% if form.systems.errors %}<p class="text-red-600 text-xs">{{ form.systems.errors.0 }}</p>{% endif %}
+            </section>
 
-            {% elif field.name == 'systems' %}
+            {# —— Drawing Type —— #}
+            <section class="space-y-4 pt-2 border-t border-slate-100">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900">Drawing Type <span class="text-red-500">*</span></h3>
+                    <p class="text-xs text-slate-500 mt-1">Select the type of drawing package required for this request.</p>
+                </div>
 
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">System Name *</label>
-                <p class="text-xs text-slate-500 mb-2">Hold Ctrl (Windows) or Cmd (Mac) to select multiple systems. All selected systems must belong to the same group.</p>
-                {{ field }}
-                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
-            </div>
+                {% if form.fields.drawing_type.queryset %}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {% for dt in form.fields.drawing_type.queryset %}
+                    <label class="group relative flex flex-col gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all duration-150 min-h-[88px]"
+                           :class="drawingType === '{{ dt.pk }}'
+                               ? 'border-primary bg-primary/[0.04] shadow-sm ring-1 ring-primary/10'
+                               : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'">
+                        <input type="radio" name="drawing_type" value="{{ dt.pk }}" class="sr-only"
+                               {% if form.drawing_type.value|stringformat:"s" == dt.pk|stringformat:"s" %}checked{% endif %}
+                               @change="drawingType = '{{ dt.pk }}'">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="text-sm font-semibold transition-colors"
+                                  :class="drawingType === '{{ dt.pk }}' ? 'text-primary' : 'text-slate-800'">{{ dt.name }}</span>
+                            <span class="flex-shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md"
+                                  :class="drawingType === '{{ dt.pk }}' ? 'bg-primary/15 text-primary' : 'bg-slate-100 text-slate-500'">{{ dt.code_prefix }}</span>
+                        </div>
+                        <span class="text-xs text-slate-500 flex items-center gap-1.5">
+                            <i data-lucide="clock" class="w-3 h-3"></i>
+                            {{ dt.allowed_duration_label }} allowed
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                    No drawing types are available. Contact an administrator.
+                </div>
+                {% endif %}
+                {% if form.drawing_type.errors %}<p class="text-red-600 text-xs">{{ form.drawing_type.errors.0 }}</p>{% endif %}
+            </section>
 
-            {% else %}
+            {# —— Priority & Target Date —— #}
+            <section class="space-y-5 pt-2 border-t border-slate-100">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-3">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900">Priority <span class="text-red-500">*</span></h3>
+                            <p class="text-xs text-slate-500 mt-1">How urgently should this request be handled?</p>
+                        </div>
+                        <input type="hidden" name="priority" :value="priority">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {% for val, label in form.fields.priority.choices %}
+                            <button type="button" @click="priority = '{{ val }}'"
+                                :class="priority === '{{ val }}' ? priorityActive('{{ val }}') : priorityIdle('{{ val }}')"
+                                class="px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all duration-150">
+                                {{ label }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                        {% if form.priority.errors %}<p class="text-red-600 text-xs">{{ form.priority.errors.0 }}</p>{% endif %}
+                    </div>
 
-            <div>
+                    <div class="space-y-3">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900">Target Completion Date <span class="text-red-500">*</span></h3>
+                            <p class="text-xs text-slate-500 mt-1">When do you need the finished design?</p>
+                        </div>
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                                <i data-lucide="calendar" class="w-4 h-4"></i>
+                            </span>
+                            {{ form.target_completion_date }}
+                        </div>
+                        {% if form.target_completion_date.errors %}<p class="text-red-600 text-xs">{{ form.target_completion_date.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </section>
 
-                <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+            {# —— Request Message —— #}
+            <section class="space-y-3 pt-2 border-t border-slate-100">
+                <div class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center mt-0.5">
+                        <i data-lucide="message-square-text" class="w-4 h-4 text-slate-500"></i>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-sm font-semibold text-slate-900">Request Message</h3>
+                        <p class="text-xs text-slate-500 mt-1">Optional context, scope notes, or special instructions for the review team.</p>
+                    </div>
+                </div>
+                {{ form.request_message }}
+                {% if form.request_message.errors %}<p class="text-red-600 text-xs">{{ form.request_message.errors.0 }}</p>{% endif %}
+            </section>
 
-                {{ field }}
+            {# —— Reference Design —— #}
+            <section class="space-y-3 pt-2 border-t border-slate-100">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div class="flex items-start gap-3">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center mt-0.5">
+                            <i data-lucide="link-2" class="w-4 h-4 text-slate-500"></i>
+                        </span>
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900">Reference Design</h3>
+                            <p class="text-xs text-slate-500 mt-1">Link to a completed design on this project, if applicable.</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400 bg-slate-100 px-2 py-1 rounded-md">Optional</span>
+                </div>
 
-                {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
+                <div class="relative">
+                    {{ form.reference_design }}
+                    <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    </span>
+                </div>
 
-            </div>
+                {% if not form.fields.reference_design.queryset %}
+                <p class="flex items-start gap-2 text-xs text-slate-500 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2.5">
+                    <i data-lucide="lightbulb" class="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500"></i>
+                    <span>No approved or completed designs exist on this project yet — you can skip this field.</span>
+                </p>
+                {% endif %}
+                {% if form.reference_design.errors %}<p class="text-red-600 text-xs">{{ form.reference_design.errors.0 }}</p>{% endif %}
+            </section>
 
-            {% endif %}
-
-            {% endfor %}
-            <div class="flex items-center gap-3 pt-2">
-
-                <button type="submit" class="g-btn-primary">Submit Request</button>
-
+            <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
+                <button type="submit" class="g-btn-primary g-submit-btn">Submit Request</button>
                 <a href="{% url 'projects:detail' project.pk %}" class="g-btn-secondary">Cancel</a>
-
             </div>
 
         </form>
@@ -90,4 +260,26 @@
 
 </div>
 
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    #id_target_completion_date {
+        padding-left: 2.5rem;
+    }
+    #id_reference_design {
+        padding-right: 2.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) lucide.createIcons();
+    });
+    document.addEventListener('alpine:initialized', () => {
+        if (window.lucide) lucide.createIcons();
+    });
+</script>
 {% endblock %}

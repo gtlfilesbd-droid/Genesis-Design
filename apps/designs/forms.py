@@ -9,14 +9,28 @@ from apps.systems.services import resolve_group_for_systems
 from .models import DesignRequest, DesignStatus, DrawingType
 
 
-INPUT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
-MULTI_SELECT = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]'
+INPUT = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-2.5 text-sm text-slate-900 '
+    'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
+)
+SELECT = (
+    'w-full appearance-none border border-slate-200 rounded-xl bg-white px-4 py-2.5 pr-10 text-sm text-slate-900 '
+    'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
+)
+TEXTAREA = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 '
+    'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition min-h-[120px] resize-y'
+)
+DATE = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-2.5 text-sm text-slate-900 '
+    'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
+)
 
 
 class DesignRequestForm(forms.ModelForm):
     systems = forms.ModelMultipleChoiceField(
         queryset=SystemName.objects.filter(is_active=True),
-        widget=forms.SelectMultiple(attrs={'class': MULTI_SELECT}),
+        widget=forms.CheckboxSelectMultiple(),
         label='System Name',
         required=True,
     )
@@ -28,25 +42,35 @@ class DesignRequestForm(forms.ModelForm):
             'request_message', 'reference_design',
         ]
         widgets = {
-            'drawing_type': forms.Select(attrs={'class': INPUT}),
+            'drawing_type': forms.RadioSelect(),
             'priority': forms.Select(attrs={'class': INPUT}),
-            'target_completion_date': forms.DateInput(attrs={'type': 'date', 'class': INPUT}),
-            'request_message': forms.Textarea(attrs={'rows': 4, 'class': INPUT}),
-            'reference_design': forms.Select(attrs={'class': INPUT}),
+            'target_completion_date': forms.DateInput(attrs={'type': 'date', 'class': DATE}),
+            'request_message': forms.Textarea(attrs={
+                'rows': 4,
+                'class': TEXTAREA,
+                'placeholder': 'Describe scope, site conditions, deliverables, or any context the design team should know…',
+            }),
+            'reference_design': forms.Select(attrs={'class': SELECT}),
         }
 
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.project = project
         self.fields['drawing_type'].queryset = DrawingType.objects.filter(is_active=True)
+        self.fields['drawing_type'].label = 'Drawing Type'
         self.fields['systems'].queryset = SystemName.objects.filter(is_active=True)
         self.fields['target_completion_date'].required = True
+        self.fields['request_message'].label = 'Request Message'
+        self.fields['request_message'].required = False
+        self.fields['reference_design'].label = 'Reference Design'
+        self.fields['reference_design'].required = False
         if project:
             self.fields['reference_design'].queryset = DesignRequest.objects.filter(
                 project=project,
                 status__in=[DesignStatus.APPROVED, DesignStatus.COMPLETED],
             )
-        self.fields['reference_design'].required = False
+        else:
+            self.fields['reference_design'].queryset = DesignRequest.objects.none()
 
     def clean_systems(self):
         systems = self.cleaned_data.get('systems')
