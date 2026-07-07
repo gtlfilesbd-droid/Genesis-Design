@@ -18,7 +18,7 @@ from apps.workflow.services import get_head_of_design
 HOD_ACTIONS = (
     'acknowledge', 'assign', 'request_correction', 'accept_design',
     'send_to_verification', 'forward_to_designer', 'send_to_compliance',
-    'compliance_approved', 'complete', 'hod_fast_complete', 'start_review',
+    'complete', 'hod_fast_complete', 'start_review',
 )
 
 ROLE_LABELS = {
@@ -171,7 +171,7 @@ def _latest_hod_activity_user(design):
         .order_by('-created_at')
         .first()
     )
-    if log and log.user and _is_valid_hod_actor(log.user, from_activity_log=True):
+    if log and log.user and _is_hod_role(log.user):
         return log.user
     return None
 
@@ -211,20 +211,20 @@ def _is_reminder_target_valid(design, user_id):
 
 
 def get_hod_name_and_id(design):
-    actor = _latest_hod_activity_user(design)
-    if actor:
-        return _person_name(actor), actor.id
-
     holder = design.current_holder
-    if holder and _is_valid_hod_actor(holder) and _is_hod_role(holder):
+    if holder and _is_hod_role(holder):
         return _person_name(holder), holder.id
-
-    if design.assigned_by and _is_valid_hod_actor(design.assigned_by) and _is_hod_role(design.assigned_by):
-        return _person_name(design.assigned_by), design.assigned_by_id
 
     hod = get_head_of_design()
     if hod and _is_hod_role(hod):
         return _person_name(hod), hod.id
+
+    actor = _latest_hod_activity_user(design)
+    if actor:
+        return _person_name(actor), actor.id
+
+    if design.assigned_by and _is_hod_role(design.assigned_by):
+        return _person_name(design.assigned_by), design.assigned_by_id
 
     return None, None
 
@@ -467,11 +467,21 @@ def _close_cancelled_segments(design, segments):
             seg['grow'] = max(seg['days'], 1.0)
 
 
+def _resolve_approved_stage_responsible(design):
+    holder = design.current_holder
+    if holder and _is_hod_role(holder):
+        return holder
+    return get_head_of_design()
+
+
 def _waiting_since_for_status(design):
     status = design.status
     duration = _ongoing_stage_duration(design, status)
     if duration:
-        return duration.started_at, duration.responsible_user
+        responsible = duration.responsible_user
+        if status == DesignStatus.APPROVED:
+            responsible = _resolve_approved_stage_responsible(design)
+        return duration.started_at, responsible
 
     if status == DesignStatus.REQUEST_UNDER_REVIEW:
         return design.created_at, design.assigned_review_user
@@ -510,7 +520,11 @@ def _waiting_since_for_status(design):
         return (review.created_at if review else design.updated_at), None
     if status == DesignStatus.APPROVED:
         review = design.compliance_reviews.filter(action='approved').order_by('-created_at').first()
-        return (review.created_at if review else design.updated_at), None
+        since = review.created_at if review else design.updated_at
+        holder = design.current_holder
+        if holder and _is_hod_role(holder):
+            return since, holder
+        return since, get_head_of_design()
     return design.updated_at, design.current_holder
 
 

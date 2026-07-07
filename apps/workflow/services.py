@@ -621,7 +621,10 @@ def transition(design, action, user, request=None, skip_permission=False, **kwar
         'submit_engineer_review', 'review_acknowledge',
     })
     if action not in _STAGE_START_SKIP and old_status != new_status:
-        _start_stage(design, new_status, user)
+        stage_user = user
+        if new_status == DesignStatus.APPROVED:
+            stage_user = hod or user
+        _start_stage(design, new_status, stage_user)
     update_deadline_status(design)
 
     from apps.core.activity_messages import (

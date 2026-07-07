@@ -248,6 +248,59 @@ class LifecycleTimelineTests(TestCase):
         self.assertNotEqual(delay['current_person'], 'Admin User')
         self.assertEqual(delay['person_id'], self.hod.id)
 
+    def test_approved_stage_shows_hod_not_compliance_officer(self):
+        compliance = User.objects.create_user(
+            username='compliance1',
+            password='pass',
+            role=UserRole.COMPLIANCE_TEAM,
+            employee_id='C002',
+            first_name='Jahidul',
+            last_name='Kabir',
+        )
+        verifier = User.objects.create_user(
+            username='verifier1',
+            password='pass',
+            role=UserRole.VERIFICATION_TEAM,
+            employee_id='V002',
+            first_name='Verify',
+            last_name='User',
+        )
+        transition(self.design, 'acknowledge', self.hod)
+        transition(
+            self.design, 'assign', self.hod,
+            designer=self.designer,
+            due_date=timezone.now() + timedelta(days=5),
+        )
+        transition(self.design, 'accept_assignment', self.designer)
+        transition(self.design, 'submit_work', self.designer, comments='Done')
+        transition(
+            self.design, 'send_to_verification', self.hod,
+            verifier=verifier,
+            due_date=timezone.now() + timedelta(days=2),
+        )
+        transition(self.design, 'accept_verification', verifier)
+        transition(self.design, 'verify_approved', verifier, comments='OK')
+        transition(
+            self.design, 'send_to_compliance', self.hod,
+            compliance_officer=compliance,
+            due_date=timezone.now() + timedelta(days=3),
+        )
+        transition(self.design, 'accept_compliance', compliance)
+        transition(self.design, 'compliance_approved', compliance, comments='Approved')
+        self.design.refresh_from_db()
+
+        hod_name, hod_id = get_hod_name_and_id(self.design)
+        self.assertEqual(hod_name, 'Head Design')
+        self.assertEqual(hod_id, self.hod.id)
+
+        delay = get_current_delay_info(self.design)
+        self.assertEqual(delay['current_person'], 'Head Design')
+        self.assertEqual(delay['person_id'], self.hod.id)
+
+        data = build_lifecycle_data(self.design)
+        self.assertIn('Head Design', data['progress_assigned_summary'])
+        self.assertNotIn('Jahidul Kabir', data['progress_assigned_summary'])
+
     def test_overdue_compliance_ack_delay_banner_fields(self):
         compliance = User.objects.create_user(
             username='nadia',
