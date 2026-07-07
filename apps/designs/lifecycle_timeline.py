@@ -265,6 +265,13 @@ def _format_days_count(days):
     return f'({days:g} {unit})'
 
 
+def _format_waiting_label(days):
+    if days is None:
+        return ''
+    unit = 'day' if days == 1 else 'days'
+    return f'{days:g} {unit}'
+
+
 def format_delay_target_summary(days_over_target, target_date):
     """Past target row: always requester target_completion_date + days past total target."""
     if days_over_target is None or not target_date:
@@ -281,6 +288,38 @@ def format_assigned_summary(person, role_key, since_dt, waiting_days):
     since_str = timezone.localtime(since_dt).strftime('%d %b, %I:%M %p')
     days_part = _format_days_count(waiting_days) if waiting_days is not None else ''
     return f'{name_part} · since {since_str} {days_part}'.strip()
+
+
+def site_lead_assignees_for_progress(design):
+    assignees = []
+    if design.main_design_lead_id:
+        name = _person_name(design.main_design_lead)
+        role_label = 'Main Design Lead'
+        assignees.append({
+            'name': name,
+            'role_label': role_label,
+            'role_short': 'Main',
+            'display_name': format_person_display(name, role_label),
+        })
+    elif design.assigned_site_engineer_id:
+        name = _person_name(design.assigned_site_engineer)
+        role_label = SITE_DESIGN_LEAD_LABEL
+        assignees.append({
+            'name': name,
+            'role_label': role_label,
+            'role_short': 'Lead',
+            'display_name': format_person_display(name, role_label),
+        })
+    if design.sub_design_lead_id:
+        name = _person_name(design.sub_design_lead)
+        role_label = 'Sub Design Lead'
+        assignees.append({
+            'name': name,
+            'role_label': role_label,
+            'role_short': 'Sub',
+            'display_name': format_person_display(name, role_label),
+        })
+    return assignees
 
 
 def format_progress_target_summary(target_date, now_time):
@@ -1223,6 +1262,10 @@ def build_lifecycle_data(design):
     )
 
     progress_assigned_summary = None
+    progress_assigned_leads = []
+    progress_assigned_since_display = None
+    progress_assigned_waiting_display = None
+    progress_assigned_waiting_label = None
     progress_target_summary = None
     completed_finished_summary = None
     completed_target_summary = None
@@ -1234,6 +1277,7 @@ def build_lifecycle_data(design):
         current_role_key = None
         current_elapsed_days = None
         progress_assigned_summary = None
+        progress_assigned_leads = []
         progress_target_summary = None
     elif not design.completion_date and not is_overdue:
         progress_role_key = current_role_key or 'hod'
@@ -1241,12 +1285,30 @@ def build_lifecycle_data(design):
         progress_waiting_days = (
             _days_between(progress_since, now_time) if progress_since else None
         )
-        progress_assigned_summary = format_assigned_summary(
-            _resolve_actor_name(current_person, progress_role_key, hod_name),
-            progress_role_key,
-            progress_since,
-            progress_waiting_days,
+        engineer_statuses = (
+            DesignStatus.ENGINEER_PENDING_ACK,
+            DesignStatus.ENGINEER_IN_PROGRESS,
         )
+        if (
+            progress_role_key == 'engineer'
+            and design.status in engineer_statuses
+            and (design.main_design_lead_id or design.sub_design_lead_id)
+        ):
+            progress_assigned_leads = site_lead_assignees_for_progress(design)
+            if progress_since:
+                progress_assigned_since_display = timezone.localtime(
+                    progress_since,
+                ).strftime('%d %b, %I:%M %p')
+            if progress_waiting_days is not None:
+                progress_assigned_waiting_display = _format_days_count(progress_waiting_days)
+                progress_assigned_waiting_label = _format_waiting_label(progress_waiting_days)
+        else:
+            progress_assigned_summary = format_assigned_summary(
+                _resolve_actor_name(current_person, progress_role_key, hod_name),
+                progress_role_key,
+                progress_since,
+                progress_waiting_days,
+            )
         progress_target_summary = format_progress_target_summary(
             design.target_completion_date, now_time,
         )
@@ -1304,6 +1366,10 @@ def build_lifecycle_data(design):
         'delay_since': delay_since,
         'current_waiting_on': current_waiting_on,
         'progress_assigned_summary': progress_assigned_summary,
+        'progress_assigned_leads': progress_assigned_leads,
+        'progress_assigned_since_display': progress_assigned_since_display,
+        'progress_assigned_waiting_display': progress_assigned_waiting_display,
+        'progress_assigned_waiting_label': progress_assigned_waiting_label,
         'progress_target_summary': progress_target_summary,
         'completed_finished_summary': completed_finished_summary,
         'completed_target_summary': completed_target_summary,

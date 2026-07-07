@@ -59,8 +59,8 @@ class RequestUnderReviewWorkflowTests(TestCase):
         self.due = timezone.now() + timedelta(days=5)
         self.client = Client()
 
-    def _create_request(self):
-        return create_design_request(self.project, self.requester, {
+    def _create_request(self, requested_by=None):
+        return create_design_request(self.project, requested_by or self.requester, {
             'systems': [self.system_a, self.system_b],
             'drawing_type': self.drawing_type,
             'priority': 'medium',
@@ -231,6 +231,25 @@ class RequestUnderReviewWorkflowTests(TestCase):
         self.assertIsNotNone(reviewer_segments[0]['days'])
         self.assertEqual(lifecycle['segments'][-1]['label'], 'Cancelled')
 
+    def test_lifecycle_shows_both_design_leads_when_assigned(self):
+        from apps.designs.lifecycle_timeline import build_lifecycle_data
+
+        design = self._create_request()
+        transition(design, 'review_acknowledge', self.reviewer)
+        transition(
+            design, 'review_assign', self.reviewer,
+            main_design_lead=self.main_lead,
+            sub_design_lead=self.sub_lead,
+            due_date=self.due,
+        )
+        design.refresh_from_db()
+        lifecycle = build_lifecycle_data(design)
+        self.assertEqual(len(lifecycle['progress_assigned_leads']), 2)
+        self.assertIsNotNone(lifecycle['progress_assigned_since_display'])
+        role_labels = [lead['role_label'] for lead in lifecycle['progress_assigned_leads']]
+        self.assertIn('Main Design Lead', role_labels)
+        self.assertIn('Sub Design Lead', role_labels)
+
     def test_requester_can_cancel_before_review_acknowledge(self):
         from apps.designs.lifecycle_timeline import build_lifecycle_data
         from apps.designs.progress import build_progress_steps
@@ -294,3 +313,20 @@ class RequestUnderReviewWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         design.refresh_from_db()
         self.assertEqual(design.status, DesignStatus.REQUEST_UNDER_REVIEW)
+
+    def test_requester_cannot_cancel_after_review_assign_even_as_sub_lead(self):
+        from apps.workflow.permissions import design_action_flags
+
+        design = self._create_request(requested_by=self.sub_lead)
+        transition(design, 'review_acknowledge', self.reviewer)
+        transition(
+            design, 'review_assign', self.reviewer,
+            main_design_lead=self.main_lead,
+            sub_design_lead=self.sub_lead,
+            due_date=self.due,
+        )
+        design.refresh_from_db()
+        flags = design_action_flags(self.sub_lead, design)
+        self.assertFalse(flags['can_cancel_request'])
+        flags = design_action_flags(self.main_lead, design)
+        self.assertFalse(flags['can_cancel_request'])

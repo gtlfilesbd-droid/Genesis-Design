@@ -97,6 +97,7 @@
                 <div><dt class="text-slate-500">Assigned To</dt><dd class="font-medium">{{ design.assigned_site_engineer }}</dd></div>
                 {% endif %}
                 <div><dt class="text-slate-500">Assigned By</dt><dd class="font-medium">{{ design.assigned_review_user|default:design.requested_by|default:"—" }}</dd></div>
+                <div><dt class="text-slate-500">Assigned On</dt><dd class="font-medium">{{ design.engineer_assigned_at|date:"d M Y, h:i A"|default:"—" }}</dd></div>
                 <div><dt class="text-slate-500">Due Date</dt><dd class="font-medium {% if design.is_engineer_work_overdue %}text-red-600{% endif %}">{{ design.engineer_due_date|date:"d M Y, h:i A"|default:"—" }}</dd></div>
                 <div class="col-span-2"><dt class="text-slate-500">Instructions</dt><dd>{{ design.engineer_instructions|default:"—" }}</dd></div>
                 {% if design.engineer_site_notes %}

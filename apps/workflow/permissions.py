@@ -40,8 +40,10 @@ def requester_can_cancel_design(user, design) -> bool:
         return False
     if not PermissionService.has_project_permission(user, design.project, 'PROJECT_PERM_REQUEST'):
         return False
+    if design.review_acknowledged_at:
+        return False
     if design.status == DesignStatus.REQUEST_UNDER_REVIEW:
-        return not design.review_acknowledged_at
+        return True
     return design.status in (
         DesignStatus.NEW_REQUEST,
         DesignStatus.ENGINEER_PENDING_ACK,

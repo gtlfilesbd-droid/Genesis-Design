@@ -169,9 +169,28 @@
             <span class="lc-delay-label">Current stage</span>
             <span class="lc-delay-value">{{ lifecycle.current_stage_label }}</span>
           </div>
-          <div class="lc-delay-row">
+          <div class="lc-delay-row{% if lifecycle.progress_assigned_leads %} lc-delay-row-stack{% endif %}">
             <span class="lc-delay-label">Assigned to</span>
+            {% if lifecycle.progress_assigned_leads %}
+            <div class="lc-assignee-block">
+              <ul class="lc-assignee-rows">
+                {% for lead in lifecycle.progress_assigned_leads %}
+                <li class="lc-assignee-row">
+                  <span class="lc-assignee-name">{{ lead.name }}</span>
+                  <span class="lc-assignee-role" title="{{ lead.role_label }}">{{ lead.role_short }}</span>
+                </li>
+                {% endfor %}
+              </ul>
+              {% if lifecycle.progress_assigned_since_display %}
+              <p class="lc-assignee-since">
+                <i class="ti ti-clock" aria-hidden="true"></i>
+                <span>Assigned {{ lifecycle.progress_assigned_since_display }}{% if lifecycle.progress_assigned_waiting_label %} · {{ lifecycle.progress_assigned_waiting_label }}{% endif %}</span>
+              </p>
+              {% endif %}
+            </div>
+            {% else %}
             <span class="lc-delay-value">{{ lifecycle.progress_assigned_summary }}</span>
+            {% endif %}
           </div>
           <div class="lc-delay-row">
             <span class="lc-delay-label">Target</span>
