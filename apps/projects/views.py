@@ -23,18 +23,36 @@ from .audit_helpers import (
 from .models import Project, ProjectStatus
 
 
-INPUT_CLASS = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+INPUT = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-2.5 text-sm text-slate-900 '
+    'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
+)
+TEXTAREA = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-3 text-sm text-slate-900 '
+    'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition resize-y'
+)
+DATE = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-2.5 text-sm text-slate-900 '
+    'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
+)
+
 
 class ProjectForm(forms.ModelForm):
     client_name = forms.CharField(
         label='Client Name',
         max_length=255,
-        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Client / project name'}),
+        widget=forms.TextInput(attrs={
+            'class': INPUT,
+            'placeholder': 'e.g. Essential Clothing Ltd.',
+        }),
     )
     code = forms.CharField(
         label='Short Name',
         max_length=50,
-        widget=forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'e.g. PRJ-001'}),
+        widget=forms.TextInput(attrs={
+            'class': INPUT,
+            'placeholder': 'e.g. Essential',
+        }),
     )
 
     class Meta:
@@ -44,11 +62,29 @@ class ProjectForm(forms.ModelForm):
             'start_date', 'expected_completion_date', 'description',
         ]
         widgets = {
-            'start_date': forms.DateInput(attrs={'type': 'date', 'class': INPUT_CLASS}),
-            'expected_completion_date': forms.DateInput(attrs={'type': 'date', 'class': INPUT_CLASS}),
-            'address': forms.Textarea(attrs={'rows': 2, 'class': INPUT_CLASS}),
-            'description': forms.Textarea(attrs={'rows': 4, 'class': INPUT_CLASS}),
+            'start_date': forms.DateInput(attrs={'type': 'date', 'class': DATE}),
+            'expected_completion_date': forms.DateInput(attrs={'type': 'date', 'class': DATE}),
+            'address': forms.Textarea(attrs={
+                'rows': 2,
+                'class': TEXTAREA,
+                'placeholder': 'Site or office address (optional)',
+            }),
+            'description': forms.Textarea(attrs={
+                'rows': 4,
+                'class': TEXTAREA,
+                'placeholder': 'Project scope, notes, or background information for the design team…',
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['address'].label = 'Address'
+        self.fields['address'].required = False
+        self.fields['start_date'].label = 'Start Date'
+        self.fields['expected_completion_date'].label = 'Expected Completion Date'
+        self.fields['expected_completion_date'].required = False
+        self.fields['description'].label = 'Description'
+        self.fields['description'].required = False
 
     def save(self, commit=True):
         project = super().save(commit=False)
