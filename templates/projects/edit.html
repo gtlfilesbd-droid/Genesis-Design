@@ -1,36 +1,82 @@
 {% extends "base.html" %}
 {% block title %}Edit {{ project.code }}{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto">
+
+<div class="w-full">
+
     <a href="{% url 'projects:detail' project.pk %}" class="text-sm text-slate-500 hover:text-primary-light inline-flex items-center gap-1 mb-4">
         <i data-lucide="arrow-left" class="w-4 h-4"></i> {{ project.client_name }}
     </a>
-    <h1 class="text-[28px] font-bold text-slate-900 mb-8">Edit Project</h1>
-    <div class="g-card p-8">
-        <form method="post" class="space-y-6">
-            {% csrf_token %}
-            {% for field in form %}
-                {% if field.name not in 'project_director project_engineer project_coordinator project_manager' %}
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
-                    {{ field }}
-                    {% if field.errors %}<p class="text-red-600 text-xs mt-1">{{ field.errors.0 }}</p>{% endif %}
-                </div>
-                {% endif %}
-            {% endfor %}
-            <div class="pt-2 border-t border-slate-100">
-                <h2 class="text-sm font-semibold text-slate-900 mb-4">Project Team</h2>
-                {% include 'projects/_project_team_fields.html' %}
+
+    <div class="mb-6">
+        <h1 class="text-[28px] font-bold text-slate-900 mb-1">Edit Project</h1>
+        <p class="text-sm text-slate-500">Update project details, team assignments, and timeline for <span class="font-medium text-slate-700">{{ project.code }}</span>.</p>
+    </div>
+
+    <div class="mb-8 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div class="flex items-start gap-4 px-5 py-4 bg-gradient-to-r from-slate-50 via-white to-amber-50/50 border-b border-slate-100">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                <i data-lucide="pencil-line" class="w-5 h-5 text-amber-700"></i>
             </div>
-            <div class="flex items-center gap-3 pt-2">
-                <button type="submit" class="g-btn-primary">Save Changes</button>
+            <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-slate-900">Before you save</h2>
+                <p class="text-xs text-slate-500 mt-0.5">A few things to keep in mind when editing an existing project.</p>
+            </div>
+        </div>
+        <ul class="divide-y divide-slate-100 text-sm text-slate-700">
+            <li class="flex items-start gap-3 px-5 py-3.5">
+                <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <i data-lucide="hash" class="w-4 h-4 text-primary-light"></i>
+                </span>
+                <span class="pt-1"><strong class="font-semibold text-slate-900">Short Name</strong> is already used in existing design numbers — change only if you understand the impact.</span>
+            </li>
+            <li class="flex items-start gap-3 px-5 py-3.5">
+                <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i>
+                </span>
+                <span class="pt-1"><strong class="font-semibold text-slate-900">Project Team</strong> updates appear on the project overview and in activity history.</span>
+            </li>
+            <li class="flex items-start gap-3 px-5 py-3.5">
+                <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                    <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i>
+                </span>
+                <span class="pt-1">Changes are logged with your name{% if project.updated_by %} — last edited by {{ project.updated_by.get_full_name|default:project.updated_by.username }}{% endif %}.</span>
+            </li>
+        </ul>
+    </div>
+
+    <div class="g-card p-8">
+        <form method="post" class="space-y-10">
+            {% csrf_token %}
+            {% include 'projects/_project_form_sections.html' %}
+            <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
+                <button type="submit" class="g-btn-primary g-submit-btn">Save Changes</button>
                 <a href="{% url 'projects:detail' project.pk %}" class="g-btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
+
 </div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    #id_start_date,
+    #id_expected_completion_date {
+        padding-left: 2.5rem;
+    }
+    #id_code {
+        padding-right: 2.5rem;
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.lucide) lucide.createIcons();
+    });
+</script>
 {% include 'projects/_project_team_form_js.html' %}
 {% endblock %}

@@ -276,7 +276,10 @@ def project_detail(request, pk):
 @login_required
 @require_project_permission('PROJECT_PERM_EDIT')
 def project_edit(request, pk):
-    project = get_object_or_404(Project, pk=pk)
+    project = get_object_or_404(
+        Project.objects.select_related('updated_by'),
+        pk=pk,
+    )
     if request.method == 'POST':
         before = project_audit_snapshot(project)
         form = ProjectForm(request.POST, instance=project)
