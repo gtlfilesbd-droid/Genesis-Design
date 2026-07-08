@@ -1,4 +1,3 @@
-from datetime import timedelta
 import json
 
 from django import forms
@@ -20,7 +19,7 @@ from .audit_helpers import (
     project_changed_fields,
     project_user_display,
 )
-from .models import Project, ProjectStatus
+from .models import Project, ProjectDirector, ProjectEngineer, ProjectStatus
 
 
 INPUT = (
@@ -35,6 +34,11 @@ DATE = (
     'w-full border border-slate-200 rounded-xl bg-white px-4 py-2.5 text-sm text-slate-900 '
     'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
 )
+SELECT = (
+    'w-full border border-slate-200 rounded-xl bg-white px-4 py-2.5 text-sm text-slate-900 '
+    'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
+)
+EMPTY_SELECT_LABEL = '— Select —'
 
 
 class ProjectForm(forms.ModelForm):
@@ -59,9 +63,15 @@ class ProjectForm(forms.ModelForm):
         model = Project
         fields = [
             'client_name', 'code', 'address',
+            'project_director', 'project_engineer',
+            'project_coordinator', 'project_manager',
             'start_date', 'expected_completion_date', 'description',
         ]
         widgets = {
+            'project_director': forms.Select(attrs={'class': SELECT}),
+            'project_engineer': forms.Select(attrs={'class': SELECT}),
+            'project_coordinator': forms.Select(attrs={'class': SELECT}),
+            'project_manager': forms.Select(attrs={'class': SELECT}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': DATE}),
             'expected_completion_date': forms.DateInput(attrs={'type': 'date', 'class': DATE}),
             'address': forms.Textarea(attrs={
@@ -85,6 +95,65 @@ class ProjectForm(forms.ModelForm):
         self.fields['expected_completion_date'].required = False
         self.fields['description'].label = 'Description'
         self.fields['description'].required = False
+
+        self.fields['project_director'].label = 'Project Director'
+        self.fields['project_director'].required = False
+        self.fields['project_director'].empty_label = EMPTY_SELECT_LABEL
+        self.fields['project_director'].queryset = ProjectDirector.objects.filter(is_active=True)
+
+        self.fields['project_engineer'].label = 'Project Engineer'
+        self.fields['project_engineer'].required = False
+        self.fields['project_engineer'].empty_label = EMPTY_SELECT_LABEL
+        self.fields['project_engineer'].queryset = ProjectEngineer.objects.filter(is_active=True)
+
+        site_leads = PermissionService.get_site_engineers()
+        self._all_site_leads = site_leads
+
+        excluded_from_coordinator = self._user_pk(self.data.get('project_manager')) if self.is_bound else None
+        excluded_from_manager = self._user_pk(self.data.get('project_coordinator')) if self.is_bound else None
+
+        self.fields['project_coordinator'].label = 'Project Coordinator'
+        self.fields['project_coordinator'].required = False
+        self.fields['project_coordinator'].empty_label = EMPTY_SELECT_LABEL
+        self.fields['project_coordinator'].queryset = (
+            site_leads.exclude(pk=excluded_from_coordinator) if excluded_from_coordinator else site_leads
+        )
+
+        self.fields['project_manager'].label = 'Project Manager'
+        self.fields['project_manager'].required = False
+        self.fields['project_manager'].empty_label = EMPTY_SELECT_LABEL
+        self.fields['project_manager'].queryset = (
+            site_leads.exclude(pk=excluded_from_manager) if excluded_from_manager else site_leads
+        )
+
+    @staticmethod
+    def _user_pk(value):
+        if not value:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def site_lead_options(self):
+        return [
+            {
+                'id': user.pk,
+                'name': user.get_full_name().strip() or user.username,
+            }
+            for user in self._all_site_leads
+        ]
+
+    def clean(self):
+        cleaned = super().clean()
+        coordinator = cleaned.get('project_coordinator')
+        manager = cleaned.get('project_manager')
+        if coordinator and manager and coordinator.pk == manager.pk:
+            msg = 'Project Coordinator and Project Manager cannot be the same user.'
+            self.add_error('project_coordinator', msg)
+            self.add_error('project_manager', msg)
+        return cleaned
 
     def save(self, commit=True):
         project = super().save(commit=False)
@@ -156,7 +225,11 @@ def project_create(request):
 @require_global_permission('NAV_PERM_PROJECTS')
 def project_detail(request, pk):
     project = get_object_or_404(
-        Project.objects.select_related('created_by', 'updated_by'),
+        Project.objects.select_related(
+            'created_by', 'updated_by',
+            'project_director', 'project_engineer',
+            'project_coordinator', 'project_manager',
+        ),
         pk=pk,
     )
     if not PermissionService.has_project_permission(request.user, project, 'PROJECT_PERM_VIEW'):

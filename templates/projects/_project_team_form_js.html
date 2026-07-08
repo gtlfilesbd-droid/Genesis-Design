@@ -1,0 +1,37 @@
+function projectTeamForm() {
+    return {
+        allOptions: [],
+        coordinatorId: '{{ form.project_coordinator.value|default:'' }}',
+        managerId: '{{ form.project_manager.value|default:'' }}',
+        init() {
+            const dataEl = document.getElementById('project-site-lead-options');
+            this.allOptions = dataEl ? JSON.parse(dataEl.textContent) : [];
+            this.coordinatorId = this.coordinatorId ? String(this.coordinatorId) : '';
+            this.managerId = this.managerId ? String(this.managerId) : '';
+            this.onCoordinatorChange(false);
+            this.onManagerChange(false);
+        },
+        coordinatorOptions() {
+            if (!this.managerId) {
+                return this.allOptions;
+            }
+            return this.allOptions.filter((option) => String(option.id) !== String(this.managerId));
+        },
+        managerOptions() {
+            if (!this.coordinatorId) {
+                return this.allOptions;
+            }
+            return this.allOptions.filter((option) => String(option.id) !== String(this.coordinatorId));
+        },
+        onCoordinatorChange(clearManager = true) {
+            if (clearManager && this.managerId && String(this.managerId) === String(this.coordinatorId)) {
+                this.managerId = '';
+            }
+        },
+        onManagerChange(clearCoordinator = true) {
+            if (clearCoordinator && this.coordinatorId && String(this.coordinatorId) === String(this.managerId)) {
+                this.coordinatorId = '';
+            }
+        },
+    };
+}

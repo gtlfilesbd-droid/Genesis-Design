@@ -81,6 +81,20 @@
                 </div>
             </section>
 
+            {# —— Project team —— #}
+            <section class="space-y-4 pt-2 border-t border-slate-100">
+                <div class="flex items-start gap-3">
+                    <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <i data-lucide="users" class="w-4 h-4 text-indigo-600"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-900">Project Team</h3>
+                        <p class="text-xs text-slate-500 mt-1">Assign leadership roles for this project. Coordinator and Manager cannot be the same person.</p>
+                    </div>
+                </div>
+                {% include 'projects/_project_team_fields.html' %}
+            </section>
+
             {# —— Location —— #}
             <section class="space-y-3 pt-2 border-t border-slate-100">
                 <div class="flex items-start gap-3">
@@ -186,4 +200,5 @@
         if (window.lucide) lucide.createIcons();
     });
 </script>
+{% include 'projects/_project_team_form_js.html' %}
 {% endblock %}

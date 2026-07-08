@@ -1,0 +1,50 @@
+{{ form.site_lead_options|json_script:"project-site-lead-options" }}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-5"
+     x-data="projectTeamForm()"
+     x-init="init()">
+    <div class="space-y-2">
+        <label for="id_project_director" class="block text-sm font-medium text-slate-700">
+            Project Director
+        </label>
+        {{ form.project_director }}
+        {% if form.project_director.errors %}<p class="text-red-600 text-xs">{{ form.project_director.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="space-y-2">
+        <label for="id_project_engineer" class="block text-sm font-medium text-slate-700">
+            Project Engineer
+        </label>
+        {{ form.project_engineer }}
+        {% if form.project_engineer.errors %}<p class="text-red-600 text-xs">{{ form.project_engineer.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="space-y-2">
+        <label for="id_project_coordinator" class="block text-sm font-medium text-slate-700">
+            Project Coordinator
+        </label>
+        <select id="id_project_coordinator" name="project_coordinator" class="{{ form.fields.project_coordinator.widget.attrs.class }}"
+                x-model="coordinatorId" @change="onCoordinatorChange()">
+            <option value="">— Select —</option>
+            <template x-for="option in coordinatorOptions()" :key="'coord-' + option.id">
+                <option :value="option.id" x-text="option.name"></option>
+            </template>
+        </select>
+        {% if form.project_coordinator.errors %}<p class="text-red-600 text-xs">{{ form.project_coordinator.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="space-y-2">
+        <label for="id_project_manager" class="block text-sm font-medium text-slate-700">
+            Project Manager
+        </label>
+        <select id="id_project_manager" name="project_manager" class="{{ form.fields.project_manager.widget.attrs.class }}"
+                x-model="managerId" @change="onManagerChange()">
+            <option value="">— Select —</option>
+            <template x-for="option in managerOptions()" :key="'mgr-' + option.id">
+                <option :value="option.id" x-text="option.name"></option>
+            </template>
+        </select>
+        {% if form.project_manager.errors %}<p class="text-red-600 text-xs">{{ form.project_manager.errors.0 }}</p>{% endif %}
+    </div>
+    {% if form.non_field_errors %}
+    <div class="md:col-span-2">
+        <p class="text-red-600 text-xs">{{ form.non_field_errors.0 }}</p>
+    </div>
+    {% endif %}
+</div>

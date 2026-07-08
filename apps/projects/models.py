@@ -9,6 +9,36 @@ class ProjectStatus(models.TextChoices):
     ON_HOLD = 'on_hold', 'On Hold'
 
 
+class ProjectDirector(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Project Director'
+        verbose_name_plural = 'Project Directors'
+
+    def __str__(self):
+        return self.name
+
+
+class ProjectEngineer(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Project Engineer'
+        verbose_name_plural = 'Project Engineers'
+
+    def __str__(self):
+        return self.name
+
+
 class Project(models.Model):
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=50, unique=True)
@@ -37,6 +67,34 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     health_score = models.PositiveSmallIntegerField(default=100)
+    project_director = models.ForeignKey(
+        ProjectDirector,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='projects',
+    )
+    project_engineer = models.ForeignKey(
+        ProjectEngineer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='projects',
+    )
+    project_coordinator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='coordinated_projects',
+    )
+    project_manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='managed_projects',
+    )
 
     class Meta:
         ordering = ['-created_at']
