@@ -387,6 +387,64 @@ a.g-stat-card-link.g-stat-card-kpi-alert:hover {
 .g-step-current { background: var(--primary); box-shadow: 0 0 0 4px rgba(46,117,182,0.25); }
 .g-step-pending { background: #CBD5E1; }
 
+.pd-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748B;
+  margin: 0;
+}
+.pd-meta-cell {
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #F8FAFC;
+  padding: 12px 14px;
+  min-width: 0;
+  margin: 0;
+}
+.pd-meta-cell-team {
+  background: #FFFFFF;
+  border-color: #E8EDF3;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.pd-meta-cell-muted {
+  background: #FFFFFF;
+}
+.pd-meta-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.3;
+}
+.pd-meta-value {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0F172A;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.pd-meta-cell-team .pd-meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94A3B8;
+}
+.pd-meta-cell-team .pd-meta-value {
+  margin-top: 6px;
+  font-size: 14px;
+}
+.pd-meta-sub {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: #64748B;
+  line-height: 1.4;
+}
+
 @media (max-width: 1024px) {
   .g-sidebar { position: fixed; z-index: 40; transform: translateX(-100%); transition: transform 0.2s; }
   .g-sidebar.open { transform: translateX(0); }
