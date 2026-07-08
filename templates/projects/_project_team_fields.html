@@ -10,13 +10,6 @@
         {% if form.project_director.errors %}<p class="text-red-600 text-xs">{{ form.project_director.errors.0 }}</p>{% endif %}
     </div>
     <div class="space-y-2">
-        <label for="id_project_engineer" class="block text-sm font-medium text-slate-700">
-            Project Engineer
-        </label>
-        {{ form.project_engineer }}
-        {% if form.project_engineer.errors %}<p class="text-red-600 text-xs">{{ form.project_engineer.errors.0 }}</p>{% endif %}
-    </div>
-    <div class="space-y-2">
         <label for="id_project_coordinator" class="block text-sm font-medium text-slate-700">
             Project Coordinator
         </label>
@@ -28,6 +21,7 @@
             </template>
         </select>
         {% if form.project_coordinator.errors %}<p class="text-red-600 text-xs">{{ form.project_coordinator.errors.0 }}</p>{% endif %}
+        <p class="text-xs text-slate-400" x-show="allOptions.length === 0">No Site Design Lead users are available. Grant Site Design Lead permission in user settings.</p>
     </div>
     <div class="space-y-2">
         <label for="id_project_manager" class="block text-sm font-medium text-slate-700">
@@ -41,6 +35,13 @@
             </template>
         </select>
         {% if form.project_manager.errors %}<p class="text-red-600 text-xs">{{ form.project_manager.errors.0 }}</p>{% endif %}
+    </div>
+    <div class="space-y-2">
+        <label for="id_project_engineer" class="block text-sm font-medium text-slate-700">
+            Project Engineer
+        </label>
+        {{ form.project_engineer }}
+        {% if form.project_engineer.errors %}<p class="text-red-600 text-xs">{{ form.project_engineer.errors.0 }}</p>{% endif %}
     </div>
     {% if form.non_field_errors %}
     <div class="md:col-span-2">

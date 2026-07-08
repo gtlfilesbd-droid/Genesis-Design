@@ -52,9 +52,9 @@
             <div class="flex justify-between"><dt class="text-slate-500">Target Completion</dt><dd>{{ project.expected_completion_date|date:"d M Y"|default:"—" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Status</dt><dd>{% render_status_badge project.status %}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Project Director</dt><dd>{{ project.project_director|default:"—" }}</dd></div>
-            <div class="flex justify-between"><dt class="text-slate-500">Project Engineer</dt><dd>{{ project.project_engineer|default:"—" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Project Coordinator</dt><dd>{{ project.project_coordinator.get_full_name|default:project.project_coordinator.username|default:"—" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Project Manager</dt><dd>{{ project.project_manager.get_full_name|default:project.project_manager.username|default:"—" }}</dd></div>
+            <div class="flex justify-between"><dt class="text-slate-500">Project Engineer</dt><dd>{{ project.project_engineer|default:"—" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Created By</dt><dd class="font-medium text-slate-900">{{ project.created_by.get_full_name|default:project.created_by.username }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Created At</dt><dd class="text-slate-900">{{ project.created_at|date:"d M Y, h:i A" }}</dd></div>
             <div class="flex justify-between"><dt class="text-slate-500">Last Edited By</dt><dd class="font-medium text-slate-900">{% if project.updated_by %}{{ project.updated_by.get_full_name|default:project.updated_by.username }}{% else %}—{% endif %}</dd></div>
