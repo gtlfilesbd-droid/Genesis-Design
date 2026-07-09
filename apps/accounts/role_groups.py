@@ -14,6 +14,7 @@ PERMISSION_FIELD_LABELS = {
     'can_manage_settings': 'Manage Settings',
     'can_site_engineer': SITE_DESIGN_LEAD_LABEL,
     'can_edit_project': 'Edit Projects',
+    'can_add_project_team': 'Add Project team',
 }
 
 ROLE_GROUP_ORDER = [

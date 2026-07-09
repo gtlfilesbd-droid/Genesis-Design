@@ -91,6 +91,14 @@ class PermissionService:
         )
 
     @staticmethod
+    def can_assign_project_team(user) -> bool:
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser or user.role == UserRole.ADMIN:
+            return True
+        return PermissionService._extra_flag(user, 'can_add_project_team')
+
+    @staticmethod
     def _is_admin_or_hod(user) -> bool:
         return (
             user.is_superuser

@@ -7,6 +7,7 @@ from apps.accounts.models import User, UserRole
 from apps.core.models import RolePermission, UserExtraPermission
 from apps.projects.models import Project, ProjectDirector, ProjectEngineer
 from apps.projects.views import ProjectForm
+from apps.permissions.services import PermissionService
 
 
 class ProjectTeamFormTests(TestCase):
@@ -129,6 +130,7 @@ class ProjectCreateTeamFieldsTests(TestCase):
         )
         UserExtraPermission.objects.create(user=self.coordinator, can_site_engineer=True)
         UserExtraPermission.objects.create(user=self.manager, can_site_engineer=True)
+        UserExtraPermission.objects.create(user=self.creator, can_add_project_team=True)
         self.client = Client()
         self.client.login(username='creator', password='pass')
 
@@ -151,3 +153,132 @@ class ProjectCreateTeamFieldsTests(TestCase):
         self.assertEqual(project.project_engineer_id, self.engineer.pk)
         self.assertEqual(project.project_coordinator_id, self.coordinator.pk)
         self.assertEqual(project.project_manager_id, self.manager.pk)
+
+
+class ProjectTeamPermissionTests(TestCase):
+    def setUp(self):
+        RolePermission.objects.filter(role=UserRole.DESIGN_REQUESTER).update(
+            can_create_project=True,
+        )
+        RolePermission.objects.filter(role=UserRole.HEAD_OF_DESIGN).update(
+            can_create_project=True,
+        )
+        self.director = ProjectDirector.objects.create(name='Site Director')
+        self.engineer = ProjectEngineer.objects.create(name='Site Engineer')
+        self.coordinator = User.objects.create_user(
+            username='coord_perm',
+            password='pass',
+            role=UserRole.VERIFICATION_TEAM,
+            employee_id='CP001',
+            first_name='Project',
+            last_name='Coordinator',
+        )
+        UserExtraPermission.objects.create(user=self.coordinator, can_site_engineer=True)
+        self.post_data = {
+            'client_name': 'Essential Clothing',
+            'code': 'ESS-PERM',
+            'address': 'Dhaka',
+            'project_director': self.director.pk,
+            'project_engineer': self.engineer.pk,
+            'project_coordinator': self.coordinator.pk,
+            'project_manager': '',
+            'start_date': date.today().isoformat(),
+            'expected_completion_date': '',
+            'description': 'Permission test',
+        }
+
+    def test_creator_without_extra_permission_ignores_team_on_create(self):
+        creator = User.objects.create_user(
+            username='creator_noperm',
+            password='pass',
+            role=UserRole.DESIGN_REQUESTER,
+            employee_id='NP001',
+        )
+        client = Client()
+        client.login(username='creator_noperm', password='pass')
+        response = client.post(reverse('projects:new'), self.post_data)
+        self.assertEqual(response.status_code, 302)
+        project = Project.objects.get(code='ESS-PERM')
+        self.assertIsNone(project.project_director_id)
+        self.assertIsNone(project.project_engineer_id)
+        self.assertIsNone(project.project_coordinator_id)
+        self.assertIsNone(project.project_manager_id)
+
+    def test_creator_with_extra_permission_saves_team_on_create(self):
+        creator = User.objects.create_user(
+            username='creator_perm',
+            password='pass',
+            role=UserRole.DESIGN_REQUESTER,
+            employee_id='WP001',
+        )
+        UserExtraPermission.objects.create(user=creator, can_add_project_team=True)
+        client = Client()
+        client.login(username='creator_perm', password='pass')
+        response = client.post(reverse('projects:new'), {
+            **self.post_data,
+            'code': 'ESS-ALLOW',
+        })
+        self.assertEqual(response.status_code, 302)
+        project = Project.objects.get(code='ESS-ALLOW')
+        self.assertEqual(project.project_director_id, self.director.pk)
+        self.assertEqual(project.project_coordinator_id, self.coordinator.pk)
+
+    def test_hod_without_extra_permission_cannot_assign_team(self):
+        hod = User.objects.create_user(
+            username='hod_noperm',
+            password='pass',
+            role=UserRole.HEAD_OF_DESIGN,
+            employee_id='HN001',
+        )
+        self.assertFalse(PermissionService.can_assign_project_team(hod))
+        form = ProjectForm(user=hod)
+        self.assertNotIn('project_director', form.fields)
+
+    def test_hod_with_extra_permission_can_assign_team(self):
+        hod = User.objects.create_user(
+            username='hod_perm',
+            password='pass',
+            role=UserRole.HEAD_OF_DESIGN,
+            employee_id='HP001',
+        )
+        UserExtraPermission.objects.create(user=hod, can_add_project_team=True)
+        self.assertTrue(PermissionService.can_assign_project_team(hod))
+        form = ProjectForm(user=hod)
+        self.assertIn('project_director', form.fields)
+
+    def test_edit_without_team_permission_preserves_existing_team(self):
+        editor = User.objects.create_user(
+            username='editor',
+            password='pass',
+            role=UserRole.DESIGN_REQUESTER,
+            employee_id='ED001',
+        )
+        UserExtraPermission.objects.create(user=editor, can_edit_project=True)
+        project = Project.objects.create(
+            name='Existing',
+            client_name='Existing',
+            code='KEEP-TEAM',
+            start_date=date.today(),
+            project_director=self.director,
+            project_coordinator=self.coordinator,
+            created_by=editor,
+        )
+        client = Client()
+        client.login(username='editor', password='pass')
+        response = client.post(reverse('projects:edit', args=[project.pk]), {
+            'client_name': 'Updated Client',
+            'code': 'KEEP-TEAM',
+            'address': '',
+            'project_director': '',
+            'project_engineer': '',
+            'project_coordinator': '',
+            'project_manager': '',
+            'start_date': date.today().isoformat(),
+            'expected_completion_date': '',
+            'description': 'Updated',
+        })
+        self.assertEqual(response.status_code, 302)
+        project.refresh_from_db()
+        self.assertEqual(project.client_name, 'Updated Client')
+        self.assertEqual(project.project_director_id, self.director.pk)
+        self.assertEqual(project.project_coordinator_id, self.coordinator.pk)

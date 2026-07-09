@@ -210,6 +210,7 @@ class UserExtraPermission(models.Model):
     can_manage_settings = models.BooleanField(default=False)
     can_site_engineer = models.BooleanField(default=False)
     can_edit_project = models.BooleanField(default=False)
+    can_add_project_team = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = 'user extra permissions'

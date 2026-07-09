@@ -39,6 +39,10 @@ SELECT = (
     'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary-light transition'
 )
 EMPTY_SELECT_LABEL = '— Select —'
+TEAM_FIELDS = (
+    'project_director', 'project_engineer',
+    'project_coordinator', 'project_manager',
+)
 
 
 class ProjectForm(forms.ModelForm):
@@ -86,7 +90,7 @@ class ProjectForm(forms.ModelForm):
             }),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['address'].label = 'Address'
         self.fields['address'].required = False
@@ -95,6 +99,12 @@ class ProjectForm(forms.ModelForm):
         self.fields['expected_completion_date'].required = False
         self.fields['description'].label = 'Description'
         self.fields['description'].required = False
+
+        if user is not None and not PermissionService.can_assign_project_team(user):
+            for field_name in TEAM_FIELDS:
+                self.fields.pop(field_name, None)
+            self._all_site_leads = PermissionService.get_site_engineers().none()
+            return
 
         self.fields['project_director'].label = 'Project Director'
         self.fields['project_director'].required = False
@@ -189,7 +199,7 @@ def project_list(request):
 @require_global_permission('PROJECT_PERM_CREATE')
 def project_create(request):
     if request.method == 'POST':
-        form = ProjectForm(request.POST)
+        form = ProjectForm(request.POST, user=request.user)
         if form.is_valid():
             project = form.save(commit=False)
             project.created_by = request.user
@@ -217,7 +227,7 @@ def project_create(request):
             return redirect('projects:detail', pk=project.pk)
         messages.error(request, 'Could not create project. Please check the form and try again.')
     else:
-        form = ProjectForm()
+        form = ProjectForm(user=request.user)
     return render(request, 'projects/create.html', {'form': form})
 
 
@@ -282,7 +292,7 @@ def project_edit(request, pk):
     )
     if request.method == 'POST':
         before = project_audit_snapshot(project)
-        form = ProjectForm(request.POST, instance=project)
+        form = ProjectForm(request.POST, instance=project, user=request.user)
         if form.is_valid():
             project = form.save(commit=False)
             project.updated_by = request.user
@@ -318,5 +328,5 @@ def project_edit(request, pk):
             return redirect('projects:detail', pk=project.pk)
         messages.error(request, 'Please correct the errors below.')
     else:
-        form = ProjectForm(instance=project)
+        form = ProjectForm(instance=project, user=request.user)
     return render(request, 'projects/edit.html', {'form': form, 'project': project})

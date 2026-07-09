@@ -76,5 +76,7 @@
         if (window.lucide) lucide.createIcons();
     });
 </script>
+{% if can_add_project_team %}
 {% include 'projects/_project_team_form_js.html' %}
+{% endif %}
 {% endblock %}

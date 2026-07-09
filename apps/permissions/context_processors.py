@@ -76,6 +76,7 @@ def user_permissions(request):
         'can_view_reports': ps.has_global_permission(user, 'PERM_VIEW_REPORTS'),
         'can_manage_users': ps.has_global_permission(user, 'PERM_MANAGE_USERS'),
         'can_create_project': ps.has_global_permission(user, 'PROJECT_PERM_CREATE'),
+        'can_add_project_team': ps.can_assign_project_team(user),
         'can_view_all_projects': ps.has_global_permission(user, 'PERM_VIEW_ALL_PROJECTS'),
         'can_view_team': ps.has_global_permission(user, 'NAV_PERM_TEAM'),
         'can_view_profiles': ps.has_global_permission(user, 'VIS_PERM_USER_PROFILES'),
