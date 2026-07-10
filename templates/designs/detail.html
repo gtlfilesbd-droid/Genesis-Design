@@ -240,7 +240,7 @@
                 <a href="{% url 'workflow:action' design.pk 'review_assign' %}" class="g-btn-primary w-full block text-center">Assign Design Leads</a>
                 {% endif %}
                 {% if design.status == 'request_under_review' and can_review_cancel %}
-                <a href="{% url 'workflow:action' design.pk 'review_cancel' %}" class="g-btn-secondary w-full block text-center mt-2">Cancel Request</a>
+                <a href="{% url 'workflow:action' design.pk 'review_cancel' %}" class="g-btn-secondary w-full block text-center mt-2 text-red-600 border-red-200">Cancel Request</a>
                 {% endif %}
                 {% if design.status == 'engineer_pending_acknowledgement' and can_acknowledge_engineer %}
                 <form method="post" action="{% url 'workflow:action' design.pk 'acknowledge_engineer' %}">{% csrf_token %}<button class="g-btn-primary w-full">Acknowledge Site Assignment</button></form>

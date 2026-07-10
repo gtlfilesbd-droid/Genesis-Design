@@ -285,6 +285,20 @@ class RequestUnderReviewWorkflowTests(TestCase):
             ).exists()
         )
 
+    def test_reviewer_who_is_requester_sees_only_reviewer_cancel(self):
+        from apps.workflow.permissions import design_action_flags
+
+        self.group.review_user = self.requester
+        self.group.save()
+
+        design = self._create_request(requested_by=self.requester)
+        self.assertEqual(design.assigned_review_user_id, self.requester.pk)
+
+        flags = design_action_flags(self.requester, design)
+        self.assertTrue(flags['can_review_cancel'])
+        self.assertTrue(flags['can_review_acknowledge'])
+        self.assertFalse(flags['can_cancel_request'])
+
     def test_requester_cancel_requires_reason(self):
         design = self._create_request()
         self.client.login(username='req', password='pass')

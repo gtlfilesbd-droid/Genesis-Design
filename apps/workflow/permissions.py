@@ -51,6 +51,13 @@ def requester_can_cancel_design(user, design) -> bool:
     )
 
 
+def is_assigned_request_reviewer(user, design) -> bool:
+    return (
+        design.status == DesignStatus.REQUEST_UNDER_REVIEW
+        and design.assigned_review_user_id == user.pk
+    )
+
+
 def design_action_flags(user, design) -> dict:
     project = design.project
     return {
@@ -133,10 +140,7 @@ def design_action_flags(user, design) -> dict:
             and design.assigned_review_user_id == user.pk
             and design.review_acknowledged_at
         ),
-        'can_review_cancel': (
-            design.status == DesignStatus.REQUEST_UNDER_REVIEW
-            and design.assigned_review_user_id == user.pk
-        ),
+        'can_review_cancel': is_assigned_request_reviewer(user, design),
         'can_forward_to_designer': can_run_workflow_action(
             user, project, 'forward_to_designer', 'PROJECT_PERM_ASSIGN',
         ),
@@ -147,9 +151,13 @@ def design_action_flags(user, design) -> dict:
             user, project, 'complete', 'PROJECT_PERM_COMPLETE',
         ),
         'can_cancel_request': (
-            requester_can_cancel_design(user, design)
-        ) or (
-            PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL')
-            and design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED)
+            (
+                requester_can_cancel_design(user, design)
+                or (
+                    PermissionService.has_global_permission(user, 'PERM_ADMIN_PANEL')
+                    and design.status not in (DesignStatus.COMPLETED, DesignStatus.CANCELLED)
+                )
+            )
+            and not is_assigned_request_reviewer(user, design)
         ),
     }
